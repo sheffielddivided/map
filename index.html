@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aker BP – Fields, Licences and Business Arrangement Areas on the NCS</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0a1628; color: #e0e8f0; height: 100vh; display: flex; flex-direction: column; }
+    header { background: linear-gradient(90deg, #0a1628 0%, #112244 100%); border-bottom: 2px solid #1e5fa8; padding: 12px 20px; display: flex; align-items: center; gap: 16px; z-index: 1000; flex-wrap: wrap; }
+    .logo { display: flex; align-items: center; }
+    header h1 { font-size: 15px; font-weight: 400; color: #8ab0d0; }
+    .controls { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .legend-btn { background: #1e3a5f; border: 1px solid #2a5a8f; color: #c0d8f0; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: background 0.2s; }
+    .legend-btn:hover { background: #2a5a8f; }
+    .legend-btn.active { background: #1e5fa8; border-color: #4a9eff; color: #fff; }
+    #map { flex: 1; }
+    #loading { position: fixed; inset: 0; background: rgba(10,22,40,0.88); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: 16px; }
+    #loading.hidden { display: none; }
+    .spinner { width: 48px; height: 48px; border: 4px solid #1e3a5f; border-top-color: #4a9eff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { color: #8ab0d0; font-size: 14px; }
+    #sidebar { position: absolute; top: 70px; right: 16px; width: 320px; background: rgba(10,22,40,0.97); border: 1px solid #1e5fa8; border-radius: 10px; z-index: 800; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.6); max-height: calc(100vh - 100px); display: flex; flex-direction: column; }
+    #sidebar.hidden { display: none; }
+    .sidebar-header { background: #0e2240; padding: 12px 16px; border-bottom: 1px solid #1e3a5f; display: flex; justify-content: space-between; align-items: center; }
+    .sidebar-header h2 { font-size: 14px; color: #4a9eff; font-weight: 600; }
+    .close-btn { background: none; border: none; color: #8ab0d0; cursor: pointer; font-size: 18px; }
+    .sidebar-content { padding: 10px 14px; overflow-y: auto; }
+    .info-section-title { font-size: 11px; color: #4a9eff; text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 4px; border-top: 1px solid #1a2e48; padding-top: 8px; }
+    .info-section-title:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #1a2e48; font-size: 13px; gap: 8px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: #8ab0d0; white-space: nowrap; flex-shrink: 0; }
+    .info-value { color: #e0e8f0; font-weight: 500; text-align: right; }
+    #statsbar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(10,22,40,0.92); border: 1px solid #1e5fa8; border-radius: 30px; padding: 8px 24px; display: flex; gap: 24px; z-index: 800; font-size: 13px; white-space: nowrap; }
+    .stat { display: flex; align-items: center; gap: 8px; }
+    .stat-dot { width: 12px; height: 12px; border-radius: 3px; }
+    .dot-field { background: #00e676; } .dot-licence { background: #e040fb; } .dot-unit { background: #e040fb; }
+    .stat-label { color: #8ab0d0; }
+    .stat-count { color: #fff; font-weight: 700; font-size: 15px; margin-left: 2px; }
+    #maplegend { position: absolute; top: 70px; left: 16px; background: rgba(10,22,40,0.94); border: 1px solid #1e5fa8; border-radius: 10px; padding: 14px; z-index: 800; min-width: 230px; }
+    #maplegend.hidden { display: none; }
+    #maplegend h3 { font-size: 11px; color: #4a9eff; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+    .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 13px; color: #c0d8f0; }
+    .legend-swatch { width: 26px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+    #errormsg { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: #3a1010; border: 1px solid #a03030; color: #ff8080; padding: 12px 20px; border-radius: 8px; z-index: 1000; font-size: 13px; max-width: 500px; text-align: center; }
+    #errormsg.hidden { display: none; }
+    .tooltip-dark { background: rgba(10,22,40,0.95) !important; border: 1px solid #1e5fa8 !important; color: #e0e8f0 !important; border-radius: 6px !important; padding: 5px 10px !important; font-size: 12px !important; font-family: 'Segoe UI', sans-serif !important; box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important; }
+    .leaflet-tooltip.tooltip-dark::before { display: none !important; }
+
+    /* Permanent map labels */
+    .map-label {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      font-family: 'Segoe UI', sans-serif !important;
+      font-size: 11px !important;
+      font-weight: 600 !important;
+      pointer-events: none !important;
+      white-space: nowrap !important;
+      text-shadow: 0 0 3px #000, 0 0 6px #000, 0 0 10px #000 !important;
+      padding: 0 !important;
+    }
+    .map-label::before { display: none !important; }
+    .map-label-licence { color: #e040fb !important; font-size: 10px !important; font-weight: 700 !important; }
+    .map-label-unit    { color: #e040fb !important; font-size: 11px !important; font-weight: 700 !important; }
+    .map-label-field   { color: #ffffff !important; font-size: 11px !important; font-weight: 700 !important; }
+    .map-label-office  { color: #4a9eff !important; font-size: 11px !important; font-weight: 600 !important; }
+    /* ── Customise panel ──────────────────────────────────────────────── */
+    #customise-panel {
+      position: absolute; top: 70px; right: 16px; width: 310px;
+      background: rgba(10,22,40,0.97); border: 1px solid #1e5fa8;
+      border-radius: 10px; z-index: 900;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+      max-height: calc(100vh - 100px); display: flex; flex-direction: column;
+    }
+    #customise-panel.hidden { display: none; }
+    .cp-header {
+      background: #0e2240; padding: 12px 16px;
+      border-bottom: 1px solid #1e3a5f;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .cp-header h2 { font-size: 14px; color: #4a9eff; font-weight: 600; }
+    .cp-body { padding: 12px 14px; overflow-y: auto; }
+    .cp-section { margin-bottom: 16px; }
+    .cp-section:last-child { margin-bottom: 0; }
+    .cp-section-title {
+      font-size: 11px; color: #4a9eff; text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 10px;
+      border-bottom: 1px solid #1a2e48; padding-bottom: 5px;
+    }
+    .cp-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px; gap: 8px; font-size: 13px;
+    }
+    .cp-row:last-child { margin-bottom: 0; }
+    .cp-label { color: #c0d8f0; flex: 1; }
+    .cp-color {
+      width: 32px; height: 22px; border: 1px solid #2a5a8f; border-radius: 4px;
+      cursor: pointer; padding: 1px; background: none;
+    }
+    /* Label toggle switch */
+    .cp-toggle {
+      position: relative; width: 36px; height: 20px; flex-shrink: 0;
+    }
+    .cp-toggle input { opacity: 0; width: 0; height: 0; }
+    .cp-slider {
+      position: absolute; inset: 0; background: #1e3a5f;
+      border-radius: 20px; cursor: pointer; transition: background 0.2s;
+    }
+    .cp-slider::before {
+      content: ''; position: absolute; width: 14px; height: 14px;
+      left: 3px; top: 3px; background: #8ab0d0;
+      border-radius: 50%; transition: transform 0.2s, background 0.2s;
+    }
+    .cp-toggle input:checked + .cp-slider { background: #1e5fa8; }
+    .cp-toggle input:checked + .cp-slider::before { transform: translateX(16px); background: #fff; }
+    .cp-reset {
+      display: block; width: 100%; margin-top: 14px;
+      background: #1e3a5f; border: 1px solid #2a5a8f; color: #c0d8f0;
+      padding: 7px; border-radius: 6px; cursor: pointer; font-size: 12px;
+      font-family: 'Segoe UI', sans-serif; transition: background 0.15s;
+    }
+    .cp-reset:hover { background: #2a5a8f; }
+
+    #basemap-switcher {
+      position: absolute; bottom: 80px; left: 16px;
+      background: rgba(10,22,40,0.94); border: 1px solid #1e5fa8;
+      border-radius: 10px; padding: 10px 12px; z-index: 800; min-width: 180px;
+    }
+    #basemap-switcher h4 {
+      font-size: 11px; color: #4a9eff; text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 8px;
+    }
+    .basemap-btn {
+      display: block; width: 100%; text-align: left;
+      background: #0e2240; border: 1px solid #1e3a5f; color: #c0d8f0;
+      padding: 6px 10px; border-radius: 5px; cursor: pointer;
+      font-size: 12px; margin-bottom: 4px; transition: background 0.15s;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .basemap-btn:last-child { margin-bottom: 0; }
+    .basemap-btn:hover { background: #1e3a5f; }
+    .basemap-btn.active { background: #1e5fa8; border-color: #4a9eff; color: #fff; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo"><svg height="36" style="display:block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 568 128"><path d="M201.1 89.8h-46l-11.9 26.5h-9.8L173 29h10.5l39.6 87.3h-10.5l-11.5-26.5zm-22.9-51.7l-19.4 43.4h38.6l-19.2-43.4zM227.4 28.3h9v55.4l38.8-30.9h13.5l-31.1 24.1 33.5 39.5h-12l-28.3-33.6-14.3 10.9v22.7h-9l-.1-88.1z" fill="#6d6e6b"></path><path d="M354.8 96.1c-3.7 11.2-13.2 22.3-34.2 22.3-26 0-34.6-18.2-34.6-33.8 0-17.7 10.9-33.7 34.6-33.7 16.4 0 35.8 7.1 35.8 35.9H295c0 13.2 9.4 24 25.5 24 15.2 0 22-5 25.2-14.7h9.1zm-7.5-16.2c-2.6-15.7-14.1-21.5-26.2-21.5-11.6 0-24.1 6-26.2 21.5h52.4zM365.3 52.8h9v14.6h.2c3.3-7.6 9.3-16.5 24.3-16.5 1.8 0 3.6.1 5.4.5v9.3c-2.7-.5-5.5-.7-8.3-.7-9.8 0-21.6 6-21.6 24.1v32.4h-9V52.8zM409.5 29.1h49.6c17.1 0 24.3 9.7 24.3 22 0 8.4-4.6 16.3-15 18.7v.2c11.5 1.7 18.5 10.1 18.5 21.4 0 18.2-15.4 24.9-28.9 24.9h-48.6V29.1zm9 37.9h35.8c12.2 0 20-3.9 20-15.5 0-10.6-7.1-14.1-17-14.1h-38.8V67zm0 41h38c11.7 0 20.5-4.7 20.5-16.6 0-12.6-7.8-16.1-18.3-16.1h-40.2V108zM494.6 29.1h47.1c13.5 0 26.3 6.7 26.3 25.2 0 16.5-10.9 25.4-30.3 25.4h-34v36.7h-9l-.1-87.3zm9.1 42.3h35c15.2 0 19.6-7 19.6-17.1 0-13.1-7.3-16.9-17.7-16.9h-36.8l-.1 34z" fill="#6d6e6b"></path><linearGradient id="a" gradientUnits="userSpaceOnUse" x1="95.178" y1="74.202" x2="118.788" y2="67.432" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#ac6244"></stop><stop offset=".49" stop-color="#8d2700"></stop><stop offset=".63" stop-color="#8f2a04"></stop><stop offset=".75" stop-color="#94340f"></stop><stop offset=".87" stop-color="#9c4421"></stop><stop offset=".98" stop-color="#a85a3a"></stop><stop offset="1" stop-color="#aa5e3f"></stop></linearGradient><path d="M119.8 53.5c.2-1.5.4-2.8.6-4v.1c-.7 4-4.4 1.8-5.9.8-7.7-5.1-19.5-10.1-17.1 3.5 2.2 12.7 18 18.3 17.8 21.1 2-6.8 3.5-13.8 4.5-20.8l.1-.7z" fill="url(#a)"></path><path d="M27.6 6.6c-.5.8.3 1.7 1.4 2.8 3.5-2.9.1-5.2-1.3-3l-.1.2zM24.2 31.4c-1.4-2.5-2.7-5.5-2.2-8.4-1.6 1.8-3 3.8-4 6-.5 1-.5 2.1 6.2 2.4zM15.4 43.1c-.3-2.3-2.5-3.5-3.2-2-.4.8-.2 2.6 3 3.9.2-.6.3-1.2.2-1.9z" fill="#54284e"></path><linearGradient id="b" gradientUnits="userSpaceOnUse" x1="-310.911" y1="-171.789" x2="-254.041" y2="-190.262" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset="0" stop-color="#8e006d"></stop><stop offset=".04" stop-color="#ad006d"></stop><stop offset=".08" stop-color="#c4006d"></stop><stop offset=".11" stop-color="#d2006d"></stop><stop offset=".14" stop-color="#d7006d"></stop><stop offset=".17" stop-color="#d80670"></stop><stop offset=".2" stop-color="#db1778"></stop><stop offset=".24" stop-color="#e13386"></stop><stop offset=".28" stop-color="#e95a9a"></stop><stop offset=".32" stop-color="#f28bb2"></stop><stop offset=".33" stop-color="#f391b6"></stop><stop offset=".34" stop-color="#f498bb"></stop><stop offset=".37" stop-color="#f49abc"></stop><stop offset=".41" stop-color="#f27bb0"></stop><stop offset=".48" stop-color="#ef469b"></stop><stop offset=".54" stop-color="#ec208c"></stop><stop offset=".59" stop-color="#eb0983"></stop><stop offset=".62" stop-color="#ea0080"></stop><stop offset=".69" stop-color="#e0007e"></stop><stop offset=".81" stop-color="#c60079"></stop><stop offset=".96" stop-color="#9b0070"></stop><stop offset="1" stop-color="#8e006d"></stop></linearGradient><path d="M71.4 48c-1.8-2.2-3.9-4.1-6.4-5.5-11-6.8-29.8-10.9-37.7-11-1.2 0-2.2 0-3.1-.1-6.7-.3-6.7-1.4-6.2-2.4 1-2.2 2.4-4.3 4.1-6 4.8-5.1 10.9-6.9 15.7-8.2C44 13 54.5 7.1 45.3 2.3s-14.7-.6-15.7.8c-.8 1.1-1.4 2.3-2 3.5l.1-.2c1.5-2.2 4.8.1 1.3 3l-.2.1c-3.9 3.1-8.1 10.2-10.4 15.4-3.2 7.1-6.3 16.2-6.3 16.2.8-1.5 2.9-.3 3.2 2 .1.6 0 1.3-.2 1.9-.5 1.4-1.1 2.7-1.9 3.9-3.2 5.5 1.9 10.2 6.6 11.1 4.1.8 27.2-1.2 35.5-2.2 1.3-.2 2.2-.3 2.7-.4 3.4-.6 18.2-3 13.4-9.4z" fill="url(#b)"></path><path d="M1.8 79.8v-.2.2z" fill="#0d361c"></path><linearGradient id="c" gradientUnits="userSpaceOnUse" x1="1.764" y1="49.34" x2="17.5" y2="49.34" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#003824"></stop><stop offset="1" stop-color="#00822c"></stop></linearGradient><path d="M3.2 87c2.9 2.2 7.8 1.4 14.3-.1C9.8 78.8 7.2 72.6 4.4 73c-1.5.2-2.2 4.2-2.6 6.7-.2 4.4.4 6.6 1.4 7.3z" fill="url(#c)"></path><linearGradient id="d" gradientUnits="userSpaceOnUse" x1="-316.529" y1="-243.401" x2="-260.452" y2="-275.779" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset="0" stop-color="#003824"></stop><stop offset=".51" stop-color="#109840"></stop><stop offset=".72" stop-color="#0d943c"></stop><stop offset=".93" stop-color="#048831"></stop><stop offset="1" stop-color="#00822c"></stop></linearGradient><path d="M5.3 102.5l-.7-.2c1.9 3.8 4.2 7.4 6.9 10.7 15.4 18.9 46.1 15.6 53.2 13.1s1.6-7.6-2.7-10.1c-2.5-1.5-9.4-4.1-18.3-9.2-12.6-.3-27.8-1.4-38.4-4.3z" fill="url(#d)"></path><linearGradient id="e" gradientUnits="userSpaceOnUse" x1="-289.899" y1="-194.116" x2="-210.154" y2="-210.997" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset=".16" stop-color="#8d2719"></stop><stop offset=".22" stop-color="#9b391c"></stop><stop offset=".34" stop-color="#bf6722"></stop><stop offset=".51" stop-color="#f5ad2c"></stop><stop offset=".65" stop-color="#f5ad2c"></stop><stop offset=".69" stop-color="#f2a32c"></stop><stop offset=".77" stop-color="#e98a2a"></stop><stop offset=".86" stop-color="#dc6029"></stop><stop offset=".93" stop-color="#d03c27"></stop></linearGradient><path d="M108.8 33.1c-11 .1-22 1.7-32.7 4.6-3.9 1-7.6 2.6-11 4.8v.1c2.4 1.4 4.6 3.3 6.3 5.5 4.8 6.4-10 8.8-13.5 9.5-.5.1-1.4.2-2.7.4-.2 1.5-.2 3 0 4.5.4 3.3-1.1 6.7-4.8 7.5s-20.7 5.3-20.8 9c.1 1.8.6 3.5 1.5 5 2.1-.4 4.4-.8 6.7-1.1 16.4-2.1 47.3-6.3 49.2.8 8.6-4 13.9-8.7 17.3-10.3 4-1.9 10 3.8 10.8 1.7.2-2.8-15.7-8.4-17.8-21.1-2.3-13.6 9.5-8.6 17.1-3.5 1.5 1 5.2 3.2 5.9-.8v-.1c.9-6.3.7-6.7 1.1-10.8.5-5-7.9-5.9-12.6-5.7z" fill="url(#e)"></path><linearGradient id="f" gradientUnits="userSpaceOnUse" x1="1.482" y1="49.064" x2="83.137" y2="28.71" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#005d33"></stop><stop offset=".02" stop-color="#096339"></stop><stop offset=".06" stop-color="#237349"></stop><stop offset=".11" stop-color="#4d8d62"></stop><stop offset=".17" stop-color="#86b186"></stop><stop offset=".21" stop-color="#b2cda1"></stop><stop offset=".25" stop-color="#b2cda1"></stop><stop offset=".3" stop-color="#73bb7a"></stop><stop offset=".35" stop-color="#42ad5c"></stop><stop offset=".4" stop-color="#1ea345"></stop><stop offset=".43" stop-color="#089c38"></stop><stop offset=".46" stop-color="#009a33"></stop><stop offset=".87" stop-color="#005d33"></stop></linearGradient><path d="M37.9 82.8c-2.3.3-4.6.7-6.7 1.1-5.1 1-9.8 2.2-13.7 3-6.5 1.5-11.4 2.3-14.3.1-1-.8-1.6-3-1.4-7.3v.2C1.2 84-.1 92.6 0 96.3c.1 3.5.8 4.8 4.6 6l.7.2c10.6 2.9 25.8 4 38.5 4.3 10.9.2 19.9-.2 22.3-.6 5.1-.8 4.5-4.4 3.8-6.9-.8-2.7-1.4-4.8 2.6-5.8 5.1-1.3 14.3-5 14.8-8.7.1-.4 0-.8-.1-1.2-2-7.1-32.9-2.9-49.3-.8z" fill="url(#f)"></path></svg></div>
+  <h1>Fields, Licences and Business Arrangement Areas on the NCS</h1>
+  <div class="controls">
+    <button class="legend-btn active" id="toggleLicences" onclick="toggleLayer('licences')">Licences</button>
+    <button class="legend-btn active" id="toggleUnits"    onclick="toggleLayer('units')">Bus. Arr. Areas</button>
+    <button class="legend-btn active" id="toggleFields"   onclick="toggleLayer('fields')">Fields</button>
+    <button class="legend-btn active" id="toggleOffices" onclick="toggleOfficeLayer()">Offices</button>
+    <button class="legend-btn" id="toggleCustomise" onclick="toggleCustomise()">&#9881; Customise</button>
+    <button class="legend-btn" onclick="toggleLegend()">Legend</button>
+  </div>
+</header>
+<div id="map"></div>
+<div id="loading"><div class="spinner"></div><p id="loadingMsg">Loading data from Sodir...</p></div>
+<div id="customise-panel" class="hidden">
+  <div class="cp-header">
+    <h2>Customise</h2>
+    <button class="close-btn" onclick="toggleCustomise()">&#x2715;</button>
+  </div>
+  <div class="cp-body">
+
+    <div class="cp-section">
+      <div class="cp-section-title">Colours</div>
+      <div class="cp-row"><span class="cp-label">Licence – operator</span>   <input class="cp-color" type="color" id="col-lic-op"  oninput="updateColour('LIC_OP',this.value)"></div>
+      <div class="cp-row"><span class="cp-label">Licence – licensee</span>   <input class="cp-color" type="color" id="col-lic-lh"  oninput="updateColour('LIC_LH',this.value)"></div>
+      <div class="cp-row"><span class="cp-label">BAA – operator</span>       <input class="cp-color" type="color" id="col-unit-op" oninput="updateColour('UNIT_OP',this.value)"></div>
+      <div class="cp-row"><span class="cp-label">BAA – licensee</span>       <input class="cp-color" type="color" id="col-unit-lh" oninput="updateColour('UNIT_LH',this.value)"></div>
+      <div class="cp-row"><span class="cp-label">Field – operator</span>     <input class="cp-color" type="color" id="col-fld-op"  oninput="updateColour('FLD_OP',this.value)"></div>
+      <div class="cp-row"><span class="cp-label">Field – owner</span>        <input class="cp-color" type="color" id="col-fld-ow"  oninput="updateColour('FLD_OW',this.value)"></div>
+      <div class="cp-row"><span class="cp-label">Field – shut down</span>    <input class="cp-color" type="color" id="col-fld-sd"  oninput="updateColour('FLD_SD',this.value)"></div>
+    </div>
+
+    <div class="cp-section">
+      <div class="cp-section-title">Visibility</div>
+      <div class="cp-row">
+        <span class="cp-label">Show shut-down fields</span>
+        <label class="cp-toggle"><input type="checkbox" id="vis-shutdown" checked onchange="toggleShutdown(this.checked)"><span class="cp-slider"></span></label>
+      </div>
+    </div>
+
+    <div class="cp-section">
+      <div class="cp-section-title">Labels on map</div>
+      <div class="cp-row">
+        <span class="cp-label">Licence labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-licences" onchange="toggleLabels('licences',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">BAA labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-units" onchange="toggleLabels('units',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Field labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-fields" onchange="toggleLabels('fields',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Office labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-offices" onchange="toggleLabels('offices',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+    </div>
+
+    <button class="cp-reset" onclick="resetCustomise()">&#8635; Reset to defaults</button>
+  </div>
+</div>
+
+<div id="sidebar" class="hidden">
+  <div class="sidebar-header"><h2 id="sidebarTitle">Info</h2><button class="close-btn" onclick="closeSidebar()">&#x2715;</button></div>
+  <div class="sidebar-content" id="sidebarContent"></div>
+</div>
+<div id="statsbar">
+  <div class="stat"><div class="stat-dot dot-licence"></div><span class="stat-label">Licences:</span><span class="stat-count" id="licenceCount">-</span></div>
+  <div class="stat"><div class="stat-dot dot-unit"></div><span class="stat-label">BAAs:</span><span class="stat-count" id="unitCount">-</span></div>
+  <div class="stat"><div class="stat-dot dot-field"></div><span class="stat-label">Fields:</span><span class="stat-count" id="fieldCount">-</span></div>
+</div>
+<div id="maplegend" class="hidden">
+  <h3>Legend</h3>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(224,64,251,0.22);border:2px solid #e040fb;" id="swatch-lic-op"></div>Licence – Aker BP operator</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,152,0,0.22);border:2px dashed #ff9800;" id="swatch-lic-lh"></div>Licence – Aker BP licensee</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(224,64,251,0.35);border:3px solid #e040fb;" id="swatch-unit-op"></div>Bus. arr. area – operator</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,152,0,0.35);border:3px dashed #ff9800;" id="swatch-unit-lh"></div>Bus. arr. area – licensee</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,230,118,0.55);border:2px solid #00e676;" id="swatch-fld-op"></div>Field – Aker BP operator</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,235,59,0.55);border:2px solid #ffeb3b;" id="swatch-fld-ow"></div>Field – Aker BP owner</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.08);border:2px solid rgba(255,255,255,0.25);"></div>Field – shut down</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.9);border:2px solid #4a9eff;border-radius:50%;"></div>Aker BP office</div>
+</div>
+<div id="basemap-switcher">
+  <h4>Basemap</h4>
+  <button class="basemap-btn active" data-name="Dark"      onclick="switchBasemap(this.dataset.name)">Dark</button>
+  <button class="basemap-btn"        data-name="Light"     onclick="switchBasemap(this.dataset.name)">Light</button>
+  <button class="basemap-btn"        data-name="OSM"       onclick="switchBasemap(this.dataset.name)">OpenStreetMap</button>
+  <button class="basemap-btn"        data-name="Satellite" onclick="switchBasemap(this.dataset.name)">Satellite</button>
+  <button class="basemap-btn"        data-name="Ocean"     onclick="switchBasemap(this.dataset.name)">Ocean (Esri)</button>
+  <button class="basemap-btn"        data-name="NatGeo"    onclick="switchBasemap(this.dataset.name)">Nat. Geographic</button>
+</div>
+<div id="errormsg" class="hidden"></div>
+
+<script>
+const BASE      = 'https://factmaps.sodir.no/api/rest/services/DataService/Data/MapServer';
+const AKERBP_ID = 28544099;
+
+// Farger
+let C_LIC_OP  = '#e040fb';  // magenta  – lisens, operatør
+let C_LIC_LH  = '#ff9800';  // oransje  – lisens, lisenshaver
+let C_UNIT_OP = '#e040fb';  // magenta  – unit, operatør (samme som lisens)
+let C_UNIT_LH = '#ff9800';  // oransje  – unit, lisenshaver (samme som lisens)
+let C_FLD_OP  = '#00e676';  // grønn    – felt, operatør
+let C_FLD_OW  = '#ffeb3b';  // gul      – felt, eier
+let C_FLD_SD  = '#ffffff';  // hvit dim – felt, shut down
+
+// Label visibility state – declared early so renderOffices IIFE can access it
+const labelState = { licences: false, units: false, fields: false, offices: false };
+
+const map = L.map('map', { zoomControl: true }).setView([68, 10], 5);
+
+const BASEMAPS = {
+  'Dark':        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',   { attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 19 }),
+  'Light':       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',  { attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 19 }),
+  'OSM':         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',                  { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }),
+  'Satellite':   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri &copy; USGS', maxZoom: 19 }),
+  'Ocean':       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri &copy; GEBCO &copy; NOAA', maxZoom: 13 }),
+  'NatGeo':      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri &copy; National Geographic', maxZoom: 16 }),
+};
+
+let currentBasemap = BASEMAPS['Dark'];
+currentBasemap.addTo(map);
+
+function switchBasemap(name) {
+  map.removeLayer(currentBasemap);
+  currentBasemap = BASEMAPS[name];
+  currentBasemap.addTo(map);
+  // Ensure basemap is below data layers
+  const pane = map.getPane('tilePane');
+  if (pane) pane.style.zIndex = 200;
+  document.querySelectorAll('.basemap-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.name === name)
+  );
+}
+
+// Lag-rekkefølge nederst til øverst: lisenser → units → felt
+// Leaflet-paner for garantert lag-rekkefølge (høyere z-index = øverst)
+map.createPane('officePane');  map.getPane('officePane').style.zIndex  = 430;
+map.createPane('licencePane'); map.getPane('licencePane').style.zIndex = 400;
+map.createPane('unitPane');    map.getPane('unitPane').style.zIndex    = 410;
+map.createPane('fieldPane');   map.getPane('fieldPane').style.zIndex   = 420;
+
+const officeLayer  = L.layerGroup().addTo(map);
+const licenceLayer = L.layerGroup().addTo(map);
+const unitLayer    = L.layerGroup().addTo(map);
+const fieldLayer   = L.layerGroup().addTo(map);
+
+let showFields=true, showLicences=true, showUnits=true;
+function toggleLayer(t) {
+  if(t==='fields')   { showFields=!showFields;     document.getElementById('toggleFields').classList.toggle('active',showFields);     showFields   ?map.addLayer(fieldLayer)  :map.removeLayer(fieldLayer);   }
+  if(t==='licences') { showLicences=!showLicences; document.getElementById('toggleLicences').classList.toggle('active',showLicences); showLicences ?map.addLayer(licenceLayer):map.removeLayer(licenceLayer); }
+  if(t==='units')    { showUnits=!showUnits;       document.getElementById('toggleUnits').classList.toggle('active',showUnits);       showUnits    ?map.addLayer(unitLayer)   :map.removeLayer(unitLayer);    }
+}
+function toggleLegend() { document.getElementById('maplegend').classList.toggle('hidden'); }
+let showOffices=true;
+function toggleOfficeLayer(){ showOffices=!showOffices; document.getElementById('toggleOffices').classList.toggle('active',showOffices); showOffices?map.addLayer(officeLayer):map.removeLayer(officeLayer); }
+function closeSidebar()  { document.getElementById('sidebar').classList.add('hidden'); }
+function showError(msg)  { const el=document.getElementById('errormsg'); el.textContent=msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),12000); }
+function setLoading(msg) { const el=document.getElementById('loading'); msg ? (document.getElementById('loadingMsg').textContent=msg, el.classList.remove('hidden')) : el.classList.add('hidden'); }
+
+// ─── API ───────────────────────────────────────────────────────────────────
+
+async function queryAll(layerId, where, outFields, withGeo=false) {
+  let all=[], offset=0;
+  while(true) {
+    const params = {
+      where, outFields, f:'json',
+      returnGeometry: withGeo ? 'true' : 'false',
+      resultRecordCount: '2000',
+      resultOffset: String(offset),
+      ...(withGeo ? {outSR:'4326'} : {})
+    };
+    // Use POST to avoid URL-length CORS issues on large IN-lists
+    const body = new URLSearchParams(params);
+    let d;
+    try {
+      const resp = await fetch(`${BASE}/${layerId}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+      });
+      d = await resp.json();
+    } catch(postErr) {
+      // Fallback to GET for layers that don't accept POST
+      const qs = new URLSearchParams(params);
+      const resp = await fetch(`${BASE}/${layerId}/query?${qs}`);
+      d = await resp.json();
+    }
+    if(d.error) throw new Error(`Lag ${layerId}: ${d.error.message}`);
+    const rows = d.features||[];
+    all = all.concat(rows);
+    if(!d.exceededTransferLimit || rows.length === 0) break;
+    offset += rows.length;
+  }
+  return all;
+}
+
+// GET-only variant for lag som ikke støtter POST (f.eks. lag 3300)
+// Bruker exceededTransferLimit for å håndtere serverens egne sidestørrelser
+async function queryAllGET(layerId, where, outFields, withGeo=false) {
+  let all=[], offset=0;
+  while(true) {
+    const qs = new URLSearchParams({
+      where, outFields, f:'json',
+      returnGeometry: withGeo ? 'true' : 'false',
+      resultRecordCount: '500',
+      resultOffset: String(offset),
+      ...(withGeo ? {outSR:'4326'} : {})
+    });
+    const d = await (await fetch(`${BASE}/${layerId}/query?${qs}`)).json();
+    if(d.error) throw new Error(`Lag ${layerId}: ${d.error.message}`);
+    const rows = d.features||[];
+    all = all.concat(rows);
+    // Stopp hvis serveren ikke sier det er mer, eller ingen rader
+    if(!d.exceededTransferLimit || rows.length === 0) break;
+    offset += rows.length;
+  }
+  return all;
+}
+
+// GeoJSON-konvertering fra ESRI JSON
+function toGeoJSON(esriFeatures) {
+  return {
+    type: 'FeatureCollection',
+    features: esriFeatures.map(f => ({
+      type: 'Feature',
+      geometry: esriGeom(f.geometry),
+      properties: f.attributes
+    })).filter(f => f.geometry)
+  };
+}
+
+function esriGeom(g) {
+  if(!g) return null;
+  if(g.rings) {
+    if(g.rings.length === 0) return null;
+    if(g.rings.length === 1) return { type:'Polygon', coordinates:g.rings };
+    return { type:'MultiPolygon', coordinates:g.rings.map(r=>[r]) };
+  }
+  if(g.x !== undefined) return { type:'Point', coordinates:[g.x, g.y] };
+  if(g.type) return g;
+  return null;
+}
+
+function fmtPct(v) { return (v==null||v==='')?null: parseFloat(v).toFixed(1)+' %'; }
+
+function isShutDown(status) {
+  if(!status) return false;
+  const s = status.toLowerCase();
+  return s.includes('shut') || s.includes('abandon') || s.includes('closed') || s.includes('cease');
+}
+
+// ─── FAKTABOKS ────────────────────────────────────────────────────────────
+
+function showSidebar(title, sections) {
+  document.getElementById('sidebarTitle').textContent = title;
+  let html = '';
+  for(const s of sections) {
+    if(s.heading) html += `<div class="info-section-title">${s.heading}</div>`;
+    for(const [label, value] of (s.rows||[])) {
+      if(value===null||value===undefined||value==='') continue;
+      html += `<div class="info-row"><span class="info-label">${label}</span><span class="info-value">${value}</span></div>`;
+    }
+  }
+  document.getElementById('sidebarContent').innerHTML = html;
+  document.getElementById('sidebar').classList.remove('hidden');
+}
+
+function polyStyle(col, dashed, dimmed) {
+  return {
+    color: col,
+    weight: dimmed ? 1 : 1.5,
+    fillColor: col,
+    fillOpacity: dimmed ? 0.04 : 0.20,
+    dashArray: dashed ? '7 4' : null,
+    opacity: dimmed ? 0.30 : 1.0
+  };
+}
+
+// ─── MAIN LOAD ────────────────────────────────────────────────────────────
+
+async function loadData() {
+  try {
+
+    // ── 1. Lisensoperatørroller (lag 3008) ──────────────────────────────
+    // Aker BP er operatør på 130 lisenser (prlOperDateValidTo IS NULL)
+    setLoading('Fetching licence operator roles...');
+    const licOperRows = await queryAll(3008,
+      `cmpNpdidCompany = ${AKERBP_ID} AND prlOperDateValidTo IS NULL`,
+      'prlNpdidLicence');
+    const operatorLicIds = new Set(licOperRows.map(f => f.attributes.prlNpdidLicence));
+    console.log('Lisensoperatørandeler:', operatorLicIds.size);
+
+    // ── 2. Lisenserveiandeler for Aker BP (lag 3007) ─────────────────────
+    // prlLicenseeInterest = Aker BPs andel, prlLicenseeDateValidTo IS NULL = nåværende
+    setLoading('Fetching licence ownership shares...');
+    const licShareRows = await queryAll(3007,
+      `cmpNpdidCompany = ${AKERBP_ID} AND prlLicenseeDateValidTo IS NULL`,
+      'prlNpdidLicence,prlLicenseeInterest');
+    const licShareMap = {}; // prlNpdidLicence → Aker BPs andel
+    licShareRows.forEach(f => { licShareMap[f.attributes.prlNpdidLicence] = f.attributes.prlLicenseeInterest; });
+
+    // ── 3. Alle medlisenshavers andeler per lisens (lag 3007) ────────────
+    // Hent alle nåværende lisenshavere for Aker BPs lisenser
+    setLoading('Fetching all licensees...');
+    // Vi trenger lisens-IDene fra steg 1+2
+    const allLicIds = [...new Set([...operatorLicIds, ...Object.keys(licShareMap).map(Number)])];
+    let allLicenseeRows = [];
+    for(let i=0; i<allLicIds.length; i+=500) {
+      const batch = allLicIds.slice(i,i+500).join(',');
+      const rows = await queryAll(3007,
+        `prlNpdidLicence IN (${batch}) AND prlLicenseeDateValidTo IS NULL`,
+        'prlNpdidLicence,cmpLongName,prlLicenseeInterest,prlLicenseeSdfi');
+      allLicenseeRows = allLicenseeRows.concat(rows);
+    }
+    // Bygg map: prlNpdidLicence → [ {company, share, sdfi} ]
+    const licLicenseeMap = {};
+    allLicenseeRows.forEach(f => {
+      const a = f.attributes;
+      if(!licLicenseeMap[a.prlNpdidLicence]) licLicenseeMap[a.prlNpdidLicence] = [];
+      licLicenseeMap[a.prlNpdidLicence].push({ company: a.cmpLongName, share: a.prlLicenseeInterest, sdfi: a.prlLicenseeSdfi });
+    });
+
+    // ── 4. Lisensgeometrier (lag 3000) ────────────────────────────────────
+    // Lag 3000 har én rad per lisenshaver per lisens.
+    // Vi henter geometri for ALLE lisenser der Aker BP er involvert:
+    //   a) lisenser der Aker BP er operatør (fra operatorLicIds)
+    //   b) lisenser der Aker BP er lisenshaver (fra licShareMap)
+    // Kombinerer disse og henter geometri via prlNpdidLicence IN (...)
+    setLoading('Loading licence geometries...');
+    const allInvolvedLicIds = [...new Set([...operatorLicIds, ...Object.keys(licShareMap).map(Number)])];
+    console.log(`Totalt involverte lisenser: ${allInvolvedLicIds.length} (${operatorLicIds.size} operatør, ${Object.keys(licShareMap).length} med andel)`);
+    let licGeoRows = [];
+    // Hent i bolker på 100 for å unngå for store queries
+    for(let i=0; i<allInvolvedLicIds.length; i+=100) {
+      const batch = allInvolvedLicIds.slice(i,i+100).join(',');
+      const rows = await queryAll(3000,
+        `prlNpdidLicence IN (${batch})`,
+        'prlNpdidLicence,prlName,prlMainArea,prlStatus,prlPhaseCurrent,prlCurrentArea,prlFactPageUrl',
+        true);
+      licGeoRows = licGeoRows.concat(rows);
+    }
+    // Dedupliser (lag 3000 kan ha flere rader per lisens – ta første per prlNpdidLicence)
+    const seenLicIds = new Set();
+    const dedupedLicRows = licGeoRows.filter(f => {
+      const id = f.attributes.prlNpdidLicence;
+      if(seenLicIds.has(id)) return false;
+      seenLicIds.add(id);
+      return true;
+    });
+    const licGeo = toGeoJSON(dedupedLicRows);
+
+    // Berik med operatørstatus og andeler
+    licGeo.features.forEach(f => {
+      const p = f.properties;
+      p.isOperator    = operatorLicIds.has(p.prlNpdidLicence);
+      p._myShare      = licShareMap[p.prlNpdidLicence] ?? null;
+      p._allLicensees = licLicenseeMap[p.prlNpdidLicence] || [];
+    });
+    console.log(`Lisenser: ${licGeo.features.length} (${[...licGeo.features].filter(f=>f.properties.isOperator).length} operatør, ${[...licGeo.features].filter(f=>!f.properties.isOperator).length} lisenshaver)`);
+
+    // ── 5. Unit-operatørroller (lag 3302) ─────────────────────────────────
+    // baaOperatorDateValidTo IS NULL = nåværende
+    setLoading('Fetching BAA operator roles...');
+    const unitOperRows = await queryAll(3302,
+      `cmpNpdidCompany = ${AKERBP_ID} AND baaOperatorDateValidTo IS NULL`,
+      'baaNpdidBsnsArrArea,baaName');
+    const unitOperIds = new Set(unitOperRows.map(f => f.attributes.baaNpdidBsnsArrArea));
+    console.log('Unit-operatørroller:', unitOperIds.size);
+
+    // ── 6. Unit-eierandeler for Aker BP (lag 3304) ───────────────────────
+    // baaLicenseeDateValidTo IS NULL = nåværende, baaLicenseeInterest = andel
+    setLoading('Fetching BAA ownership shares...');
+    const unitShareRows = await queryAll(3304,
+      `cmpNpdidCompany = ${AKERBP_ID} AND baaLicenseeDateValidTo IS NULL`,
+      'baaNpdidBsnsArrArea,baaLicenseeInterest');
+    const unitMyShareMap = {}; // baaNpdidBsnsArrArea → Aker BPs andel
+    unitShareRows.forEach(f => { unitMyShareMap[f.attributes.baaNpdidBsnsArrArea] = f.attributes.baaLicenseeInterest; });
+    console.log('Unit-eierandeler:', Object.keys(unitMyShareMap).length);
+
+    // ── 7. Alle medlisenshavers andeler per unit (lag 3304) ──────────────
+    const allUnitIds = [...new Set([...unitOperIds, ...Object.keys(unitMyShareMap).map(Number)])];
+    let allUnitLicenseeRows = [];
+    if(allUnitIds.length > 0) {
+      const rows = await queryAll(3304,
+        `baaNpdidBsnsArrArea IN (${allUnitIds.join(',')}) AND baaLicenseeDateValidTo IS NULL`,
+        'baaNpdidBsnsArrArea,cmpLongName,baaLicenseeInterest,baaLicenseeSdfi');
+      allUnitLicenseeRows = rows;
+    }
+    const unitLicenseeMap = {}; // baaNpdidBsnsArrArea → [ {company, share} ]
+    allUnitLicenseeRows.forEach(f => {
+      const a = f.attributes;
+      if(!unitLicenseeMap[a.baaNpdidBsnsArrArea]) unitLicenseeMap[a.baaNpdidBsnsArrArea] = [];
+      unitLicenseeMap[a.baaNpdidBsnsArrArea].push({ company: a.cmpLongName, share: a.baaLicenseeInterest, sdfi: a.baaLicenseeSdfi });
+    });
+
+    // ── 8. Unit-geometrier (lag 3300) ─────────────────────────────────────
+    // Lag 3300: cmpNpdidCompany-søk fungerer (bekreftet i debug), IN() feiler.
+    // Strategi: hent alle units via cmpNpdidCompany (gir operatørenheter),
+    // og suppler med enkelt-ID-oppslag for units fra eierandelslisten.
+    setLoading('Loading BAA geometries...');
+    const unitGeoMap = {}; // baaNpdidBsnsArrArea → esri feature
+
+    // Lag 3300 godtar ikke resultRecordCount/resultOffset – bruk direkte fetch
+    // og paginer manuelt via exceededTransferLimit
+    async function fetchBaaPage(where, outFields, offset) {
+      const qs = new URLSearchParams({
+        where, outFields, f: 'json', returnGeometry: 'true', outSR: '4326'
+      });
+      if(offset > 0) qs.set('resultOffset', String(offset));
+      const d = await (await fetch(`${BASE}/3300/query?${qs}`)).json();
+      return d;
+    }
+
+    // a) Hent alle units der Aker BP er nåværende operatørselskap
+    try {
+      let offset = 0;
+      while(true) {
+        const d = await fetchBaaPage(`cmpNpdidCompany = ${AKERBP_ID}`,
+          'baaNpdidBsnsArrArea,baaName,baaKind,baaActive,baaFactPageUrl', offset);
+        if(d.error) { console.error('Lag 3300 feil:', d.error.message); break; }
+        const rows = d.features || [];
+        console.log(`Lag 3300 side offset=${offset}: ${rows.length} rader, exceededTransferLimit=${d.exceededTransferLimit}`);
+        rows.forEach(r => { unitGeoMap[r.attributes.baaNpdidBsnsArrArea] = r; });
+        if(!d.exceededTransferLimit || rows.length === 0) break;
+        offset += rows.length;
+      }
+    } catch(e) { console.error('Unit geo cmpNpdidCompany FEIL:', e.message); }
+
+    // b) Hent evt. manglende units (fra eierandelslisten) enkeltvis
+    const missingUnitIds = allUnitIds.filter(id => !unitGeoMap[id]);
+    for(const id of missingUnitIds) {
+      try {
+        const d = await fetchBaaPage(`baaNpdidBsnsArrArea = ${id}`,
+          'baaNpdidBsnsArrArea,baaName,baaKind,baaActive,baaFactPageUrl', 0);
+        if(!d.error) (d.features||[]).forEach(r => { unitGeoMap[r.attributes.baaNpdidBsnsArrArea] = r; });
+      } catch(e) { console.warn(`Unit geo id=${id}:`, e.message); }
+    }
+
+    const unitGeoRows = Object.values(unitGeoMap);
+    console.log('Unit geo rader fra API:', unitGeoRows.length);
+    // Debug: sjekk geometritype på første rad
+    if(unitGeoRows.length > 0) {
+      const g = unitGeoRows[0].geometry;
+      console.log('Første unit geometri:', g ? `type=${g.type||'?'}, rings=${g.rings ? g.rings.length : 'n/a'}, paths=${g.paths ? g.paths.length : 'n/a'}` : 'NULL');
+      console.log('Første unit attrs:', JSON.stringify(unitGeoRows[0].attributes));
+    }
+    const unitGeo = toGeoJSON(unitGeoRows);
+    console.log('Unit GeoJSON features etter konvertering:', unitGeo.features.length);
+    unitGeo.features.forEach(f => {
+      const p = f.properties;
+      p.isOperator     = unitOperIds.has(p.baaNpdidBsnsArrArea);
+      p._myShare       = unitMyShareMap[p.baaNpdidBsnsArrArea] ?? null;
+      p._allLicensees  = unitLicenseeMap[p.baaNpdidBsnsArrArea] || [];
+    });
+    console.log(`Units: ${unitGeo.features.length} (${[...unitGeo.features].filter(f=>f.properties.isOperator).length} operatør)`);
+
+    // ── 9. Felt-operatørroller (lag 7110) ─────────────────────────────────
+    setLoading('Fetching field operator roles...');
+    const fldOperRows = await queryAll(7110,
+      `cmpNpdidCompany = ${AKERBP_ID} AND fldOperatorTo IS NULL`,
+      'fldNpdidField');
+    const operatorFieldIds = new Set(fldOperRows.map(f => f.attributes.fldNpdidField));
+
+    // ── 10. Felt-eierandeler for Aker BP (lag 7108) ───────────────────────
+    // fldLicenseeTo IS NULL = nåværende, fldCompanyShare = Aker BPs andel
+    setLoading('Fetching field ownership shares...');
+    const fldShareRows = await queryAll(7108,
+      `cmpNpdidCompany = ${AKERBP_ID} AND fldLicenseeTo IS NULL`,
+      'fldNpdidField,fldCompanyShare,fldOwnerKind,fldOwnerName');
+    // Bygg map: fldNpdidField → Aker BPs andel (summer per felt hvis flere rader)
+    const fldMyShareMap = {};
+    fldShareRows.forEach(f => {
+      const a = f.attributes;
+      if(!fldMyShareMap[a.fldNpdidField]) fldMyShareMap[a.fldNpdidField] = { total: 0, owners: [] };
+      fldMyShareMap[a.fldNpdidField].total += parseFloat(a.fldCompanyShare)||0;
+      fldMyShareMap[a.fldNpdidField].owners.push({ kind: a.fldOwnerKind, name: a.fldOwnerName, share: a.fldCompanyShare });
+    });
+
+    // ── 11. Alle medlisenshavers andeler per felt (lag 7108) ─────────────
+    // Dette gir oss eierstruktur og eventuelle unit-koblinger
+    setLoading('Fetching all field licensees...');
+    const allFldIds = [...new Set([...operatorFieldIds, ...Object.keys(fldMyShareMap).map(Number)])];
+    let allFldLicenseeRows = [];
+    for(let i=0; i<allFldIds.length; i+=500) {
+      const batch = allFldIds.slice(i,i+500).join(',');
+      const rows = await queryAll(7108,
+        `fldNpdidField IN (${batch}) AND fldLicenseeTo IS NULL`,
+        'fldNpdidField,cmpLongName,fldCompanyShare,fldOwnerKind,fldOwnerName,fldSdfiShare');
+      allFldLicenseeRows = allFldLicenseeRows.concat(rows);
+    }
+    // Bygg map: fldNpdidField → [ {company, share, ownerKind, ownerName} ]
+    const fldLicenseeMap = {};
+    allFldLicenseeRows.forEach(f => {
+      const a = f.attributes;
+      if(!fldLicenseeMap[a.fldNpdidField]) fldLicenseeMap[a.fldNpdidField] = [];
+      fldLicenseeMap[a.fldNpdidField].push({
+        company:   a.cmpLongName,
+        share:     a.fldCompanyShare,
+        ownerKind: a.fldOwnerKind,
+        ownerName: a.fldOwnerName,
+        sdfi:      a.fldSdfiShare
+      });
+    });
+
+    // ── 12. Feltgeometrier (lag 7100) ─────────────────────────────────────
+    setLoading('Loading field geometries...');
+    let fldGeoRows = [];
+    for(let i=0; i<allFldIds.length; i+=500) {
+      const batch = allFldIds.slice(i,i+500).join(',');
+      const rows = await queryAll(7100,
+        `fldNpdidField IN (${batch})`,
+        'fldNpdidField,fldName,fldMainArea,fldCurrentActivitySatus,fldHcType,fldDiscoveryYear,fldOwnerName,fldFactPageUrl',
+        true);
+      fldGeoRows = fldGeoRows.concat(rows);
+    }
+    const fieldGeo = toGeoJSON(fldGeoRows);
+    fieldGeo.features.forEach(f => {
+      const p = f.properties;
+      p.isOperator    = operatorFieldIds.has(p.fldNpdidField);
+      p._myShare      = fldMyShareMap[p.fldNpdidField] ?? null;
+      p._allLicensees = fldLicenseeMap[p.fldNpdidField] || [];
+      p._shutDown     = isShutDown(p.fldCurrentActivitySatus);
+    });
+    console.log(`Felt: ${fieldGeo.features.length} (${[...fieldGeo.features].filter(f=>f.properties.isOperator).length} operatør, ${[...fieldGeo.features].filter(f=>f.properties._shutDown).length} shut down)`);
+
+    // ── 13. Render ────────────────────────────────────────────────────────
+    window._licGeo   = licGeo;
+    window._unitGeo  = unitGeo;
+    window._fieldGeo = fieldGeo;
+    renderLicences(licGeo);
+    renderUnits(unitGeo);
+    renderFields(fieldGeo);
+
+    document.getElementById('licenceCount').textContent = licGeo.features.length;
+    document.getElementById('unitCount').textContent    = unitGeo.features.length;
+    document.getElementById('fieldCount').textContent   = fieldGeo.features.length;
+
+    // Zoom til portefølje
+    const allF = [...licGeo.features, ...unitGeo.features, ...fieldGeo.features];
+    if(allF.length > 0) {
+      try {
+        const bounds = L.geoJSON({type:'FeatureCollection',features:allF}).getBounds();
+        if(bounds.isValid()) map.fitBounds(bounds, {padding:[50,50]});
+      } catch(e) {}
+    }
+    setLoading(null);
+
+  } catch(err) {
+    console.error(err);
+    setLoading(null);
+    showError('Error: ' + err.message);
+  }
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────
+
+function renderLicences(geojson) {
+  licenceLayer.clearLayers();
+  L.geoJSON(geojson, {
+    pane: 'licencePane',
+    style(f) {
+      const col = f.properties.isOperator ? C_LIC_OP : C_LIC_LH;
+      return polyStyle(col, !f.properties.isOperator, false);
+    },
+    onEachFeature(feature, layer) {
+      const p   = feature.properties;
+      const col  = p.isOperator ? C_LIC_OP : C_LIC_LH;
+      const role = p.isOperator ? 'Operator' : 'Licensee';
+      const myShare = fmtPct(p._myShare);
+
+      layer.on('mouseover', () => layer.setStyle({fillOpacity:0.42, weight:2.5}));
+      layer.on('mouseout',  () => layer.setStyle(polyStyle(col, !p.isOperator, false)));
+      layer.on('click', () => {
+        // Bygg lisenshaver-tabell
+        const lhRows = p._allLicensees.length > 0
+          ? p._allLicensees
+              .sort((a,b) => (b.share||0)-(a.share||0))
+              .map(l => [l.company||'?', fmtPct(l.share) + (l.sdfi ? ` (SDFI: ${fmtPct(l.sdfi)})` : '')])
+          : [['No data available', null]];
+        showSidebar('Licence: ' + (p.prlName||'?'), [
+          { rows: [
+            ['Licence no.', p.prlName],
+            ['Aker BP role', `<span style="color:${col}">${role}</span>`],
+            ['Aker BP share', myShare],
+            ['Area', p.prlMainArea],
+            ['Status', p.prlStatus],
+            ['Phase', p.prlPhaseCurrent],
+            ['Area (km²)', p.prlCurrentArea],
+          ]},
+          { heading: 'All licensees', rows: lhRows },
+          { heading: 'Links', rows: [
+            ['Sodir', p.prlFactPageUrl ? `<a href="${p.prlFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>` : null],
+          ]}
+        ]);
+      });
+      if(p.prlName && labelState.licences) layer.bindTooltip(p.prlName,
+        {permanent:true, direction:'center', className:'map-label map-label-licence', offset:[0,0]}
+      );
+    }
+  }).addTo(licenceLayer);
+}
+
+function renderUnits(geojson) {
+  unitLayer.clearLayers();
+  L.geoJSON(geojson, {
+    pane: 'unitPane',
+    style(f) {
+      const col = f.properties.isOperator ? C_UNIT_OP : C_UNIT_LH;
+      // Units: tykkere kant og høyere opacity enn lisenser for å skille seg ut
+      return {
+        color: col, weight: 2.5, fillColor: col,
+        fillOpacity: 0.30, dashArray: f.properties.isOperator ? null : '7 4',
+        pane: 'unitPane'
+      };
+    },
+    onEachFeature(feature, layer) {
+      const p   = feature.properties;
+      const col  = p.isOperator ? C_UNIT_OP : C_UNIT_LH;
+      const role = p.isOperator ? 'Operator' : 'Licensee';
+      const myShare = fmtPct(p._myShare);
+
+      const unitBaseStyle = { color:col, weight:2.5, fillColor:col, fillOpacity:0.30, dashArray: p.isOperator ? null : '7 4' };
+      layer.on('mouseover', () => layer.setStyle({fillOpacity:0.55, weight:3.5}));
+      layer.on('mouseout',  () => layer.setStyle(unitBaseStyle));
+      layer.on('click', () => {
+        const lhRows = p._allLicensees.length > 0
+          ? p._allLicensees
+              .sort((a,b) => (b.share||0)-(a.share||0))
+              .map(l => [l.company||'?', fmtPct(l.share) + (l.sdfi ? ` (SDFI: ${fmtPct(l.sdfi)})` : '')])
+          : [['No data available', null]];
+        showSidebar('BAA: ' + (p.baaName||'?'), [
+          { rows: [
+            ['Name', p.baaName],
+            ['Type', p.baaKind],
+            ['Aker BP role', `<span style="color:${col}">${role}</span>`],
+            ['Aker BP share', myShare],
+            ['Active', p.baaActive==='Y'?'Yes':'No'],
+          ]},
+          { heading: 'All licensees', rows: lhRows },
+          { heading: 'Links', rows: [
+            ['Sodir', p.baaFactPageUrl ? `<a href="${p.baaFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>` : null],
+          ]}
+        ]);
+      });
+      if(p.baaName && labelState.units) layer.bindTooltip(p.baaName,
+        {permanent:true, direction:'center', className:'map-label map-label-unit', offset:[0,0]}
+      );
+    }
+  }).addTo(unitLayer);
+}
+
+function renderFields(geojson) {
+  if (!geojson) return;
+  fieldLayer.clearLayers();
+  // Filter out shut-down fields if toggle is off
+  const filtered = showShutdown ? geojson : {
+    type: 'FeatureCollection',
+    features: geojson.features.filter(f => !f.properties._shutDown)
+  };
+  L.geoJSON(filtered, {
+    pane: 'fieldPane',
+    pointToLayer(f, latlng) {
+      const col = f.properties._shutDown ? C_FLD_SD
+                : f.properties.isOperator ? C_FLD_OP : C_FLD_OW;
+      const opacity = f.properties._shutDown ? 0.25 : 0.9;
+      return L.circleMarker(latlng, {radius:8, fillColor:col, color:col, weight:2, fillOpacity:opacity});
+    },
+    style(f) {
+      const shut = f.properties._shutDown;
+      const col  = shut ? C_FLD_SD : (f.properties.isOperator ? C_FLD_OP : C_FLD_OW);
+      return {
+        color: col, weight: shut ? 1 : 2.5,
+        fillColor: col, fillOpacity: shut ? 0.05 : 0.55,
+        opacity: shut ? 0.30 : 1.0
+      };
+    },
+    onEachFeature(feature, layer) {
+      const p    = feature.properties;
+      const shut = p._shutDown;
+      const col  = shut ? C_FLD_SD : (p.isOperator ? C_FLD_OP : C_FLD_OW);
+      const role = shut ? 'Shut down' : (p.isOperator ? 'Operator' : 'Owner');
+      const myShare = p._myShare ? fmtPct(p._myShare.total) : null;
+
+      // Berik lisenshaverliste – vis ownerName (unit/lisens) for hver
+      const lhRows = p._allLicensees.length > 0
+        ? p._allLicensees
+            .sort((a,b) => (b.share||0)-(a.share||0))
+            .map(l => {
+              const via = (l.ownerKind && l.ownerName) ? ` via ${l.ownerName}` : '';
+              return [l.company||'?', fmtPct(l.share) + (l.sdfi ? ` (SDFI: ${fmtPct(l.sdfi)})` : '') + (via ? `<br><span style="color:#8ab0d0;font-size:11px">${l.ownerKind}${via}</span>` : '')];
+            })
+        : [];
+
+      const shutHover  = {fillOpacity:0.15, weight:1.5};
+      const normHover  = {fillOpacity:0.85, weight:3};
+      const shutReturn = {fillOpacity:0.05, weight:1, color:col, opacity:0.30};
+      const normReturn = {fillOpacity:0.55, weight:2.5, color:col, opacity:1.0};
+
+      layer.on('mouseover', () => layer.setStyle && layer.setStyle(shut ? shutHover : normHover));
+      layer.on('mouseout',  () => layer.setStyle && layer.setStyle(shut ? shutReturn : normReturn));
+      layer.on('click', () => {
+        showSidebar('Field: ' + (p.fldName||'?'), [
+          { rows: [
+            ['Field name', p.fldName],
+            ['Aker BP role', `<span style="color:${col}">${role}</span>`],
+            ['Aker BP share', myShare],
+            ['Area', p.fldMainArea],
+            ['Status', p.fldCurrentActivitySatus],
+            ['HC type', p.fldHcType],
+            ['Discovery', p.fldDiscoveryYear],
+          ]},
+          ...(lhRows.length>0 ? [{heading:'Ownership structure', rows:lhRows}] : []),
+          { heading: 'Links', rows: [
+            ['Sodir', p.fldFactPageUrl ? `<a href="${p.fldFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>` : null],
+          ]}
+        ]);
+      });
+      const name = p.fldName||'?';
+      if(labelState.fields) layer.bindTooltip(name,
+        {permanent:true, direction:'top', className:'map-label map-label-field', offset:[0,-4]}
+      );
+    }
+  }).addTo(fieldLayer);
+}
+
+// ── Aker BP office locations ───────────────────────────────────────────────
+const OFFICES = [
+  { name: 'Head Office – Fornebu', address: 'Oksenøyveien 10, 1366 Lysaker',        lat: 59.8953, lng: 10.6267 },
+  { name: 'Stavanger Office',         address: 'Jåttåflaten 28, 4020 Stavanger',      lat: 58.8943, lng: 5.6964  },
+  { name: 'Trondheim Office',         address: 'Munkegata 26, 7011 Trondheim',           lat: 63.4305, lng: 10.3951 },
+  { name: 'Sandnesjøen Office',    address: 'Øyvind Lambes vei 55, 8803 Sandnesjøen', lat: 66.0236, lng: 12.6354 },
+  { name: 'Harstad Office',           address: 'Storåkeren 11, 9411 Harstad',           lat: 68.7988, lng: 16.5447 },
+];
+
+(function renderOffices() {
+  OFFICES.forEach(o => {
+    const m = L.circleMarker([o.lat, o.lng], {
+      pane: 'officePane', radius: 7,
+      fillColor: '#ffffff', color: '#4a9eff', weight: 2.5, fillOpacity: 0.95
+    });
+    if(labelState.offices) m.bindTooltip(o.name,
+      { permanent: true, direction: 'right', className: 'map-label map-label-office', offset: [8, 0] }
+    );
+    m._officeData = o;
+    m.on('click', () => showSidebar(o.name, [{ rows: [
+      ['Address', o.address],
+      ['Phone', '(+47) 51 35 30 00'],
+      ['Maps', '<a href="https://www.google.com/maps/search/' + encodeURIComponent(o.address) + '" target="_blank" style="color:#4a9eff">Open in Maps &#x2197;</a>'],
+    ]}]));
+    m.addTo(officeLayer);
+  });
+})();
+
+
+// ── Customisation ─────────────────────────────────────────────────────────
+
+const DEFAULTS = {
+  LIC_OP:  '#e040fb', LIC_LH:  '#ff9800',
+  UNIT_OP: '#e040fb', UNIT_LH: '#ff9800',
+  FLD_OP:  '#00e676', FLD_OW:  '#ffeb3b', FLD_SD: '#ffffff'
+};
+
+let showShutdown = true;
+
+function toggleShutdown(visible) {
+  showShutdown = visible;
+  renderFields(window._fieldGeo);
+}
+
+
+function toggleCustomise() {
+  const panel = document.getElementById('customise-panel');
+  panel.classList.toggle('hidden');
+  // Close sidebar if open to avoid overlap
+  if (!panel.classList.contains('hidden')) {
+    document.getElementById('sidebar').classList.add('hidden');
+  }
+  // Sync colour pickers to current values
+  document.getElementById('col-lic-op').value  = C_LIC_OP;
+  document.getElementById('col-lic-lh').value  = C_LIC_LH;
+  document.getElementById('col-unit-op').value = C_UNIT_OP;
+  document.getElementById('col-unit-lh').value = C_UNIT_LH;
+  document.getElementById('col-fld-op').value  = C_FLD_OP;
+  document.getElementById('col-fld-ow').value  = C_FLD_OW;
+  document.getElementById('col-fld-sd').value  = C_FLD_SD;
+}
+
+function updateColour(key, value) {
+  if (key === 'LIC_OP')  { C_LIC_OP  = value; renderLicences(window._licGeo);  updateLegend(); }
+  if (key === 'LIC_LH')  { C_LIC_LH  = value; renderLicences(window._licGeo);  updateLegend(); }
+  if (key === 'UNIT_OP') { C_UNIT_OP = value; renderUnits(window._unitGeo);    updateLegend(); }
+  if (key === 'UNIT_LH') { C_UNIT_LH = value; renderUnits(window._unitGeo);    updateLegend(); }
+  if (key === 'FLD_OP')  { C_FLD_OP  = value; renderFields(window._fieldGeo);  updateLegend(); }
+  if (key === 'FLD_OW')  { C_FLD_OW  = value; renderFields(window._fieldGeo);  updateLegend(); }
+  if (key === 'FLD_SD')  { C_FLD_SD  = value; renderFields(window._fieldGeo);  updateLegend(); }
+}
+
+function resetCustomise() {
+  Object.entries(DEFAULTS).forEach(([k, v]) => {
+    document.getElementById('col-' + k.toLowerCase().replace('_', '-')).value = v;
+    updateColour(k, v);
+  });
+  // Reset labels
+  ['licences','units','fields','offices'].forEach(t => {
+    labelState[t] = true;
+    document.getElementById('lbl-' + t).checked = true;
+    applyLabelVisibility(t, true);
+  });
+  // Reset shutdown visibility
+  showShutdown = true;
+  document.getElementById('vis-shutdown').checked = true;
+  renderFields(window._fieldGeo);
+}
+
+function toggleLabels(type, visible) {
+  labelState[type] = visible;
+  applyLabelVisibility(type, visible);
+}
+
+function applyLabelVisibility(type, visible) {
+  // For map layers: re-render respects labelState (tooltips are bound
+  // conditionally in render). For offices, toggle directly.
+  if (type === 'licences') renderLicences(window._licGeo);
+  else if (type === 'units') renderUnits(window._unitGeo);
+  else if (type === 'fields') renderFields(window._fieldGeo);
+  else if (type === 'offices') {
+    officeLayer.eachLayer(l => {
+      if (visible) {
+        if (l._officeData) l.bindTooltip(l._officeData.name,
+          { permanent: true, direction: 'right', className: 'map-label map-label-office', offset: [8, 0] }
+        );
+      } else {
+        l.unbindTooltip();
+      }
+    });
+  }
+}
+
+function updateLegend() {
+  // Update swatch colours in legend
+  const swatches = {
+    'lic-op':  { bg: hexAlpha(C_LIC_OP, 0.22),  border: `2px solid ${C_LIC_OP}` },
+    'lic-lh':  { bg: hexAlpha(C_LIC_LH, 0.22),  border: `2px dashed ${C_LIC_LH}` },
+    'unit-op': { bg: hexAlpha(C_UNIT_OP, 0.30), border: `2.5px solid ${C_UNIT_OP}` },
+    'unit-lh': { bg: hexAlpha(C_UNIT_LH, 0.30), border: `2.5px dashed ${C_UNIT_LH}` },
+    'fld-op':  { bg: hexAlpha(C_FLD_OP, 0.55),  border: `2px solid ${C_FLD_OP}` },
+    'fld-ow':  { bg: hexAlpha(C_FLD_OW, 0.55),  border: `2px solid ${C_FLD_OW}` },
+  };
+  Object.entries(swatches).forEach(([id, style]) => {
+    const el = document.getElementById('swatch-' + id);
+    if (el) { el.style.background = style.bg; el.style.border = style.border; }
+  });
+  // Update statsbar dots
+  document.querySelectorAll('.dot-licence').forEach(d => d.style.background = C_LIC_OP);
+  document.querySelectorAll('.dot-unit').forEach(d => d.style.background = C_UNIT_OP);
+  document.querySelectorAll('.dot-field').forEach(d => d.style.background = C_FLD_OP);
+}
+
+function hexAlpha(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// Initialise colour picker values on load
+document.getElementById('col-lic-op').value  = C_LIC_OP;
+document.getElementById('col-lic-lh').value  = C_LIC_LH;
+document.getElementById('col-unit-op').value = C_UNIT_OP;
+document.getElementById('col-unit-lh').value = C_UNIT_LH;
+document.getElementById('col-fld-op').value  = C_FLD_OP;
+document.getElementById('col-fld-ow').value  = C_FLD_OW;
+document.getElementById('col-fld-sd').value  = C_FLD_SD;
+
+loadData();
+</script>
+</body>
+</html>
