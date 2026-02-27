@@ -67,7 +67,8 @@
     .map-label-licence { color: #ce0f69 !important; font-size: 10px !important; font-weight: 700 !important; }
     .map-label-unit    { color: #ce0f69 !important; font-size: 11px !important; font-weight: 700 !important; }
     .map-label-field   { color: #00b373 !important; font-size: 11px !important; font-weight: 700 !important; }
-    .map-label-office  { color: #4a9eff !important; font-size: 11px !important; font-weight: 600 !important; }
+    .map-label-office     { color: #4a9eff !important; font-size: 11px !important; font-weight: 600 !important; }
+    .map-label-discovery  { color: #ffdc00 !important; font-size: 10px !important; font-weight: 600 !important; }
     /* ── Customise panel ──────────────────────────────────────────────── */
     #customise-panel {
       position: absolute; top: 70px; right: 16px; width: 310px;
@@ -141,6 +142,7 @@
     <button class="legend-btn active" id="toggleLicences" onclick="toggleLayer('licences')">Licences</button>
     <button class="legend-btn active" id="toggleUnits"    onclick="toggleLayer('units')">Bus. Arr. Areas</button>
     <button class="legend-btn active" id="toggleFields"   onclick="toggleLayer('fields')">Fields</button>
+    <button class="legend-btn active" id="toggleDiscoveries" onclick="toggleLayer('discoveries')">Discoveries</button>
     <button class="legend-btn active" id="toggleOffices" onclick="toggleOfficeLayer()">Offices</button>
     <button class="legend-btn" id="toggleCustomise" onclick="toggleCustomise()">&#9881; Customise</button>
     <button class="legend-btn" onclick="toggleLegend()">Legend</button>
@@ -165,6 +167,10 @@
         <span class="cp-label">Show other NCS fields</span>
         <label class="cp-toggle"><input type="checkbox" id="vis-other-fields" onchange="toggleOtherFields(this.checked)"><span class="cp-slider"></span></label>
       </div>
+      <div class="cp-row">
+        <span class="cp-label">Show other NCS discoveries</span>
+        <label class="cp-toggle"><input type="checkbox" id="vis-other-discoveries" onchange="toggleOtherDiscoveries(this.checked)"><span class="cp-slider"></span></label>
+      </div>
     </div>
 
     <div class="cp-section">
@@ -180,6 +186,10 @@
       <div class="cp-row">
         <span class="cp-label">Field labels</span>
         <label class="cp-toggle"><input type="checkbox" id="lbl-fields" onchange="toggleLabels('fields',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Discovery labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-discoveries" onchange="toggleLabels('discoveries',this.checked)"><span class="cp-slider"></span></label>
       </div>
       <div class="cp-row">
         <span class="cp-label">Office labels</span>
@@ -209,6 +219,7 @@
   <div class="stat"><div class="stat-dot dot-licence"></div><span class="stat-label">Licences:</span><span class="stat-count" id="licenceCount">-</span></div>
   <div class="stat"><div class="stat-dot dot-unit"></div><span class="stat-label">BAAs:</span><span class="stat-count" id="unitCount">-</span></div>
   <div class="stat"><div class="stat-dot dot-field"></div><span class="stat-label">Fields:</span><span class="stat-count" id="fieldCount">-</span></div>
+  <div class="stat"><div class="stat-dot" style="background:#ffdc00"></div><span class="stat-label">Discoveries:</span><span class="stat-count" id="discoveryCount">-</span></div>
 </div>
 <div id="maplegend" class="hidden">
   <h3>Legend</h3>
@@ -219,6 +230,8 @@
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,179,115,0.55);border:2px solid #00b373;" id="swatch-fld-op"></div>Field – Aker BP operator/owner</div>
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.08);border:2px solid rgba(255,255,255,0.25);"></div>Field – shut down</div>
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,179,115,0.10);border:1px solid #00b373;opacity:0.6;"></div>Field – other (no Aker BP interest)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,220,0,0.7);border:2px solid #ffdc00;border-radius:50%;width:14px;height:14px;"></div>Discovery – Aker BP licence</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,220,0,0.2);border:1px solid #ffdc00;border-radius:50%;width:14px;height:14px;"></div>Discovery – other</div>
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.9);border:2px solid #4a9eff;border-radius:50%;"></div>Aker BP office</div>
 </div>
 
@@ -235,10 +248,11 @@ let C_UNIT_OP = '#ce0f69';
 let C_UNIT_LH = '#f68d2e';
 let C_FLD_OP  = '#00b373';
 let C_FLD_OW  = '#00b373';
-let C_FLD_SD  = '#ffffff';  // hvit dim – felt, shut down
+let C_FLD_SD  = '#ffffff';
+const C_DISC   = '#ffdc00';  // yellow – discovery  // hvit dim – felt, shut down
 
 // Label visibility state – declared early so renderOffices IIFE can access it
-const labelState = { licences: false, units: false, fields: false, offices: false };
+const labelState = { licences: false, units: false, fields: false, offices: false, discoveries: false };
 
 const map = L.map('map', { zoomControl: true }).setView([68, 10], 5);
 
@@ -268,21 +282,24 @@ function switchBasemap(name) {
 
 // Lag-rekkefølge nederst til øverst: lisenser → units → felt
 // Leaflet-paner for garantert lag-rekkefølge (høyere z-index = øverst)
+map.createPane('discoveryPane'); map.getPane('discoveryPane').style.zIndex = 425;
 map.createPane('officePane');  map.getPane('officePane').style.zIndex  = 430;
 map.createPane('licencePane'); map.getPane('licencePane').style.zIndex = 400;
 map.createPane('unitPane');    map.getPane('unitPane').style.zIndex    = 410;
 map.createPane('fieldPane');   map.getPane('fieldPane').style.zIndex   = 420;
 
+const discoveryLayer = L.layerGroup().addTo(map);
 const officeLayer  = L.layerGroup().addTo(map);
 const licenceLayer = L.layerGroup().addTo(map);
 const unitLayer    = L.layerGroup().addTo(map);
 const fieldLayer   = L.layerGroup().addTo(map);
 
-let showFields=true, showLicences=true, showUnits=true;
+let showFields=true, showLicences=true, showUnits=true, showDiscoveries=true;
 function toggleLayer(t) {
-  if(t==='fields')   { showFields=!showFields;     document.getElementById('toggleFields').classList.toggle('active',showFields);     showFields   ?map.addLayer(fieldLayer)  :map.removeLayer(fieldLayer);   }
-  if(t==='licences') { showLicences=!showLicences; document.getElementById('toggleLicences').classList.toggle('active',showLicences); showLicences ?map.addLayer(licenceLayer):map.removeLayer(licenceLayer); }
-  if(t==='units')    { showUnits=!showUnits;       document.getElementById('toggleUnits').classList.toggle('active',showUnits);       showUnits    ?map.addLayer(unitLayer)   :map.removeLayer(unitLayer);    }
+  if(t==='fields')      { showFields=!showFields;           document.getElementById('toggleFields').classList.toggle('active',showFields);           showFields      ?map.addLayer(fieldLayer)     :map.removeLayer(fieldLayer);      }
+  if(t==='licences')    { showLicences=!showLicences;       document.getElementById('toggleLicences').classList.toggle('active',showLicences);       showLicences    ?map.addLayer(licenceLayer)   :map.removeLayer(licenceLayer);    }
+  if(t==='units')       { showUnits=!showUnits;             document.getElementById('toggleUnits').classList.toggle('active',showUnits);             showUnits       ?map.addLayer(unitLayer)      :map.removeLayer(unitLayer);       }
+  if(t==='discoveries') { showDiscoveries=!showDiscoveries; document.getElementById('toggleDiscoveries').classList.toggle('active',showDiscoveries); showDiscoveries ?map.addLayer(discoveryLayer):map.removeLayer(discoveryLayer); }
 }
 function toggleLegend() { document.getElementById('maplegend').classList.toggle('hidden'); }
 let showOffices=true;
@@ -669,6 +686,10 @@ async function loadData() {
     document.getElementById('unitCount').textContent    = unitGeo.features.length;
     document.getElementById('fieldCount').textContent   = fieldGeo.features.length;
 
+    // ── 14. Discoveries ───────────────────────────────────────────────────
+    setLoading('Loading Aker BP discoveries...');
+    await loadAkerbpDiscoveries(licGeo);
+
     // Zoom til portefølje
     const allF = [...licGeo.features, ...unitGeo.features, ...fieldGeo.features];
     if(allF.length > 0) {
@@ -727,9 +748,20 @@ function renderLicences(geojson) {
           ]}
         ]);
       });
-      if(p.prlName && labelState.licences) layer.bindTooltip(p.prlName,
-        {permanent:true, direction:'center', className:'map-label map-label-licence', offset:[0,0]}
-      );
+      if(p.prlName) {
+        if(labelState.licences) {
+          layer.bindTooltip(p.prlName,
+            {permanent:true, direction:'center', className:'map-label map-label-licence', offset:[0,0]}
+          );
+        } else {
+          const role = p.isOperator ? 'Operator' : 'Licensee';
+          const myShare = p._myShare ? fmtPct(p._myShare) : null;
+          layer.bindTooltip(
+            `<strong>${p.prlName}</strong><br><span style="color:${col};font-size:11px">${role}${myShare ? ' · ' + myShare : ''}</span>`,
+            {sticky:true, className:'tooltip-dark'}
+          );
+        }
+      }
     }
   }).addTo(licenceLayer);
 }
@@ -776,9 +808,20 @@ function renderUnits(geojson) {
           ]}
         ]);
       });
-      if(p.baaName && labelState.units) layer.bindTooltip(p.baaName,
-        {permanent:true, direction:'center', className:'map-label map-label-unit', offset:[0,0]}
-      );
+      if(p.baaName) {
+        if(labelState.units) {
+          layer.bindTooltip(p.baaName,
+            {permanent:true, direction:'center', className:'map-label map-label-unit', offset:[0,0]}
+          );
+        } else {
+          const role = p.isOperator ? 'Operator' : 'Licensee';
+          const myShare = p._myShare ? fmtPct(p._myShare) : null;
+          layer.bindTooltip(
+            `<strong>${p.baaName}</strong><br><span style="color:${col};font-size:11px">${role}${myShare ? ' · ' + myShare : ''}</span>`,
+            {sticky:true, className:'tooltip-dark'}
+          );
+        }
+      }
     }
   }).addTo(unitLayer);
 }
@@ -867,9 +910,18 @@ function renderFields(geojson) {
         ]);
       });
       const name = p.fldName||'?';
-      if(labelState.fields && !p._other) layer.bindTooltip(name,
-        {permanent:true, direction:'top', className:'map-label map-label-field', offset:[0,-4]}
-      );
+      if(!p._other) {
+        if(labelState.fields) {
+          layer.bindTooltip(name,
+            {permanent:true, direction:'top', className:'map-label map-label-field', offset:[0,-4]}
+          );
+        } else {
+          layer.bindTooltip(
+            `<strong>${name}</strong><br><span style="color:${col};font-size:11px">${role}${myShare ? ' · ' + myShare : ''}</span>`,
+            {sticky:true, className:'tooltip-dark'}
+          );
+        }
+      }
     }
   }).addTo(fieldLayer);
 }
@@ -889,9 +941,16 @@ const OFFICES = [
       pane: 'officePane', radius: 7,
       fillColor: '#ffffff', color: '#4a9eff', weight: 2.5, fillOpacity: 0.95
     });
-    if(labelState.offices) m.bindTooltip(o.name,
-      { permanent: true, direction: 'right', className: 'map-label map-label-office', offset: [8, 0] }
-    );
+    if(labelState.offices) {
+      m.bindTooltip(o.name,
+        { permanent: true, direction: 'right', className: 'map-label map-label-office', offset: [8, 0] }
+      );
+    } else {
+      m.bindTooltip(
+        '<strong>' + o.name + '</strong><br><span style="font-size:11px;color:#8ab0d0">' + o.address + '</span>',
+        { sticky: true, className: 'tooltip-dark' }
+      );
+    }
     m._officeData = o;
     m.on('click', () => showSidebar(o.name, [{ rows: [
       ['Address', o.address],
@@ -946,7 +1005,7 @@ function resetCustomise() {
     document.getElementById('col-' + k.toLowerCase().replace('_', '-')).value = v;
   });
   // Reset labels
-  ['licences','units','fields','offices'].forEach(t => {
+  ['licences','units','fields','offices','discoveries'].forEach(t => {
     labelState[t] = true;
     document.getElementById('lbl-' + t).checked = true;
     applyLabelVisibility(t, true);
@@ -958,6 +1017,9 @@ function resetCustomise() {
   document.getElementById('vis-other-fields').checked = false;
   window._allFieldGeo = null;
   renderFields(window._fieldGeo);
+  showOtherDiscoveries = false;
+  document.getElementById('vis-other-discoveries').checked = false;
+  renderDiscoveries();
 }
 
 function toggleLabels(type, visible) {
@@ -971,12 +1033,22 @@ function applyLabelVisibility(type, visible) {
   if (type === 'licences') renderLicences(window._licGeo);
   else if (type === 'units') renderUnits(window._unitGeo);
   else if (type === 'fields') renderFields(window._fieldGeo);
+  else if (type === 'discoveries') renderDiscoveries();
   else if (type === 'offices') {
     officeLayer.eachLayer(l => {
       if (visible) {
-        if (l._officeData) l.bindTooltip(l._officeData.name,
-          { permanent: true, direction: 'right', className: 'map-label map-label-office', offset: [8, 0] }
-        );
+        if (l._officeData) {
+          if (visible) {
+            l.bindTooltip(l._officeData.name,
+              { permanent: true, direction: 'right', className: 'map-label map-label-office', offset: [8, 0] }
+            );
+          } else {
+            l.bindTooltip(
+              '<strong>' + l._officeData.name + '</strong><br><span style="font-size:11px;color:#8ab0d0">' + l._officeData.address + '</span>',
+              { sticky: true, className: 'tooltip-dark' }
+            );
+          }
+        }
       } else {
         l.unbindTooltip();
       }
@@ -1033,6 +1105,179 @@ async function loadAllFields() {
   }
   setLoading(null);
   renderFields(window._fieldGeo);
+}
+
+
+// ── Discovery colours ─────────────────────────────────────────────────────
+// C_DISC = '#ffdc00' defined above with colour constants
+
+// ── Load Aker BP discoveries (points from lag 7060 or 7050) ──────────────
+// Sodir discovery layer: wellbore discovery points are typically in the
+// wlbPoint layers. The factmaps discovery polygon layer is in the 5000-range.
+// We probe the known discovery point layer (7050) and polygon layer (5060).
+
+let showOtherDiscoveries = false;
+
+async function loadAkerbpDiscoveries(licGeo) {
+  // Build set of licence IDs where Aker BP is involved
+  const akerbpLicIds = new Set(licGeo.features.map(f => f.properties.prlNpdidLicence));
+
+  // Probe for discovery layer in DataService/Data MapServer.
+  // Known layer IDs from FactMaps_ogc: 503 (active), 504 (all).
+  // DataService/Data may use different numbering — probe broadly.
+  // Fields: dscNpdidDiscovery, dscName, dscCurrentActivityStatus, prlNpdidLicence, dscFactPageUrl
+  // Some layers use prlNpdidProdLicence instead of prlNpdidLicence.
+  let discoveryLayerId = null;
+  let discoveryFields  = null;
+  let licenceIdField   = null;
+
+  // Discovery layer is 7000 in DataService/Data.
+  // Probe with minimal fields first to confirm layer works, then check available fields.
+  const discoveryBase = BASE;
+
+  // Layer 7000 = discovery polygons. Known fields (no licence ID — use layer 7003 for that).
+  discoveryLayerId = 7000;
+  discoveryFields  = 'dscNpdidDiscovery,dscName,dscCurrentActivityStatus,dscFactPageUrl,dscDiscoveryYear,dscHcType,cmpLongName,cmpNpdidCompany,nmaName,fldName,fldNpdidField';
+  licenceIdField   = null;
+
+  if (discoveryLayerId === null) {
+    console.warn('No discovery layer found in DataService/Data – skipping');
+    setLoading(null);
+    return;
+  }
+
+  // Load all discoveries (paginated)
+  let rows = [];
+  let offset = 0;
+  while (true) {
+    const body = new URLSearchParams({
+      where: "dscCurrentActivityStatus NOT IN ('Included in other discovery','Producing','Shut down')", outFields: discoveryFields, f: 'json',
+      returnGeometry: 'true', outSR: '4326',
+      resultRecordCount: '500', resultOffset: String(offset)
+    });
+    const d = await (await fetch(`${discoveryBase}/${discoveryLayerId}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    })).json();
+    if (d.error) { console.warn('Discovery query error:', d.error.message); break; }
+    rows = rows.concat(d.features || []);
+    if (!d.exceededTransferLimit || (d.features||[]).length === 0) break;
+    offset += (d.features||[]).length;
+  }
+
+  console.log('Total discoveries loaded:', rows.length);
+
+  // Use layer 7003 (discovery_licensee table) to get ALL discoveries where
+  // Aker BP has any interest (operator or licensee).
+  setLoading('Loading Aker BP discovery interests...');
+  const akerbpDiscIds = new Set();
+  try {
+    const rows7003 = await queryAll(7003,
+      `cmpNpdidCompany = ${AKERBP_ID}`,
+      'dscNpdidDiscovery');
+    rows7003.forEach(f => akerbpDiscIds.add(f.attributes.dscNpdidDiscovery));
+    console.log('Aker BP discovery interests (lag 7003):', akerbpDiscIds.size);
+  } catch(e) { console.warn('Layer 7003 query failed:', e.message); }
+
+  const akerbpDisc = [], otherDisc = [];
+  rows.forEach(f => {
+    if (akerbpDiscIds.has(f.attributes.dscNpdidDiscovery)) akerbpDisc.push(f);
+    else otherDisc.push(f);
+  });
+
+  const toGeoD = (arr, isOther) => {
+    const geo = toGeoJSON(arr);
+    geo.features.forEach(f => { f.properties._other = isOther; f.properties._isDiscovery = true; });
+    return geo;
+  };
+
+  window._discAkerbpGeo = toGeoD(akerbpDisc, false);
+  window._discOtherGeo  = toGeoD(otherDisc, true);
+  console.log(`Discoveries – Aker BP: ${akerbpDisc.length}, other: ${otherDisc.length}`);
+
+  renderDiscoveries();
+  document.getElementById('discoveryCount').textContent = akerbpDisc.length;
+  setLoading(null);
+}
+
+function renderDiscoveries() {
+  discoveryLayer.clearLayers();
+  if (!window._discAkerbpGeo) return;
+
+  const features = [
+    ...(showOtherDiscoveries && window._discOtherGeo ? window._discOtherGeo.features : []),
+    ...window._discAkerbpGeo.features,
+  ];
+  const geo = { type: 'FeatureCollection', features };
+
+  L.geoJSON(geo, {
+    pane: 'discoveryPane',
+    pointToLayer(f, latlng) {
+      const other = f.properties._other;
+      return L.circleMarker(latlng, {
+        pane: 'discoveryPane',
+        radius: other ? 5 : 7,
+        fillColor: C_DISC,
+        color: C_DISC,
+        weight: other ? 1 : 2,
+        fillOpacity: other ? 0.20 : 0.75
+      });
+    },
+    style(f) {
+      const other = f.properties._other;
+      return {
+        color: C_DISC, weight: other ? 1 : 2,
+        fillColor: C_DISC,
+        fillOpacity: other ? 0.10 : 0.45,
+        opacity: other ? 0.4 : 0.9
+      };
+    },
+    onEachFeature(feature, layer) {
+      const p = feature.properties;
+      const other = p._other;
+      const name = p.dscName || '?';
+      const status = p.dscCurrentActivityStatus || '';
+
+      const hoverStyle  = { fillOpacity: other ? 0.45 : 0.95, weight: other ? 1.5 : 3 };
+      const returnStyle = { fillOpacity: other ? 0.10 : 0.45, weight: other ? 1 : 2 };
+
+      layer.on('mouseover', () => layer.setStyle && layer.setStyle(hoverStyle));
+      layer.on('mouseout',  () => layer.setStyle && layer.setStyle(returnStyle));
+      layer.on('click', () => {
+        showSidebar('Discovery: ' + name, [{ rows: [
+          ['Name', name],
+          ['Status', status],
+          ['HC type',       p.dscHcType || null],
+          ['Discovery year',p.dscDiscoveryYear || null],
+          ['Operator',      p.cmpLongName || null],
+          ['Area',          p.nmaName || null],
+          ['Aker BP',       other ? 'No' : '<span style="color:#ffdc00">Yes</span>'],
+          ['Related field', p.fldName || null],
+          ...(p.dscFactPageUrl ? [['Sodir', `<a href="${p.dscFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`]] : [])
+        ]}]);
+      });
+
+      if(!other) {
+        if(labelState.discoveries) {
+          layer.bindTooltip(name, {
+            permanent: true, direction: 'right',
+            className: 'map-label map-label-discovery', offset: [6, 0]
+          });
+        } else {
+          layer.bindTooltip(
+            `<strong>${name}</strong><br><span style="color:#ffdc00;font-size:11px">${p.dscHcType||''}</span>`,
+            {sticky:true, className:'tooltip-dark'}
+          );
+        }
+      }
+    }
+  }).addTo(discoveryLayer);
+}
+
+function toggleOtherDiscoveries(visible) {
+  showOtherDiscoveries = visible;
+  renderDiscoveries();
 }
 
 
