@@ -22,7 +22,7 @@
     .spinner { width: 48px; height: 48px; border: 4px solid #1e3a5f; border-top-color: #4a9eff; border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     #loading p { color: #8ab0d0; font-size: 14px; }
-    #sidebar { position: absolute; top: 70px; right: 16px; width: 320px; background: rgba(10,22,40,0.97); border: 1px solid #1e5fa8; border-radius: 10px; z-index: 800; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.6); max-height: calc(100vh - 100px); display: flex; flex-direction: column; }
+    #sidebar { position: absolute; top: 76px; right: 16px; width: 320px; background: rgba(10,22,40,0.97); border: 1px solid #1e5fa8; border-radius: 10px; z-index: 800; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.6); max-height: calc(100vh - 110px); display: flex; flex-direction: column; }
     #sidebar.hidden { display: none; }
     .sidebar-header { background: #0e2240; padding: 12px 16px; border-bottom: 1px solid #1e3a5f; display: flex; justify-content: space-between; align-items: center; }
     .sidebar-header h2 { font-size: 14px; color: #4a9eff; font-weight: 600; }
@@ -40,12 +40,12 @@
     .dot-field { background: #00b373; } .dot-licence { background: #ce0f69; } .dot-unit { background: #ce0f69; }
     .stat-label { color: #8ab0d0; }
     .stat-count { color: #fff; font-weight: 700; font-size: 15px; margin-left: 2px; }
-    #maplegend { position: absolute; top: 70px; left: 16px; background: rgba(10,22,40,0.94); border: 1px solid #1e5fa8; border-radius: 10px; padding: 14px; z-index: 800; min-width: 230px; }
+    #maplegend { position: absolute; top: 76px; left: 16px; background: rgba(10,22,40,0.94); border: 1px solid #1e5fa8; border-radius: 10px; padding: 14px; z-index: 800; min-width: 230px; }
     #maplegend.hidden { display: none; }
     #maplegend h3 { font-size: 11px; color: #4a9eff; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
     .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 13px; color: #c0d8f0; }
     .legend-swatch { width: 26px; height: 14px; border-radius: 3px; flex-shrink: 0; }
-    #errormsg { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: #3a1010; border: 1px solid #a03030; color: #ff8080; padding: 12px 20px; border-radius: 8px; z-index: 1000; font-size: 13px; max-width: 500px; text-align: center; }
+    #errormsg { position: absolute; top: 86px; left: 50%; transform: translateX(-50%); background: #3a1010; border: 1px solid #a03030; color: #ff8080; padding: 12px 20px; border-radius: 8px; z-index: 1000; font-size: 13px; max-width: 500px; text-align: center; }
     #errormsg.hidden { display: none; }
     .tooltip-dark { background: rgba(10,22,40,0.95) !important; border: 1px solid #1e5fa8 !important; color: #e0e8f0 !important; border-radius: 6px !important; padding: 5px 10px !important; font-size: 12px !important; font-family: 'Segoe UI', sans-serif !important; box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important; }
     .leaflet-tooltip.tooltip-dark::before { display: none !important; }
@@ -80,9 +80,10 @@
     .map-label-discovery  { color: #ffdc00 !important; font-size: 10px !important; font-weight: 600 !important; }
     /* ── Customise panel ──────────────────────────────────────────────── */
     #customise-panel {
-      position: absolute; top: 70px; right: 16px; width: 310px;
+      position: absolute; top: 76px; right: 16px; width: 310px;
       background: rgba(10,22,40,0.97); border: 1px solid #1e5fa8;
       border-radius: 10px; z-index: 900;
+      max-height: calc(100vh - 110px); overflow-y: auto;
       box-shadow: 0 4px 24px rgba(0,0,0,0.6);
       max-height: calc(100vh - 100px); display: flex; flex-direction: column;
     }
@@ -141,6 +142,14 @@
     .basemap-btn:last-child { margin-bottom: 0; }
     .basemap-btn:hover { background: #1e3a5f; }
     .basemap-btn.active { background: #1e5fa8; border-color: #4a9eff; color: #fff; }
+    @media (max-width: 600px) {
+      header { padding: 8px 12px; gap: 8px; }
+      header h1 { display: none; }
+      .logo svg { height: 26px; }
+      #sidebar, #customise-panel { top: 64px; right: 8px; left: 8px; width: auto; max-height: calc(100vh - 100px); }
+      #maplegend { top: 64px; left: 8px; right: 8px; min-width: unset; }
+      #statsbar { bottom: 60px; font-size: 11px; padding: 6px 14px; gap: 14px; }
+    }
   </style>
 </head>
 <body>
@@ -273,7 +282,8 @@ let showShutdown = false;
 let showOtherFields = false;
 let showOtherDiscoveries = false;
 
-const map = L.map('map', { zoomControl: true }).setView([68, 10], 5);
+const map = L.map('map', { zoomControl: false }).setView([68, 10], 5);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 const BASEMAPS = {
   'Dark':        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',   { attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 19 }),
@@ -1429,6 +1439,18 @@ function renderUKLicences(geojson) {
   }).addTo(ukLicenceLayer);
 }
 
+
+// Juster panel-posisjoner basert på faktisk header-høyde
+function adjustPanelTops() {
+  const h = document.querySelector('header').offsetHeight;
+  const offset = h + 8;
+  for (const id of ['sidebar', 'maplegend', 'customise-panel', 'errormsg']) {
+    const el = document.getElementById(id);
+    if (el) el.style.top = offset + 'px';
+  }
+}
+adjustPanelTops();
+window.addEventListener('resize', adjustPanelTops);
 
 loadData();
 </script>
