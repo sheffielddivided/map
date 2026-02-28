@@ -152,7 +152,6 @@
     <button class="legend-btn active" id="toggleFields"   onclick="toggleLayer('fields')">Fields</button>
     <button class="legend-btn active" id="toggleDiscoveries" onclick="toggleLayer('discoveries')">Discoveries</button>
     <button class="legend-btn" id="toggleCustomise" onclick="toggleCustomise()">&#9881; Customise</button>
-    <button class="legend-btn" onclick="toggleLegend()">Legend</button>
   </div>
 </header>
 <div id="map"></div>
@@ -218,7 +217,24 @@
     </div>
 
     <button class="cp-reset" onclick="resetCustomise()">&#8635; Reset to defaults</button>
+
+    <div class="cp-section" style="margin-top:16px;border-top:1px solid #1e3a5f;padding-top:14px">
+      <button class="cp-reset" style="background:#1e3a5f;width:100%;text-align:left;padding:8px 12px;border-radius:6px;color:#c0d8f0;font-size:12px;cursor:pointer;border:1px solid #2a5a8f" onclick="toggleLegend()">&#9432; Show / hide legend</button>
+    </div>
   </div>
+</div>
+
+<div id="maplegend" class="hidden">
+  <h3>Legend</h3>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(206,15,105,0.22);border:2px solid #ce0f69;" id="swatch-lic-op"></div>Licence – Aker BP operator</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(246,141,46,0.22);border:2px dashed #f68d2e;" id="swatch-lic-lh"></div>Licence – Aker BP licensee</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,207,255,0.18);border:2px solid #00cfff;"></div>UK Licence – Aker BP</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,179,115,0.55);border:2px solid #00b373;" id="swatch-fld-op"></div>Field – Aker BP operator/owner</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.08);border:2px solid rgba(255,255,255,0.25);"></div>Field – shut down</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,179,115,0.10);border:1px solid #00b373;opacity:0.6;"></div>Field – other (no Aker BP interest)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,220,0,0.7);border:2px solid #ffdc00;border-radius:50%;width:14px;height:14px;"></div>Discovery – Aker BP licence</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,220,0,0.2);border:1px solid #ffdc00;border-radius:50%;width:14px;height:14px;"></div>Discovery – other</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.9);border:2px solid #4a9eff;border-radius:50%;"></div>Aker BP office</div>
 </div>
 
 <div id="sidebar" class="hidden">
@@ -229,19 +245,6 @@
   <div class="stat"><div class="stat-dot dot-licence"></div><span class="stat-label">Licences:</span><span class="stat-count" id="licenceCount">-</span></div>
   <div class="stat"><div class="stat-dot dot-field"></div><span class="stat-label">Fields:</span><span class="stat-count" id="fieldCount">-</span></div>
   <div class="stat"><div class="stat-dot" style="background:#ffdc00"></div><span class="stat-label">Discoveries:</span><span class="stat-count" id="discoveryCount">-</span></div>
-  <div class="stat"><div class="stat-dot" style="background:#00cfff"></div><span class="stat-label">UK Licences:</span><span class="stat-count" id="ukLicenceCount">-</span></div>
-</div>
-<div id="maplegend" class="hidden">
-  <h3>Legend</h3>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(206,15,105,0.22);border:2px solid #ce0f69;" id="swatch-lic-op"></div>Licence – Aker BP operator</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(246,141,46,0.22);border:2px dashed #f68d2e;" id="swatch-lic-lh"></div>Licence – Aker BP licensee</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,179,115,0.55);border:2px solid #00b373;" id="swatch-fld-op"></div>Field – Aker BP operator/owner</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.08);border:2px solid rgba(255,255,255,0.25);"></div>Field – shut down</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,179,115,0.10);border:1px solid #00b373;opacity:0.6;"></div>Field – other (no Aker BP interest)</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,220,0,0.7);border:2px solid #ffdc00;border-radius:50%;width:14px;height:14px;"></div>Discovery – Aker BP licence</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,220,0,0.2);border:1px solid #ffdc00;border-radius:50%;width:14px;height:14px;"></div>Discovery – other</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,207,255,0.18);border:2px solid #00cfff;"></div>UK Licence – Aker BP</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.9);border:2px solid #4a9eff;border-radius:50%;"></div>Aker BP office</div>
 </div>
 
 <div id="errormsg" class="hidden"></div>
@@ -1347,13 +1350,14 @@ async function loadUKLicences() {
   const geojson = await resp.json();
 
   if (!geojson.features?.length) {
-    document.getElementById('ukLicenceCount').textContent = '0';
     return;
   }
 
   window._ukGeo = geojson;
   renderUKLicences(geojson);
-  document.getElementById('ukLicenceCount').textContent = geojson.features.length;
+  // Summer UK-lisenser inn i licenceCount
+  const norCount = parseInt(document.getElementById('licenceCount').textContent) || 0;
+  document.getElementById('licenceCount').textContent = norCount + geojson.features.length;
   console.log(`UK lisenser: ${geojson.features.length}`);
 }
 
