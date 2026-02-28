@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Aker BP – Fields, Licences and Business Arrangement Areas on the NCS</title>
+  <title>Aker BP – Licence Map</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
@@ -63,6 +63,15 @@
       text-shadow: 0 0 3px #000, 0 0 6px #000, 0 0 10px #000 !important;
       padding: 0 !important;
     }
+    /* Light basemap: dark outline instead of black glow */
+    body.basemap-light .map-label {
+      text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 10px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff !important;
+    }
+    body.basemap-light .map-label-licence { color: #9a0048 !important; }
+    body.basemap-light .map-label-unit    { color: #9a0048 !important; }
+    body.basemap-light .map-label-field   { color: #007a50 !important; }
+    body.basemap-light .map-label-office  { color: #1a6abf !important; }
+    body.basemap-light .map-label-discovery { color: #b8900a !important; }
     .map-label::before { display: none !important; }
     .map-label-licence { color: #ce0f69 !important; font-size: 10px !important; font-weight: 700 !important; }
     .map-label-unit    { color: #ce0f69 !important; font-size: 11px !important; font-weight: 700 !important; }
@@ -137,13 +146,11 @@
 <body>
 <header>
   <div class="logo"><svg height="36" style="display:block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 568 128"><path d="M201.1 89.8h-46l-11.9 26.5h-9.8L173 29h10.5l39.6 87.3h-10.5l-11.5-26.5zm-22.9-51.7l-19.4 43.4h38.6l-19.2-43.4zM227.4 28.3h9v55.4l38.8-30.9h13.5l-31.1 24.1 33.5 39.5h-12l-28.3-33.6-14.3 10.9v22.7h-9l-.1-88.1z" fill="#6d6e6b"></path><path d="M354.8 96.1c-3.7 11.2-13.2 22.3-34.2 22.3-26 0-34.6-18.2-34.6-33.8 0-17.7 10.9-33.7 34.6-33.7 16.4 0 35.8 7.1 35.8 35.9H295c0 13.2 9.4 24 25.5 24 15.2 0 22-5 25.2-14.7h9.1zm-7.5-16.2c-2.6-15.7-14.1-21.5-26.2-21.5-11.6 0-24.1 6-26.2 21.5h52.4zM365.3 52.8h9v14.6h.2c3.3-7.6 9.3-16.5 24.3-16.5 1.8 0 3.6.1 5.4.5v9.3c-2.7-.5-5.5-.7-8.3-.7-9.8 0-21.6 6-21.6 24.1v32.4h-9V52.8zM409.5 29.1h49.6c17.1 0 24.3 9.7 24.3 22 0 8.4-4.6 16.3-15 18.7v.2c11.5 1.7 18.5 10.1 18.5 21.4 0 18.2-15.4 24.9-28.9 24.9h-48.6V29.1zm9 37.9h35.8c12.2 0 20-3.9 20-15.5 0-10.6-7.1-14.1-17-14.1h-38.8V67zm0 41h38c11.7 0 20.5-4.7 20.5-16.6 0-12.6-7.8-16.1-18.3-16.1h-40.2V108zM494.6 29.1h47.1c13.5 0 26.3 6.7 26.3 25.2 0 16.5-10.9 25.4-30.3 25.4h-34v36.7h-9l-.1-87.3zm9.1 42.3h35c15.2 0 19.6-7 19.6-17.1 0-13.1-7.3-16.9-17.7-16.9h-36.8l-.1 34z" fill="#6d6e6b"></path><linearGradient id="a" gradientUnits="userSpaceOnUse" x1="95.178" y1="74.202" x2="118.788" y2="67.432" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#ac6244"></stop><stop offset=".49" stop-color="#8d2700"></stop><stop offset=".63" stop-color="#8f2a04"></stop><stop offset=".75" stop-color="#94340f"></stop><stop offset=".87" stop-color="#9c4421"></stop><stop offset=".98" stop-color="#a85a3a"></stop><stop offset="1" stop-color="#aa5e3f"></stop></linearGradient><path d="M119.8 53.5c.2-1.5.4-2.8.6-4v.1c-.7 4-4.4 1.8-5.9.8-7.7-5.1-19.5-10.1-17.1 3.5 2.2 12.7 18 18.3 17.8 21.1 2-6.8 3.5-13.8 4.5-20.8l.1-.7z" fill="url(#a)"></path><path d="M27.6 6.6c-.5.8.3 1.7 1.4 2.8 3.5-2.9.1-5.2-1.3-3l-.1.2zM24.2 31.4c-1.4-2.5-2.7-5.5-2.2-8.4-1.6 1.8-3 3.8-4 6-.5 1-.5 2.1 6.2 2.4zM15.4 43.1c-.3-2.3-2.5-3.5-3.2-2-.4.8-.2 2.6 3 3.9.2-.6.3-1.2.2-1.9z" fill="#54284e"></path><linearGradient id="b" gradientUnits="userSpaceOnUse" x1="-310.911" y1="-171.789" x2="-254.041" y2="-190.262" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset="0" stop-color="#8e006d"></stop><stop offset=".04" stop-color="#ad006d"></stop><stop offset=".08" stop-color="#c4006d"></stop><stop offset=".11" stop-color="#d2006d"></stop><stop offset=".14" stop-color="#d7006d"></stop><stop offset=".17" stop-color="#d80670"></stop><stop offset=".2" stop-color="#db1778"></stop><stop offset=".24" stop-color="#e13386"></stop><stop offset=".28" stop-color="#e95a9a"></stop><stop offset=".32" stop-color="#f28bb2"></stop><stop offset=".33" stop-color="#f391b6"></stop><stop offset=".34" stop-color="#f498bb"></stop><stop offset=".37" stop-color="#f49abc"></stop><stop offset=".41" stop-color="#f27bb0"></stop><stop offset=".48" stop-color="#ef469b"></stop><stop offset=".54" stop-color="#ec208c"></stop><stop offset=".59" stop-color="#eb0983"></stop><stop offset=".62" stop-color="#ea0080"></stop><stop offset=".69" stop-color="#e0007e"></stop><stop offset=".81" stop-color="#c60079"></stop><stop offset=".96" stop-color="#9b0070"></stop><stop offset="1" stop-color="#8e006d"></stop></linearGradient><path d="M71.4 48c-1.8-2.2-3.9-4.1-6.4-5.5-11-6.8-29.8-10.9-37.7-11-1.2 0-2.2 0-3.1-.1-6.7-.3-6.7-1.4-6.2-2.4 1-2.2 2.4-4.3 4.1-6 4.8-5.1 10.9-6.9 15.7-8.2C44 13 54.5 7.1 45.3 2.3s-14.7-.6-15.7.8c-.8 1.1-1.4 2.3-2 3.5l.1-.2c1.5-2.2 4.8.1 1.3 3l-.2.1c-3.9 3.1-8.1 10.2-10.4 15.4-3.2 7.1-6.3 16.2-6.3 16.2.8-1.5 2.9-.3 3.2 2 .1.6 0 1.3-.2 1.9-.5 1.4-1.1 2.7-1.9 3.9-3.2 5.5 1.9 10.2 6.6 11.1 4.1.8 27.2-1.2 35.5-2.2 1.3-.2 2.2-.3 2.7-.4 3.4-.6 18.2-3 13.4-9.4z" fill="url(#b)"></path><path d="M1.8 79.8v-.2.2z" fill="#0d361c"></path><linearGradient id="c" gradientUnits="userSpaceOnUse" x1="1.764" y1="49.34" x2="17.5" y2="49.34" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#003824"></stop><stop offset="1" stop-color="#00822c"></stop></linearGradient><path d="M3.2 87c2.9 2.2 7.8 1.4 14.3-.1C9.8 78.8 7.2 72.6 4.4 73c-1.5.2-2.2 4.2-2.6 6.7-.2 4.4.4 6.6 1.4 7.3z" fill="url(#c)"></path><linearGradient id="d" gradientUnits="userSpaceOnUse" x1="-316.529" y1="-243.401" x2="-260.452" y2="-275.779" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset="0" stop-color="#003824"></stop><stop offset=".51" stop-color="#109840"></stop><stop offset=".72" stop-color="#0d943c"></stop><stop offset=".93" stop-color="#048831"></stop><stop offset="1" stop-color="#00822c"></stop></linearGradient><path d="M5.3 102.5l-.7-.2c1.9 3.8 4.2 7.4 6.9 10.7 15.4 18.9 46.1 15.6 53.2 13.1s1.6-7.6-2.7-10.1c-2.5-1.5-9.4-4.1-18.3-9.2-12.6-.3-27.8-1.4-38.4-4.3z" fill="url(#d)"></path><linearGradient id="e" gradientUnits="userSpaceOnUse" x1="-289.899" y1="-194.116" x2="-210.154" y2="-210.997" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset=".16" stop-color="#8d2719"></stop><stop offset=".22" stop-color="#9b391c"></stop><stop offset=".34" stop-color="#bf6722"></stop><stop offset=".51" stop-color="#f5ad2c"></stop><stop offset=".65" stop-color="#f5ad2c"></stop><stop offset=".69" stop-color="#f2a32c"></stop><stop offset=".77" stop-color="#e98a2a"></stop><stop offset=".86" stop-color="#dc6029"></stop><stop offset=".93" stop-color="#d03c27"></stop></linearGradient><path d="M108.8 33.1c-11 .1-22 1.7-32.7 4.6-3.9 1-7.6 2.6-11 4.8v.1c2.4 1.4 4.6 3.3 6.3 5.5 4.8 6.4-10 8.8-13.5 9.5-.5.1-1.4.2-2.7.4-.2 1.5-.2 3 0 4.5.4 3.3-1.1 6.7-4.8 7.5s-20.7 5.3-20.8 9c.1 1.8.6 3.5 1.5 5 2.1-.4 4.4-.8 6.7-1.1 16.4-2.1 47.3-6.3 49.2.8 8.6-4 13.9-8.7 17.3-10.3 4-1.9 10 3.8 10.8 1.7.2-2.8-15.7-8.4-17.8-21.1-2.3-13.6 9.5-8.6 17.1-3.5 1.5 1 5.2 3.2 5.9-.8v-.1c.9-6.3.7-6.7 1.1-10.8.5-5-7.9-5.9-12.6-5.7z" fill="url(#e)"></path><linearGradient id="f" gradientUnits="userSpaceOnUse" x1="1.482" y1="49.064" x2="83.137" y2="28.71" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#005d33"></stop><stop offset=".02" stop-color="#096339"></stop><stop offset=".06" stop-color="#237349"></stop><stop offset=".11" stop-color="#4d8d62"></stop><stop offset=".17" stop-color="#86b186"></stop><stop offset=".21" stop-color="#b2cda1"></stop><stop offset=".25" stop-color="#b2cda1"></stop><stop offset=".3" stop-color="#73bb7a"></stop><stop offset=".35" stop-color="#42ad5c"></stop><stop offset=".4" stop-color="#1ea345"></stop><stop offset=".43" stop-color="#089c38"></stop><stop offset=".46" stop-color="#009a33"></stop><stop offset=".87" stop-color="#005d33"></stop></linearGradient><path d="M37.9 82.8c-2.3.3-4.6.7-6.7 1.1-5.1 1-9.8 2.2-13.7 3-6.5 1.5-11.4 2.3-14.3.1-1-.8-1.6-3-1.4-7.3v.2C1.2 84-.1 92.6 0 96.3c.1 3.5.8 4.8 4.6 6l.7.2c10.6 2.9 25.8 4 38.5 4.3 10.9.2 19.9-.2 22.3-.6 5.1-.8 4.5-4.4 3.8-6.9-.8-2.7-1.4-4.8 2.6-5.8 5.1-1.3 14.3-5 14.8-8.7.1-.4 0-.8-.1-1.2-2-7.1-32.9-2.9-49.3-.8z" fill="url(#f)"></path></svg></div>
-  <h1>Fields, Licences and Business Arrangement Areas on the NCS</h1>
+  <h1>Licence map</h1>
   <div class="controls">
     <button class="legend-btn active" id="toggleLicences" onclick="toggleLayer('licences')">Licences</button>
-    <button class="legend-btn active" id="toggleUnits"    onclick="toggleLayer('units')">Bus. Arr. Areas</button>
     <button class="legend-btn active" id="toggleFields"   onclick="toggleLayer('fields')">Fields</button>
     <button class="legend-btn active" id="toggleDiscoveries" onclick="toggleLayer('discoveries')">Discoveries</button>
-    <button class="legend-btn active" id="toggleOffices" onclick="toggleOfficeLayer()">Offices</button>
     <button class="legend-btn" id="toggleCustomise" onclick="toggleCustomise()">&#9881; Customise</button>
     <button class="legend-btn" onclick="toggleLegend()">Legend</button>
   </div>
@@ -159,17 +166,22 @@
 
     <div class="cp-section">
       <div class="cp-section-title">Visibility</div>
+
+      <div class="cp-row">
+        <span class="cp-label">Show carbon storage licences</span>
+        <label class="cp-toggle"><input type="checkbox" id="vis-carbon" onchange="toggleCarbonLicences(this.checked)"><span class="cp-slider"></span></label>
+      </div>
       <div class="cp-row">
         <span class="cp-label">Show shut-down fields</span>
         <label class="cp-toggle"><input type="checkbox" id="vis-shutdown" onchange="toggleShutdown(this.checked)"><span class="cp-slider"></span></label>
       </div>
       <div class="cp-row">
         <span class="cp-label">Show other NCS fields</span>
-        <label class="cp-toggle"><input type="checkbox" id="vis-other-fields" onchange="toggleOtherFields(this.checked)"><span class="cp-slider"></span></label>
+        <label class="cp-toggle"><input type="checkbox" id="vis-otherfields" onchange="toggleOtherFields(this.checked)"><span class="cp-slider"></span></label>
       </div>
       <div class="cp-row">
         <span class="cp-label">Show other NCS discoveries</span>
-        <label class="cp-toggle"><input type="checkbox" id="vis-other-discoveries" onchange="toggleOtherDiscoveries(this.checked)"><span class="cp-slider"></span></label>
+        <label class="cp-toggle"><input type="checkbox" id="vis-otherdisc" onchange="toggleOtherDiscoveries(this.checked)"><span class="cp-slider"></span></label>
       </div>
     </div>
 
@@ -177,34 +189,32 @@
       <div class="cp-section-title">Labels on map</div>
       <div class="cp-row">
         <span class="cp-label">Licence labels</span>
-        <label class="cp-toggle"><input type="checkbox" id="lbl-licences" onchange="toggleLabels('licences',this.checked)"><span class="cp-slider"></span></label>
-      </div>
-      <div class="cp-row">
-        <span class="cp-label">BAA labels</span>
-        <label class="cp-toggle"><input type="checkbox" id="lbl-units" onchange="toggleLabels('units',this.checked)"><span class="cp-slider"></span></label>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-licences" onchange="toggleLabels('licences',this.checked);toggleLabels('units',this.checked);toggleLabels('ukLicences',this.checked)"><span class="cp-slider"></span></label>
       </div>
       <div class="cp-row">
         <span class="cp-label">Field labels</span>
         <label class="cp-toggle"><input type="checkbox" id="lbl-fields" onchange="toggleLabels('fields',this.checked)"><span class="cp-slider"></span></label>
       </div>
       <div class="cp-row">
-        <span class="cp-label">Discovery labels</span>
-        <label class="cp-toggle"><input type="checkbox" id="lbl-discoveries" onchange="toggleLabels('discoveries',this.checked)"><span class="cp-slider"></span></label>
-      </div>
-      <div class="cp-row">
         <span class="cp-label">Office labels</span>
         <label class="cp-toggle"><input type="checkbox" id="lbl-offices" onchange="toggleLabels('offices',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Discovery labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-discoveries" onchange="toggleLabels('discoveries',this.checked)"><span class="cp-slider"></span></label>
       </div>
     </div>
 
     <div class="cp-section">
       <div class="cp-section-title">Basemap</div>
-      <button class="basemap-btn active" data-name="Dark"      onclick="switchBasemap(this.dataset.name)">Dark</button>
-      <button class="basemap-btn"        data-name="Light"     onclick="switchBasemap(this.dataset.name)">Light</button>
-      <button class="basemap-btn"        data-name="OSM"       onclick="switchBasemap(this.dataset.name)">OpenStreetMap</button>
-      <button class="basemap-btn"        data-name="Satellite" onclick="switchBasemap(this.dataset.name)">Satellite</button>
-      <button class="basemap-btn"        data-name="Ocean"     onclick="switchBasemap(this.dataset.name)">Ocean (Esri)</button>
-      <button class="basemap-btn"        data-name="NatGeo"    onclick="switchBasemap(this.dataset.name)">Nat. Geographic</button>
+      <div class="cp-basemap-grid">
+        <button class="basemap-btn active" data-name="Dark"      onclick="switchBasemap(this.dataset.name)">Dark</button>
+        <button class="basemap-btn"        data-name="Light"     onclick="switchBasemap(this.dataset.name)">Light</button>
+        <button class="basemap-btn"        data-name="OSM"       onclick="switchBasemap(this.dataset.name)">OpenStreetMap</button>
+        <button class="basemap-btn"        data-name="Satellite" onclick="switchBasemap(this.dataset.name)">Satellite</button>
+        <button class="basemap-btn"        data-name="Ocean"     onclick="switchBasemap(this.dataset.name)">Ocean</button>
+        <button class="basemap-btn"        data-name="NatGeo"    onclick="switchBasemap(this.dataset.name)">Nat. Geographic</button>
+      </div>
     </div>
 
     <button class="cp-reset" onclick="resetCustomise()">&#8635; Reset to defaults</button>
@@ -217,21 +227,20 @@
 </div>
 <div id="statsbar">
   <div class="stat"><div class="stat-dot dot-licence"></div><span class="stat-label">Licences:</span><span class="stat-count" id="licenceCount">-</span></div>
-  <div class="stat"><div class="stat-dot dot-unit"></div><span class="stat-label">BAAs:</span><span class="stat-count" id="unitCount">-</span></div>
   <div class="stat"><div class="stat-dot dot-field"></div><span class="stat-label">Fields:</span><span class="stat-count" id="fieldCount">-</span></div>
   <div class="stat"><div class="stat-dot" style="background:#ffdc00"></div><span class="stat-label">Discoveries:</span><span class="stat-count" id="discoveryCount">-</span></div>
+  <div class="stat"><div class="stat-dot" style="background:#00cfff"></div><span class="stat-label">UK Licences:</span><span class="stat-count" id="ukLicenceCount">-</span></div>
 </div>
 <div id="maplegend" class="hidden">
   <h3>Legend</h3>
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(206,15,105,0.22);border:2px solid #ce0f69;" id="swatch-lic-op"></div>Licence – Aker BP operator</div>
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(246,141,46,0.22);border:2px dashed #f68d2e;" id="swatch-lic-lh"></div>Licence – Aker BP licensee</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(206,15,105,0.35);border:3px solid #ce0f69;" id="swatch-unit-op"></div>Bus. arr. area – operator</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(246,141,46,0.35);border:3px dashed #f68d2e;" id="swatch-unit-lh"></div>Bus. arr. area – licensee</div>
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,179,115,0.55);border:2px solid #00b373;" id="swatch-fld-op"></div>Field – Aker BP operator/owner</div>
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.08);border:2px solid rgba(255,255,255,0.25);"></div>Field – shut down</div>
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,179,115,0.10);border:1px solid #00b373;opacity:0.6;"></div>Field – other (no Aker BP interest)</div>
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,220,0,0.7);border:2px solid #ffdc00;border-radius:50%;width:14px;height:14px;"></div>Discovery – Aker BP licence</div>
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,220,0,0.2);border:1px solid #ffdc00;border-radius:50%;width:14px;height:14px;"></div>Discovery – other</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,207,255,0.18);border:2px solid #00cfff;"></div>UK Licence – Aker BP</div>
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.9);border:2px solid #4a9eff;border-radius:50%;"></div>Aker BP office</div>
 </div>
 
@@ -240,6 +249,7 @@
 <script>
 const BASE      = 'https://factmaps.sodir.no/api/rest/services/DataService/Data/MapServer';
 const AKERBP_ID = 28544099;
+const NSTA_BASE = 'https://services-eu1.arcgis.com/OZMfUznmLTnWccBc/arcgis/rest/services/UKCS%20offshore%20petroleum%20licences%20WGS84/FeatureServer';
 
 // Farger
 let C_LIC_OP  = '#ce0f69';
@@ -252,7 +262,13 @@ let C_FLD_SD  = '#ffffff';
 const C_DISC   = '#ffdc00';  // yellow – discovery  // hvit dim – felt, shut down
 
 // Label visibility state – declared early so renderOffices IIFE can access it
-const labelState = { licences: false, units: false, fields: false, offices: false, discoveries: false };
+const labelState = { licences: false, units: false, fields: false, offices: false, discoveries: false, ukLicences: false };
+
+// Feature visibility flags – declared early so render functions can always read them
+let showCarbonLicences = false;
+let showShutdown = false;
+let showOtherFields = false;
+let showOtherDiscoveries = false;
 
 const map = L.map('map', { zoomControl: true }).setView([68, 10], 5);
 
@@ -268,16 +284,17 @@ const BASEMAPS = {
 let currentBasemap = BASEMAPS['Dark'];
 currentBasemap.addTo(map);
 
-function switchBasemap(name) {
-  map.removeLayer(currentBasemap);
+const LIGHT_BASEMAPS = new Set(['Light', 'OSM', 'NatGeo']);
+async function switchBasemap(name) {
+  if (currentBasemap) map.removeLayer(currentBasemap);
   currentBasemap = BASEMAPS[name];
   currentBasemap.addTo(map);
-  // Ensure basemap is below data layers
   const pane = map.getPane('tilePane');
   if (pane) pane.style.zIndex = 200;
   document.querySelectorAll('.basemap-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.name === name)
   );
+  document.body.classList.toggle('basemap-light', LIGHT_BASEMAPS.has(name));
 }
 
 // Lag-rekkefølge nederst til øverst: lisenser → units → felt
@@ -293,17 +310,17 @@ const officeLayer  = L.layerGroup().addTo(map);
 const licenceLayer = L.layerGroup().addTo(map);
 const unitLayer    = L.layerGroup().addTo(map);
 const fieldLayer   = L.layerGroup().addTo(map);
+const ukLicenceLayer = L.layerGroup().addTo(map);
 
 let showFields=true, showLicences=true, showUnits=true, showDiscoveries=true;
+let showUKLicences=true;
 function toggleLayer(t) {
   if(t==='fields')      { showFields=!showFields;           document.getElementById('toggleFields').classList.toggle('active',showFields);           showFields      ?map.addLayer(fieldLayer)     :map.removeLayer(fieldLayer);      }
-  if(t==='licences')    { showLicences=!showLicences;       document.getElementById('toggleLicences').classList.toggle('active',showLicences);       showLicences    ?map.addLayer(licenceLayer)   :map.removeLayer(licenceLayer);    }
-  if(t==='units')       { showUnits=!showUnits;             document.getElementById('toggleUnits').classList.toggle('active',showUnits);             showUnits       ?map.addLayer(unitLayer)      :map.removeLayer(unitLayer);       }
+  if(t==='licences')    { showLicences=!showLicences; showUnits=showLicences; showUKLicences=showLicences; document.getElementById('toggleLicences').classList.toggle('active',showLicences); showLicences ? (map.addLayer(licenceLayer), map.addLayer(unitLayer), map.addLayer(ukLicenceLayer)) : (map.removeLayer(licenceLayer), map.removeLayer(unitLayer), map.removeLayer(ukLicenceLayer)); }
   if(t==='discoveries') { showDiscoveries=!showDiscoveries; document.getElementById('toggleDiscoveries').classList.toggle('active',showDiscoveries); showDiscoveries ?map.addLayer(discoveryLayer):map.removeLayer(discoveryLayer); }
 }
 function toggleLegend() { document.getElementById('maplegend').classList.toggle('hidden'); }
 let showOffices=true;
-function toggleOfficeLayer(){ showOffices=!showOffices; document.getElementById('toggleOffices').classList.toggle('active',showOffices); showOffices?map.addLayer(officeLayer):map.removeLayer(officeLayer); }
 function closeSidebar()  { document.getElementById('sidebar').classList.add('hidden'); }
 function showError(msg)  { const el=document.getElementById('errormsg'); el.textContent=msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),12000); }
 function setLoading(msg) { const el=document.getElementById('loading'); msg ? (document.getElementById('loadingMsg').textContent=msg, el.classList.remove('hidden')) : el.classList.add('hidden'); }
@@ -683,12 +700,15 @@ async function loadData() {
     renderFields(fieldGeo);
 
     document.getElementById('licenceCount').textContent = licGeo.features.length;
-    document.getElementById('unitCount').textContent    = unitGeo.features.length;
+    // unitCount element removed from UI
     document.getElementById('fieldCount').textContent   = fieldGeo.features.length;
 
     // ── 14. Discoveries ───────────────────────────────────────────────────
     setLoading('Loading Aker BP discoveries...');
     await loadAkerbpDiscoveries(licGeo);
+
+    // UK-lisenser (ikke-blokkerende — eget API)
+    loadUKLicences().catch(e => console.warn('UK licences failed:', e));
 
     // Zoom til portefølje
     const allF = [...licGeo.features, ...unitGeo.features, ...fieldGeo.features];
@@ -710,6 +730,7 @@ async function loadData() {
 // ─── RENDER ───────────────────────────────────────────────────────────────
 
 function renderLicences(geojson) {
+  if (!geojson) return;
   licenceLayer.clearLayers();
   L.geoJSON(geojson, {
     pane: 'licencePane',
@@ -767,8 +788,14 @@ function renderLicences(geojson) {
 }
 
 function renderUnits(geojson) {
+  if (!geojson) return;
   unitLayer.clearLayers();
-  L.geoJSON(geojson, {
+  // EXL-enheter er karbonlagring — filtrer bort med mindre showCarbonLicences er på
+  const filtered = showCarbonLicences ? geojson : {
+    type: 'FeatureCollection',
+    features: geojson.features.filter(f => !String(f.properties.baaName || '').toUpperCase().startsWith('EXL'))
+  };
+  L.geoJSON(filtered, {
     pane: 'unitPane',
     style(f) {
       const col = f.properties.isOperator ? C_UNIT_OP : C_UNIT_LH;
@@ -910,7 +937,12 @@ function renderFields(geojson) {
         ]);
       });
       const name = p.fldName||'?';
-      if(!p._other) {
+      if(p._other) {
+        layer.bindTooltip(
+          `<strong>${name}</strong><br><span style="color:#00b373;font-size:11px">Other NCS field</span>`,
+          {sticky:true, className:'tooltip-dark'}
+        );
+      } else {
         if(labelState.fields) {
           layer.bindTooltip(name,
             {permanent:true, direction:'top', className:'map-label map-label-field', offset:[0,-4]}
@@ -970,8 +1002,10 @@ const DEFAULTS = {
   FLD_OP:  '#00b373', FLD_OW:  '#00b373', FLD_SD: '#ffffff'
 };
 
-let showShutdown = false;
-let showOtherFields = false;
+function toggleCarbonLicences(visible) {
+  showCarbonLicences = visible;
+  renderUnits(window._unitGeo);
+}
 
 function toggleShutdown(visible) {
   showShutdown = visible;
@@ -1005,12 +1039,16 @@ function resetCustomise() {
     document.getElementById('col-' + k.toLowerCase().replace('_', '-')).value = v;
   });
   // Reset labels
-  ['licences','units','fields','offices','discoveries'].forEach(t => {
-    labelState[t] = true;
-    document.getElementById('lbl-' + t).checked = true;
-    applyLabelVisibility(t, true);
+  ['licences','fields','offices','discoveries'].forEach(t => {
+    labelState[t] = false;
+    document.getElementById('lbl-' + t).checked = false;
+    applyLabelVisibility(t, false);
   });
-  // Reset shutdown visibility
+  labelState.units = false;
+  applyLabelVisibility('units', false);
+  showCarbonLicences = false;
+  document.getElementById('vis-carbon').checked = false;
+  renderUnits(window._unitGeo);
   showShutdown = false;
   document.getElementById('vis-shutdown').checked = false;
   showOtherFields = false;
@@ -1034,6 +1072,7 @@ function applyLabelVisibility(type, visible) {
   else if (type === 'units') renderUnits(window._unitGeo);
   else if (type === 'fields') renderFields(window._fieldGeo);
   else if (type === 'discoveries') renderDiscoveries();
+  else if (type === 'ukLicences') { if (window._ukGeo) renderUKLicences(window._ukGeo); }
   else if (type === 'offices') {
     officeLayer.eachLayer(l => {
       if (visible) {
@@ -1115,8 +1154,6 @@ async function loadAllFields() {
 // Sodir discovery layer: wellbore discovery points are typically in the
 // wlbPoint layers. The factmaps discovery polygon layer is in the 5000-range.
 // We probe the known discovery point layer (7050) and polygon layer (5060).
-
-let showOtherDiscoveries = false;
 
 async function loadAkerbpDiscoveries(licGeo) {
   // Build set of licence IDs where Aker BP is involved
@@ -1258,7 +1295,12 @@ function renderDiscoveries() {
         ]}]);
       });
 
-      if(!other) {
+      if(other) {
+        layer.bindTooltip(
+          `<strong>${name}</strong><br><span style="color:#ffdc00;font-size:11px">${p.dscHcType||''}</span>`,
+          {sticky:true, className:'tooltip-dark'}
+        );
+      } else {
         if(labelState.discoveries) {
           layer.bindTooltip(name, {
             permanent: true, direction: 'right',
@@ -1278,6 +1320,109 @@ function renderDiscoveries() {
 function toggleOtherDiscoveries(visible) {
   showOtherDiscoveries = visible;
   renderDiscoveries();
+}
+
+
+
+
+
+
+
+
+
+
+// ─── UK LICENSER (NSTA) ───────────────────────────────────────────────────
+const C_UK_LIC = '#00cfff';
+
+async function loadUKLicences() {
+  // Hent Aker BP UK-lisenser fra NSTA FeatureServer
+  // ADMORGNO = selskapsnummer for lisensadministrator
+  // Aker BP UK Limited = 12908310
+  // Vi henter også lisenser der LICORG inneholder selskapsnummeret (medeier)
+  const where = encodeURIComponent(`ADMORGNO='12908310' OR LICORG LIKE '%12908310%'`);
+  const url = `${NSTA_BASE}/0/query?where=${where}&outFields=LICREF,LICNO,LICPREFIX,LICTYPE,LICSTATUS,LICORG,ADMORG,ADMORGNO,BLOCKREF,FIELDS,LICSTARTDT,LICENDDT,RNDNO,RNDTYPE,REGIONS,URL&returnGeometry=true&outSR=4326&f=geojson`;
+
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`NSTA HTTP ${resp.status}`);
+  const geojson = await resp.json();
+
+  if (!geojson.features?.length) {
+    document.getElementById('ukLicenceCount').textContent = '0';
+    return;
+  }
+
+  window._ukGeo = geojson;
+  renderUKLicences(geojson);
+  document.getElementById('ukLicenceCount').textContent = geojson.features.length;
+  console.log(`UK lisenser: ${geojson.features.length}`);
+}
+
+function renderUKLicences(geojson) {
+  ukLicenceLayer.clearLayers();
+
+  L.geoJSON(geojson, {
+    pane: 'licencePane',
+    style: () => polyStyle(C_UK_LIC, true, false),
+    onEachFeature(feature, layer) {
+      const p = feature.properties;
+
+      const licRef   = p.LICREF   || `P${p.LICNO}`;
+      const licType  = p.LICTYPE  || '–';
+      const status   = p.LICSTATUS|| '–';
+      const blocks   = p.BLOCKREF || '–';
+      const fields   = p.FIELDS   || '–';
+      const org      = p.LICORG   || p.ADMORG || '–';
+      const region   = p.REGIONS  || '–';
+      const round    = p.RNDNO    ? `${p.RNDTYPE || 'Round'} ${p.RNDNO}` : '–';
+
+      const fmtDate = ts => {
+        if (!ts) return '–';
+        try { return new Date(ts).toLocaleDateString('en-GB', {year:'numeric',month:'short'}); }
+        catch { return '–'; }
+      };
+
+      const ukStyle = () => polyStyle(C_UK_LIC, true, false);
+
+      layer.on('mouseover', () => layer.setStyle({fillOpacity:0.42, weight:2.5}));
+      layer.on('mouseout',  () => layer.setStyle(ukStyle()));
+      layer.on('click', () => {
+        showSidebar(`🇬🇧 UK Licence: ${licRef}`, [
+          { rows: [
+            ['Licence ref', licRef],
+            ['Type', licType],
+            ['Status', `<span style="color:${status==='Extant'?'#00d080':'#f68d2e'}">${status}</span>`],
+            ['Blocks', blocks],
+            ['Fields', fields],
+            ['Region', region],
+            ['Round', round],
+            ['Start', fmtDate(p.LICSTARTDT)],
+            ['End', fmtDate(p.LICENDDT)],
+          ]},
+          { heading: 'Licensee(s)', rows: [[org, null]] },
+          { heading: 'Links', rows: [
+            ['NSTA licence doc', p.URL
+              ? `<a href="${p.URL}" target="_blank" style="color:#4a9eff">Open PDF &#x2197;</a>`
+              : null],
+            ['NSTA data portal', `<a href="https://open-data-ukcs-transition.hub.arcgis.com" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`],
+          ]}
+        ]);
+      });
+
+      // Tooltip — samme logikk som norske lisenser
+      if (licRef) {
+        if (labelState.ukLicences) {
+          layer.bindTooltip(licRef,
+            {permanent:true, direction:'center', className:'map-label map-label-licence', offset:[0,0]}
+          );
+        } else {
+          layer.bindTooltip(
+            `<strong>${licRef}</strong><br><span style="color:${C_UK_LIC};font-size:11px">🇬🇧 UK Licence</span>`,
+            {sticky:true, className:'tooltip-dark'}
+          );
+        }
+      }
+    }
+  }).addTo(ukLicenceLayer);
 }
 
 
