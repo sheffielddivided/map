@@ -10,150 +10,162 @@
   <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
   <script src="https://unpkg.com/esri-leaflet-vector@4.2.3/dist/esri-leaflet-vector.js"></script>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap');
+
+    :root {
+      --brand:   #7d2248;
+      --brand-h: #9a2a58;
+      --disc:    #e8c942;
+      --black:   #000000;
+      --panel:   rgba(0,0,0,0.92);
+      --text:    #e8e8e8;
+      --muted:   #aaaaaa;
+      --div:     rgba(255,255,255,0.10);
+      --font:    'Lato', 'Segoe UI', sans-serif;
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', sans-serif; background: #0a1628; color: #e0e8f0; height: 100vh; display: flex; flex-direction: column; }
+    body { font-family: var(--font); background: #0a1628; color: var(--text); height: 100vh; display: flex; flex-direction: column; }
     #map { flex: 1; }
-    /* ── In-map control bar ── */
+
+    /* ── Top control bar ── */
     #map-controls {
       position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
-      display: flex; gap: 6px; z-index: 800;
-      background: rgba(10,22,40,0.88); border: 1px solid #1e5fa8;
-      border-radius: 8px; padding: 6px 8px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+      display: flex; gap: 4px; z-index: 800;
+      background: var(--black);
+      border-radius: 0px; padding: 6px 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.6);
     }
-    .legend-btn { background: transparent; border: 1px solid transparent; color: #c0d8f0; padding: 5px 11px; border-radius: 5px; cursor: pointer; font-size: 12px; transition: background 0.15s, border-color 0.15s; white-space: nowrap; }
-    .legend-btn:hover { background: rgba(42,90,143,0.5); }
-    .legend-btn.active { background: #1e5fa8; border-color: #4a9eff; color: #fff; }
-    #loading { position: fixed; inset: 0; background: rgba(10,22,40,0.88); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: 16px; }
+    .legend-btn {
+      background: var(--brand); border: none; color: #fff;
+      padding: 6px 14px; border-radius: 5px; cursor: pointer;
+      font-family: var(--font); font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      transition: background 0.15s; white-space: nowrap;
+      opacity: 0.45;
+    }
+    .legend-btn:hover  { background: var(--brand-h); opacity: 1; }
+    .legend-btn.active { background: var(--brand); opacity: 1; }
+
+    /* ── Loading ── */
+    #loading { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: 16px; }
     #loading.hidden { display: none; }
-    .spinner { width: 48px; height: 48px; border: 4px solid #1e3a5f; border-top-color: #4a9eff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    .spinner { width: 48px; height: 48px; border: 4px solid #222; border-top-color: var(--brand); border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #loading p { color: #8ab0d0; font-size: 14px; }
-    #sidebar { position: absolute; top: 16px; right: 16px; width: 320px; background: rgba(10,22,40,0.97); border: 1px solid #1e5fa8; border-radius: 10px; z-index: 800; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.6); max-height: calc(100vh - 32px); display: flex; flex-direction: column; }
+    #loading p { color: var(--muted); font-size: 13px; font-family: var(--font); }
+
+    /* ── Sidebar ── */
+    #sidebar { position: absolute; top: 16px; right: 16px; width: 320px; background: var(--black); border-radius: 0px; z-index: 800; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.7); max-height: calc(100vh - 32px); display: flex; flex-direction: column; }
     #sidebar.hidden { display: none; }
-    .sidebar-header { background: #0e2240; padding: 12px 16px; border-bottom: 1px solid #1e3a5f; display: flex; justify-content: space-between; align-items: center; }
-    .sidebar-header h2 { font-size: 14px; color: #4a9eff; font-weight: 600; }
-    .close-btn { background: none; border: none; color: #8ab0d0; cursor: pointer; font-size: 18px; }
+    .sidebar-header { background: var(--brand); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+    .sidebar-header h2 { font-size: 12px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+    .close-btn { background: none; border: none; color: rgba(255,255,255,0.7); cursor: pointer; font-size: 18px; line-height: 1; }
+    .close-btn:hover { color: #fff; }
     .sidebar-content { padding: 10px 14px; overflow-y: auto; }
-    .info-section-title { font-size: 11px; color: #4a9eff; text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 4px; border-top: 1px solid #1a2e48; padding-top: 8px; }
+    .info-section-title { font-size: 10px; color: var(--brand); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin: 12px 0 4px; border-top: 1px solid var(--div); padding-top: 10px; }
     .info-section-title:first-child { border-top: none; margin-top: 0; padding-top: 0; }
-    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #1a2e48; font-size: 13px; gap: 8px; }
-    .info-row-full { padding: 6px 0; font-size: 12px; color: #c8d8e8; line-height: 1.6; border-bottom: 1px solid #1a2e48; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--div); font-size: 12px; gap: 8px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row-full { padding: 6px 0; font-size: 12px; color: #ccc; line-height: 1.6; border-bottom: 1px solid var(--div); }
     .info-row-full:last-child { border-bottom: none; }
-    .info-label { color: #8ab0d0; white-space: nowrap; flex-shrink: 0; }
-    .info-value { color: #e0e8f0; font-weight: 500; text-align: right; }
-    #statsbar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(10,22,40,0.92); border: 1px solid #1e5fa8; border-radius: 30px; padding: 8px 24px; display: flex; gap: 24px; z-index: 800; font-size: 13px; white-space: nowrap; }
+    .info-label { color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+    .info-value { color: var(--text); font-weight: 500; text-align: right; }
+
+    /* ── Statsbar ── */
+    #statsbar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--black); border-radius: 0px; padding: 8px 20px; display: flex; gap: 20px; z-index: 800; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
     .stat { display: flex; align-items: center; gap: 8px; }
     .stat-dot { width: 12px; height: 12px; border-radius: 3px; }
     .dot-field { background: #00b373; } .dot-licence { background: #ce0f69; } .dot-unit { background: #ce0f69; }
-    .stat-label { color: #8ab0d0; }
-    .stat-count { color: #fff; font-weight: 700; font-size: 15px; margin-left: 2px; }
-    #maplegend { position: absolute; top: 16px; left: 16px; background: rgba(10,22,40,0.94); border: 1px solid #1e5fa8; border-radius: 10px; padding: 14px; z-index: 800; min-width: 230px; }
+    .stat-label { color: var(--muted); font-family: var(--font); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-count { color: #fff; font-weight: 700; font-size: 14px; margin-left: 2px; }
+
+    /* ── Legend ── */
+    #maplegend { position: absolute; top: 16px; left: 16px; background: var(--black); border-radius: 0px; padding: 14px; z-index: 800; min-width: 230px; box-shadow: 0 2px 12px rgba(0,0,0,0.6); }
     #maplegend.hidden { display: none; }
-    #maplegend h3 { font-size: 11px; color: #4a9eff; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
-    .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 13px; color: #c0d8f0; }
+    #maplegend h3 { font-size: 10px; color: var(--brand); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+    .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 12px; color: #ccc; }
     .legend-swatch { width: 26px; height: 14px; border-radius: 3px; flex-shrink: 0; }
-    #errormsg { position: absolute; top: 86px; left: 50%; transform: translateX(-50%); background: #3a1010; border: 1px solid #a03030; color: #ff8080; padding: 12px 20px; border-radius: 8px; z-index: 1000; font-size: 13px; max-width: 500px; text-align: center; }
+
+    /* ── Error ── */
+    #errormsg { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); background: #2a0808; color: #ff8080; padding: 12px 20px; border-radius: 0px; z-index: 1000; font-size: 12px; max-width: 500px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
     #errormsg.hidden { display: none; }
-    .tooltip-dark { background: rgba(10,22,40,0.95) !important; border: 1px solid #1e5fa8 !important; color: #e0e8f0 !important; border-radius: 6px !important; padding: 5px 10px !important; font-size: 12px !important; font-family: 'Segoe UI', sans-serif !important; box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important; }
+
+    /* ── Tooltips ── */
+    .tooltip-dark { background: rgba(0,0,0,0.92) !important; border: none !important; color: var(--text) !important; border-radius: 0px !important; padding: 6px 10px !important; font-size: 12px !important; font-family: var(--font) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.6) !important; }
     .leaflet-tooltip.tooltip-dark::before { display: none !important; }
 
-    /* Permanent map labels */
+    /* ── Map labels ── */
     .map-label {
-      background: transparent !important;
-      border: none !important;
-      box-shadow: none !important;
-      font-family: 'Segoe UI', sans-serif !important;
-      font-size: 11px !important;
-      font-weight: 600 !important;
-      pointer-events: none !important;
-      white-space: nowrap !important;
-      text-shadow: 0 0 3px #000, 0 0 6px #000, 0 0 10px #000 !important;
-      padding: 0 !important;
+      background: transparent !important; border: none !important; box-shadow: none !important;
+      font-family: var(--font) !important; font-size: 11px !important; font-weight: 700 !important;
+      pointer-events: none !important; white-space: nowrap !important;
+      text-shadow: 0 0 3px #000, 0 0 6px #000, 0 0 10px #000 !important; padding: 0 !important;
     }
-    /* Light basemap: dark outline instead of black glow */
-    body.basemap-light .map-label {
-      text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 10px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff !important;
-    }
-    body.basemap-light .map-label-licence { color: #9a0048 !important; }
-    body.basemap-light .map-label-unit    { color: #9a0048 !important; }
-    body.basemap-light .map-label-field   { color: #007a50 !important; }
-    body.basemap-light .map-label-office  { color: #1a6abf !important; }
-    body.basemap-light .map-label-discovery { color: #b8900a !important; }
+    body.basemap-light .map-label { text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 10px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff !important; }
+    body.basemap-light .map-label-licence   { color: #9a0048 !important; }
+    body.basemap-light .map-label-unit      { color: #9a0048 !important; }
+    body.basemap-light .map-label-field     { color: #007a50 !important; }
+    body.basemap-light .map-label-office    { color: #7d2248 !important; }
+    body.basemap-light .map-label-discovery { color: #b8650a !important; }
     .map-label::before { display: none !important; }
-    .map-label-licence { color: #ce0f69 !important; font-size: 10px !important; font-weight: 700 !important; }
-    .map-label-unit    { color: #ce0f69 !important; font-size: 11px !important; font-weight: 700 !important; }
-    .map-label-field   { color: #00b373 !important; font-size: 11px !important; font-weight: 700 !important; }
-    .map-label-office     { color: #4a9eff !important; font-size: 11px !important; font-weight: 600 !important; }
-    .map-label-discovery  { color: #ffdc00 !important; font-size: 10px !important; font-weight: 600 !important; }
-    /* ── Customise panel ──────────────────────────────────────────────── */
+    .map-label-licence   { color: #ce0f69 !important; font-size: 10px !important; }
+    .map-label-unit      { color: #ce0f69 !important; font-size: 11px !important; }
+    .map-label-field     { color: #00b373 !important; font-size: 11px !important; }
+    .map-label-office    { color: #7d2248 !important; font-size: 11px !important; }
+    .map-label-discovery { color: #e8c942 !important; font-size: 10px !important; }
+
+    /* ── Settings panel ── */
     #customise-panel {
       position: absolute; top: 16px; right: 16px; width: 310px;
-      background: rgba(10,22,40,0.97); border: 1px solid #1e5fa8;
-      border-radius: 10px; z-index: 900;
+      background: var(--black); border-radius: 0px; z-index: 900;
       max-height: calc(100vh - 32px); overflow-y: auto;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.7);
       display: flex; flex-direction: column;
     }
     #customise-panel.hidden { display: none; }
     .cp-header {
-      background: #0e2240; padding: 12px 16px;
-      border-bottom: 1px solid #1e3a5f;
+      background: var(--brand); padding: 10px 14px;
       display: flex; justify-content: space-between; align-items: center;
     }
-    .cp-header h2 { font-size: 14px; color: #4a9eff; font-weight: 600; }
+    .cp-header h2 { font-size: 12px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
     .cp-body { padding: 12px 14px; overflow-y: auto; }
     .cp-section { margin-bottom: 16px; }
     .cp-section:last-child { margin-bottom: 0; }
     .cp-section-title {
-      font-size: 11px; color: #4a9eff; text-transform: uppercase;
-      letter-spacing: 1px; margin-bottom: 10px;
-      border-bottom: 1px solid #1a2e48; padding-bottom: 5px;
+      font-size: 10px; color: var(--brand); text-transform: uppercase;
+      letter-spacing: 1px; font-weight: 700; margin-bottom: 10px;
+      border-bottom: 1px solid var(--div); padding-bottom: 5px;
     }
-    .cp-row {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 8px; gap: 8px; font-size: 13px;
-    }
+    .cp-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; font-size: 12px; }
     .cp-row:last-child { margin-bottom: 0; }
-    .cp-label { color: #c0d8f0; flex: 1; }
-    /* Label toggle switch */
-    .cp-toggle {
-      position: relative; width: 36px; height: 20px; flex-shrink: 0;
-    }
+    .cp-label { color: #ccc; flex: 1; }
+    .cp-toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
     .cp-toggle input { opacity: 0; width: 0; height: 0; }
-    .cp-slider {
-      position: absolute; inset: 0; background: #1e3a5f;
-      border-radius: 20px; cursor: pointer; transition: background 0.2s;
-    }
-    .cp-slider::before {
-      content: ''; position: absolute; width: 14px; height: 14px;
-      left: 3px; top: 3px; background: #8ab0d0;
-      border-radius: 50%; transition: transform 0.2s, background 0.2s;
-    }
-    .cp-toggle input:checked + .cp-slider { background: #1e5fa8; }
+    .cp-slider { position: absolute; inset: 0; background: #333; border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+    .cp-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: #888; border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+    .cp-toggle input:checked + .cp-slider { background: var(--brand); }
     .cp-toggle input:checked + .cp-slider::before { transform: translateX(16px); background: #fff; }
     .cp-reset {
       display: block; width: 100%; margin-top: 14px;
-      background: #1e3a5f; border: 1px solid #2a5a8f; color: #c0d8f0;
-      padding: 7px; border-radius: 6px; cursor: pointer; font-size: 12px;
-      font-family: 'Segoe UI', sans-serif; transition: background 0.15s;
+      background: #1a1a1a; border: none; color: #ccc;
+      padding: 7px; border-radius: 4px; cursor: pointer;
+      font-size: 11px; font-family: var(--font);
+      text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;
+      transition: background 0.15s;
     }
-    .cp-reset:hover { background: #2a5a8f; }
-
+    .cp-reset:hover { background: #2a2a2a; }
     .basemap-btn {
       display: block; width: 100%; text-align: left;
-      background: #0e2240; border: 1px solid #1e3a5f; color: #c0d8f0;
-      padding: 5px 10px; border-radius: 5px; cursor: pointer;
-      font-size: 12px; margin-bottom: 3px; transition: background 0.15s;
-      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a1a; border: none; color: #ccc;
+      padding: 6px 10px; border-radius: 4px; cursor: pointer;
+      font-size: 12px; margin-bottom: 3px; font-family: var(--font);
+      transition: background 0.15s;
     }
     .basemap-btn:last-child { margin-bottom: 0; }
-    .basemap-btn:hover { background: #1e3a5f; }
-    .basemap-btn.active { background: #1e5fa8; border-color: #4a9eff; color: #fff; }
+    .basemap-btn:hover { background: #2a2a2a; }
+    .basemap-btn.active { background: var(--brand); color: #fff; }
+
     @media (max-width: 600px) {
-      header { padding: 8px 12px; gap: 8px; }
-      header h1 { display: none; }
-      .logo svg { height: 26px; }
       #sidebar, #customise-panel { top: 8px; right: 8px; left: 8px; width: auto; max-height: calc(100vh - 16px); }
       #maplegend { top: 8px; left: 8px; right: 8px; min-width: unset; }
       #statsbar { bottom: 60px; font-size: 11px; padding: 6px 14px; gap: 14px; }
@@ -171,16 +183,18 @@
   <button class="legend-btn active" id="toggleLicences"    onclick="toggleLayer('licences')">Licences</button>
   <button class="legend-btn active" id="toggleFields"      onclick="toggleLayer('fields')">Fields</button>
   <button class="legend-btn active" id="toggleDiscoveries" onclick="toggleLayer('discoveries')">Discoveries</button>
-  <button class="legend-btn"        id="toggleCustomise"   onclick="toggleCustomise()">&#9881; Customise</button>
+  <button class="legend-btn"        id="toggleCustomise"   onclick="toggleCustomise()">&#9881; Settings</button>
 </div>
 <div id="map"></div>
 <div id="loading"><div class="spinner"></div><p id="loadingMsg">Loading data from Sodir...</p></div>
 <div id="customise-panel" class="hidden">
   <div class="cp-header">
-    <h2>Customise</h2>
+    <h2>Settings</h2>
     <button class="close-btn" onclick="toggleCustomise()">&#x2715;</button>
   </div>
   <div class="cp-body">
+
+    <button class="cp-reset" style="margin-top:0;margin-bottom:12px" onclick="toggleLegend()">&#9432; Show / hide legend</button>
 
     <div class="cp-section">
       <div class="cp-section-title">Visibility</div>
@@ -213,10 +227,6 @@
         <label class="cp-toggle"><input type="checkbox" id="lbl-fields" onchange="toggleLabels('fields',this.checked)"><span class="cp-slider"></span></label>
       </div>
       <div class="cp-row">
-        <span class="cp-label">Office labels</span>
-        <label class="cp-toggle"><input type="checkbox" id="lbl-offices" onchange="toggleLabels('offices',this.checked)"><span class="cp-slider"></span></label>
-      </div>
-      <div class="cp-row">
         <span class="cp-label">Discovery labels</span>
         <label class="cp-toggle"><input type="checkbox" id="lbl-discoveries" onchange="toggleLabels('discoveries',this.checked)"><span class="cp-slider"></span></label>
       </div>
@@ -234,24 +244,20 @@
     </div>
 
     <button class="cp-reset" onclick="resetCustomise()">&#8635; Reset to defaults</button>
-
-    <div class="cp-section" style="margin-top:16px;border-top:1px solid #1e3a5f;padding-top:14px">
-      <button class="cp-reset" style="background:#1e3a5f;width:100%;text-align:left;padding:8px 12px;border-radius:6px;color:#c0d8f0;font-size:12px;cursor:pointer;border:1px solid #2a5a8f" onclick="toggleLegend()">&#9432; Show / hide legend</button>
-    </div>
   </div>
 </div>
 
 <div id="maplegend" class="hidden">
   <h3>Legend</h3>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(206,15,105,0.22);border:2px solid #ce0f69;"></div>Licence – Aker BP operator</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(246,141,46,0.22);border:2px solid #f68d2e;"></div>Licence – Aker BP licensee</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(73,147,180,0.18);border:2px solid #4993b4;"></div>UK Licence – Aker BP</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(0,179,115,0.55);border:2px solid #00b373;"></div>Field – Aker BP operator/owner</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#ce0f69;"></div>Licence – Aker BP operator</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#f68d2e;"></div>Licence – Aker BP licensee</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#4993b4;"></div>UK Licence – Aker BP</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#00b373;"></div>Field – Aker BP operator/owner</div>
   <div class="legend-item"><div class="legend-swatch" style="background:rgba(107,104,128,0.35);border:2px solid #6b6880;"></div>Field – shut down</div>
   <div class="legend-item"><svg width="26" height="14" style="flex-shrink:0"><rect x="1" y="1" width="24" height="12" rx="2" fill="rgba(0,122,80,0.28)" stroke="#007a50" stroke-width="1.5" stroke-dasharray="4 3"/></svg>Field – other (no Aker BP interest)</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(232,201,66,0.7);border:2px solid #e8c942;border-radius:50%;width:14px;height:14px;"></div>Discovery – Aker BP licence</div>
-  <div class="legend-item"><svg width="14" height="14" style="flex-shrink:0"><circle cx="7" cy="7" r="5.5" fill="rgba(200,134,10,0.4)" stroke="#c8860a" stroke-width="1.5" stroke-dasharray="3 2"/></svg>Discovery – other</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.9);border:2px solid #4a9eff;border-radius:50%;"></div>Aker BP office</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#e8c942;border-radius:50%;width:14px;height:14px;"></div>Discovery – Aker BP licence</div>
+  <div class="legend-item"><svg width="14" height="14" style="flex-shrink:0"><circle cx="7" cy="7" r="5.5" fill="rgba(232,201,66,0.28)" stroke="#e8c942" stroke-width="1.5" stroke-dasharray="3 2"/></svg>Discovery – other</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.9);border:2px solid #7d2248;border-radius:50%;width:14px;height:14px;"></div>Aker BP office</div>
 </div>
 
 <div id="sidebar" class="hidden">
@@ -261,7 +267,7 @@
 <div id="statsbar">
   <div class="stat"><div class="stat-dot dot-licence"></div><span class="stat-label">Licences:</span><span class="stat-count" id="licenceCount">-</span></div>
   <div class="stat"><div class="stat-dot dot-field"></div><span class="stat-label">Fields:</span><span class="stat-count" id="fieldCount">-</span></div>
-  <div class="stat"><div class="stat-dot" style="background:#ffdc00"></div><span class="stat-label">Discoveries:</span><span class="stat-count" id="discoveryCount">-</span></div>
+  <div class="stat"><div class="stat-dot" style="background:#e8c942"></div><span class="stat-label">Discoveries:</span><span class="stat-count" id="discoveryCount">-</span></div>
 </div>
 
 <div id="errormsg" class="hidden"></div>
@@ -282,7 +288,7 @@ let C_FLD_SD  = '#6b6880';
 const C_DISC  = '#e8c942';
 
 // Label visibility state
-const labelState = { licences: false, units: false, fields: false, offices: false, discoveries: false, ukLicences: false };
+const labelState = { licences: false, units: false, fields: false, offices: true, discoveries: false, ukLicences: false };
 
 // Feature visibility flags
 let showCarbonLicences    = false;
@@ -429,7 +435,7 @@ function showSidebar(title, sections) {
 }
 
 function polyStyle(col, dashed, dimmed) {
-  return { color:col, weight:dimmed?1:1.5, fillColor:col, fillOpacity:dimmed?0.04:0.20, dashArray:dashed?'7 4':null, opacity:dimmed?0.30:1.0 };
+  return { color:col, weight:dimmed?1:2, fillColor:col, fillOpacity:dimmed?0.04:0.55, dashArray:dashed?'7 4':null, opacity:dimmed?0.30:1.0 };
 }
 
 // ─── Main data load ───────────────────────────────────────────────────────────
@@ -648,15 +654,15 @@ function renderFields(geojson) {
     style(f) {
       const p=f.properties; const shut=p._shutDown; const col=shut?C_FLD_SD:C_FLD_OP;
       if(p._other) return {color:'#007a50',weight:1.5,fillColor:'#007a50',fillOpacity:0.28,opacity:0.85,dashArray:'5 4'};
-      return {color:col,weight:shut?1.5:2.5,fillColor:col,fillOpacity:shut?0.35:0.55,opacity:shut?0.80:1.0};
+      return {color:col,weight:shut?1.5:2.5,fillColor:col,fillOpacity:shut?0.35:0.80,opacity:shut?0.80:1.0};
     },
     onEachFeature(feature,layer) {
       const p=feature.properties; const shut=p._shutDown; const col=shut?C_FLD_SD:C_FLD_OP;
       const role=p._other?'No Aker BP interest':(shut?'Shut down':(p.isOperator?'Operator':'Owner'));
       const myShare=p._myShare?fmtPct(p._myShare.total):null;
       const lhRows=p._allLicensees.length>0?p._allLicensees.sort((a,b)=>(b.share||0)-(a.share||0)).map(l=>{ return [l.company||'?',fmtPct(l.share)+(l.sdfi?` (SDFI: ${fmtPct(l.sdfi)})`:'')]; }):[];
-      layer.on('mouseover',()=>layer.setStyle&&layer.setStyle({fillOpacity:p._other?0.50:(shut?0.55:0.85),weight:p._other?2:(shut?2:3)}));
-      layer.on('mouseout', ()=>layer.setStyle&&layer.setStyle(p._other?{color:'#007a50',fillColor:'#007a50',fillOpacity:0.28,weight:1.5,opacity:0.85,dashArray:'5 4'}:(shut?{fillOpacity:0.35,weight:1.5,color:col,opacity:0.80}:{fillOpacity:0.55,weight:2.5,color:col,opacity:1.0})));
+      layer.on('mouseover',()=>layer.setStyle&&layer.setStyle({fillOpacity:p._other?0.50:(shut?0.55:1.0),weight:p._other?2:(shut?2:3)}));
+      layer.on('mouseout', ()=>layer.setStyle&&layer.setStyle(p._other?{color:'#007a50',fillColor:'#007a50',fillOpacity:0.28,weight:1.5,opacity:0.85,dashArray:'5 4'}:(shut?{fillOpacity:0.35,weight:1.5,color:col,opacity:0.80}:{fillOpacity:0.80,weight:2.5,color:col,opacity:1.0})));
       layer.on('click',async ()=>{
         const fname=p.fldName||'?';
         showSidebar('Field: '+fname,[
@@ -697,19 +703,19 @@ function renderFields(geojson) {
 
 // ── Offices ───────────────────────────────────────────────────────────────────
 const OFFICES = [
-  {name:'Head Office – Fornebu',   address:'Oksenøyveien 10, 1366 Lysaker',           lat:59.8953,lng:10.6267},
-  {name:'Stavanger Office',         address:'Jåttåflaten 28, 4020 Stavanger',          lat:58.8943,lng:5.6964},
-  {name:'Trondheim Office',         address:'Munkegata 26, 7011 Trondheim',            lat:63.4305,lng:10.3951},
-  {name:'Sandnesjøen Office',       address:'Øyvind Lambes vei 55, 8803 Sandnesjøen', lat:66.0236,lng:12.6354},
-  {name:'Harstad Office',           address:'Storåkeren 11, 9411 Harstad',             lat:68.7988,lng:16.5447},
+  {name:'Fornebu',      label:'Fornebu',      address:'Oksenøyveien 10, 1366 Lysaker',           lat:59.8953,lng:10.6267},
+  {name:'Stavanger',    label:'Stavanger',    address:'Jåttåflaten 28, 4020 Stavanger',          lat:58.8943,lng:5.6964},
+  {name:'Trondheim',    label:'Trondheim',    address:'Munkegata 26, 7011 Trondheim',            lat:63.4305,lng:10.3951},
+  {name:'Sandnesjøen',  label:'Sandnesjøen',  address:'Øyvind Lambes vei 55, 8803 Sandnesjøen', lat:66.0236,lng:12.6354},
+  {name:'Harstad',      label:'Harstad',      address:'Storåkeren 11, 9411 Harstad',             lat:68.7988,lng:16.5447},
 ];
 
 (function renderOffices(){
   OFFICES.forEach(o=>{
-    const m=L.circleMarker([o.lat,o.lng],{pane:'officePane',radius:7,fillColor:'#ffffff',color:'#4a9eff',weight:2.5,fillOpacity:0.95});
-    m.bindTooltip(`<strong>${o.name}</strong><br><span style="font-size:11px;color:#8ab0d0">${o.address}</span>`,{sticky:true,className:'tooltip-dark'});
+    const m=L.circleMarker([o.lat,o.lng],{pane:'officePane',radius:7,fillColor:'#ffffff',color:'#7d2248',weight:2.5,fillOpacity:0.95});
+    m.bindTooltip(o.label,{permanent:true,direction:'right',className:'map-label map-label-office',offset:[8,0]});
     m._officeData=o;
-    m.on('click',()=>showSidebar(o.name,[{rows:[['Address',o.address],['Phone','(+47) 51 35 30 00'],['Maps',`<a href="https://www.google.com/maps/search/${encodeURIComponent(o.address)}" target="_blank" style="color:#4a9eff">Open in Maps &#x2197;</a>`]]}]));
+    m.on('click',()=>showSidebar('Aker BP – '+o.name,[{rows:[['Address',o.address],['Phone','(+47) 51 35 30 00'],['Maps',`<a href="https://www.google.com/maps/search/${encodeURIComponent(o.address)}" target="_blank" style="color:#4a9eff">Open in Maps &#x2197;</a>`]]}]));
     m.addTo(officeLayer);
   });
 })();
@@ -752,12 +758,12 @@ function renderDiscoveries() {
   const features=[...(showOtherDiscoveries&&window._discOtherGeo?window._discOtherGeo.features:[]),...window._discAkerbpGeo.features];
   L.geoJSON({type:'FeatureCollection',features},{
     pane:'discoveryPane',
-    pointToLayer(f,latlng) { const other=f.properties._other; return L.circleMarker(latlng,{pane:'discoveryPane',radius:other?5:7,fillColor:other?'#c8860a':C_DISC,color:other?'#c8860a':C_DISC,weight:other?1.5:2,fillOpacity:other?0.55:0.75,dashArray:other?'4 3':null}); },
-    style(f) { const other=f.properties._other; return {color:other?'#c8860a':C_DISC,weight:other?1.5:2,fillColor:other?'#c8860a':C_DISC,fillOpacity:other?0.40:0.45,opacity:other?0.85:0.9,dashArray:other?'4 3':null}; },
+    pointToLayer(f,latlng) { const other=f.properties._other; return L.circleMarker(latlng,{pane:'discoveryPane',radius:other?5:7,fillColor:C_DISC,color:C_DISC,weight:other?1.5:2,fillOpacity:other?0.30:0.95,dashArray:other?'4 3':null}); },
+    style(f) { const other=f.properties._other; return {color:C_DISC,weight:other?1.5:2,fillColor:C_DISC,fillOpacity:other?0.25:0.95,opacity:other?0.70:1.0,dashArray:other?'4 3':null}; },
     onEachFeature(feature,layer) {
       const p=feature.properties; const other=p._other; const name=p.dscName||'?';
-      layer.on('mouseover',()=>layer.setStyle&&layer.setStyle({fillOpacity:other?0.45:0.95,weight:other?1.5:3}));
-      layer.on('mouseout', ()=>layer.setStyle&&layer.setStyle({fillOpacity:other?0.10:0.45,weight:other?1:2}));
+      layer.on('mouseover',()=>layer.setStyle&&layer.setStyle({fillOpacity:other?0.55:1.0,weight:other?2:3}));
+      layer.on('mouseout', ()=>layer.setStyle&&layer.setStyle({fillOpacity:other?0.25:0.95,weight:other?1.5:2,opacity:other?0.70:1.0}));
       layer.on('click',async ()=>{
         // Show sidebar immediately with known data
         showSidebar('Discovery: '+name,[{rows:[['Name',name],['Status',p.dscCurrentActivityStatus||''],['HC type',p.dscHcType||null],['Discovery year',p.dscDiscoveryYear||null],['Operator',p.cmpLongName||null],['Area',p.nmaName||null],['Aker BP',other?'No':'<span style="color:#e8c942">Yes</span>'],['Related field',p.fldName||null],...(p.dscFactPageUrl?[['Sodir',`<a href="${p.dscFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`]]:[])]
@@ -779,7 +785,7 @@ function renderDiscoveries() {
         } catch(e) { console.warn('Description fetch failed:',e); }
       });
       if(!other&&labelState.discoveries) { layer.bindTooltip(name,{permanent:true,direction:'right',className:'map-label map-label-discovery',offset:[6,0]}); }
-      else { layer.bindTooltip(`<strong>${name}</strong><br><span style="color:${other?'#c8860a':C_DISC};font-size:11px">${p.dscHcType||''}</span>`,{sticky:true,className:'tooltip-dark'}); }
+      else { layer.bindTooltip(`<strong>${name}</strong><br><span style="color:${C_DISC};font-size:11px">${p.dscHcType||''}</span>`,{sticky:true,className:'tooltip-dark'}); }
     }
   }).addTo(discoveryLayer);
 }
@@ -896,7 +902,7 @@ function toggleLabels(type, visible) {
 }
 
 function resetCustomise() {
-  ['licences','fields','offices','discoveries'].forEach(t=>{ labelState[t]=false; const el=document.getElementById('lbl-'+t); if(el)el.checked=false; toggleLabels(t,false); });
+  ['licences','fields','discoveries'].forEach(t=>{ labelState[t]=false; const el=document.getElementById('lbl-'+t); if(el)el.checked=false; toggleLabels(t,false); });
   labelState.units=false;
   showCarbonLicences=false; document.getElementById('vis-carbon').checked=false; renderUnits(window._unitGeo);
   showShutdown=false; document.getElementById('vis-shutdown').checked=false;
