@@ -236,9 +236,9 @@
       <div class="cp-section-title">Basemap</div>
       <div class="cp-basemap-grid">
         <button class="basemap-btn active" data-name="Sodir"     onclick="switchBasemap(this.dataset.name)">Standard</button>
+        <button class="basemap-btn"        data-name="Ocean"     onclick="switchBasemap(this.dataset.name)">Ocean</button>
         <button class="basemap-btn"        data-name="Dark"      onclick="switchBasemap(this.dataset.name)">Dark</button>
         <button class="basemap-btn"        data-name="OSM"       onclick="switchBasemap(this.dataset.name)">OpenStreetMap</button>
-        <button class="basemap-btn"        data-name="Satellite" onclick="switchBasemap(this.dataset.name)">Satellite</button>
         <button class="basemap-btn"        data-name="NatGeo"    onclick="switchBasemap(this.dataset.name)">Nat. Geographic</button>
       </div>
     </div>
@@ -312,12 +312,12 @@ const BASEMAPS = {
   'Sodir':     makeSodirLayer(),
   'Dark':      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',   { attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 19 }),
   'OSM':       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',                  { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }),
-  'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri &copy; USGS', maxZoom: 19 }),
   'NatGeo':    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri &copy; National Geographic', maxZoom: 16 }),
+  'Ocean':     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri, GEBCO, NOAA', maxZoom: 13 }),
 };
 
 // Basemaps that have a light background → use dark label text
-const LIGHT_BASEMAPS = new Set(['Sodir', 'OSM', 'NatGeo']);
+const LIGHT_BASEMAPS = new Set(['Sodir', 'OSM', 'NatGeo', 'Ocean']);
 
 let currentBasemap = BASEMAPS['Sodir'];
 currentBasemap.addTo(map);
@@ -365,6 +365,10 @@ function toggleLayer(t) {
 
 function toggleLegend()  { document.getElementById('maplegend').classList.toggle('hidden'); }
 function closeSidebar()  { document.getElementById('sidebar').classList.add('hidden'); }
+
+map.on('click', () => closeSidebar());
+
+function stopProp(e) { L.DomEvent.stopPropagation(e); }
 function showError(msg)  { const el=document.getElementById('errormsg'); el.textContent=msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),12000); }
 function setLoading(msg) { const el=document.getElementById('loading'); msg?(document.getElementById('loadingMsg').textContent=msg,el.classList.remove('hidden')):el.classList.add('hidden'); }
 
@@ -591,7 +595,7 @@ function renderLicences(geojson) {
       const myShare=fmtPct(p._myShare);
       layer.on('mouseover',()=>layer.setStyle({fillOpacity:0.42,weight:2.5}));
       layer.on('mouseout', ()=>layer.setStyle(polyStyle(col,false,false)));
-      layer.on('click',()=>{
+      layer.on('click',(e)=>{ stopProp(e);
         const lhRows=p._allLicensees.length>0?p._allLicensees.sort((a,b)=>(b.share||0)-(a.share||0)).map(l=>[l.company||'?',fmtPct(l.share)+(l.sdfi?` (SDFI: ${fmtPct(l.sdfi)})`:'')]):[['No data available',null]];
         showSidebar('Licence: '+(p.prlName||'?'),[
           {rows:[['Licence no.',p.prlName],['Aker BP role',`<span style="color:${col}">${role}</span>`],['Aker BP share',myShare],['Area',p.prlMainArea],['Status',p.prlStatus],['Phase',p.prlPhaseCurrent],['Area (km²)',p.prlCurrentArea]]},
@@ -622,7 +626,7 @@ function renderUnits(geojson) {
       const baseStyle={color:col,weight:2.5,fillColor:col,fillOpacity:0.30,dashArray:p.isOperator?null:'7 4'};
       layer.on('mouseover',()=>layer.setStyle({fillOpacity:0.55,weight:3.5}));
       layer.on('mouseout', ()=>layer.setStyle(baseStyle));
-      layer.on('click',()=>{
+      layer.on('click',(e)=>{ stopProp(e);
         const lhRows=p._allLicensees.length>0?p._allLicensees.sort((a,b)=>(b.share||0)-(a.share||0)).map(l=>[l.company||'?',fmtPct(l.share)+(l.sdfi?` (SDFI: ${fmtPct(l.sdfi)})`:'')]):[['No data available',null]];
         showSidebar('BAA: '+(p.baaName||'?'),[
           {rows:[['Name',p.baaName],['Type',p.baaKind],['Aker BP role',`<span style="color:${col}">${role}</span>`],['Aker BP share',myShare],['Active',p.baaActive==='Y'?'Yes':'No']]},
@@ -663,7 +667,7 @@ function renderFields(geojson) {
       const lhRows=p._allLicensees.length>0?p._allLicensees.sort((a,b)=>(b.share||0)-(a.share||0)).map(l=>{ return [l.company||'?',fmtPct(l.share)+(l.sdfi?` (SDFI: ${fmtPct(l.sdfi)})`:'')]; }):[];
       layer.on('mouseover',()=>layer.setStyle&&layer.setStyle({fillOpacity:p._other?0.50:(shut?0.55:1.0),weight:p._other?2:(shut?2:3)}));
       layer.on('mouseout', ()=>layer.setStyle&&layer.setStyle(p._other?{color:'#007a50',fillColor:'#007a50',fillOpacity:0.28,weight:1.5,opacity:0.85,dashArray:'5 4'}:(shut?{fillOpacity:0.35,weight:1.5,color:col,opacity:0.80}:{fillOpacity:0.80,weight:2.5,color:col,opacity:1.0})));
-      layer.on('click',async ()=>{
+      layer.on('click',async (e)=>{ stopProp(e);
         const fname=p.fldName||'?';
         showSidebar('Field: '+fname,[
           {rows:[['Field name',p.fldName],...(p._other?[]:[['Aker BP role',`<span style="color:${col}">${role}</span>`],['Aker BP share',myShare]]),['Area',p.fldMainArea],['Status',p.fldCurrentActivitySatus],['HC type',p.fldHcType],['Discovery',p.fldDiscoveryYear]]},
@@ -715,7 +719,7 @@ const OFFICES = [
     const m=L.circleMarker([o.lat,o.lng],{pane:'officePane',radius:7,fillColor:'#ffffff',color:'#7d2248',weight:2.5,fillOpacity:0.95});
     m.bindTooltip(o.label,{permanent:true,direction:'right',className:'map-label map-label-office',offset:[8,0]});
     m._officeData=o;
-    m.on('click',()=>showSidebar('Aker BP – '+o.name,[{rows:[['Address',o.address],['Phone','(+47) 51 35 30 00'],['Maps',`<a href="https://www.google.com/maps/search/${encodeURIComponent(o.address)}" target="_blank" style="color:#4a9eff">Open in Maps &#x2197;</a>`]]}]));
+    m.on('click',(e)=>{ stopProp(e); showSidebar('Aker BP – '+o.name,[{rows:[['Address',o.address],['Phone','(+47) 51 35 30 00'],['Maps',`<a href="https://www.google.com/maps/search/${encodeURIComponent(o.address)}" target="_blank" style="color:#4a9eff">Open in Maps &#x2197;</a>`]]}]); });
     m.addTo(officeLayer);
   });
 })();
@@ -764,7 +768,7 @@ function renderDiscoveries() {
       const p=feature.properties; const other=p._other; const name=p.dscName||'?';
       layer.on('mouseover',()=>layer.setStyle&&layer.setStyle({fillOpacity:other?0.55:1.0,weight:other?2:3}));
       layer.on('mouseout', ()=>layer.setStyle&&layer.setStyle({fillOpacity:other?0.25:0.95,weight:other?1.5:2,opacity:other?0.70:1.0}));
-      layer.on('click',async ()=>{
+      layer.on('click',async (e)=>{ stopProp(e);
         // Show sidebar immediately with known data
         showSidebar('Discovery: '+name,[{rows:[['Name',name],['Status',p.dscCurrentActivityStatus||''],['HC type',p.dscHcType||null],['Discovery year',p.dscDiscoveryYear||null],['Operator',p.cmpLongName||null],['Area',p.nmaName||null],['Aker BP',other?'No':'<span style="color:#e8c942">Yes</span>'],['Related field',p.fldName||null],...(p.dscFactPageUrl?[['Sodir',`<a href="${p.dscFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`]]:[])]
         },{heading:'Description',rows:[['','<span style="color:#8ab0d0;font-style:italic">Loading...</span>']]}]);
@@ -819,7 +823,7 @@ function renderUKLicences(geojson) {
       const fmtDate=ts=>{ if(!ts)return '–'; try{return new Date(ts).toLocaleDateString('en-GB',{year:'numeric',month:'short'})}catch{return '–'} };
       layer.on('mouseover',()=>layer.setStyle({fillOpacity:0.42,weight:2.5}));
       layer.on('mouseout', ()=>layer.setStyle(polyStyle(C_UK_LIC,false,false)));
-      layer.on('click',()=>{
+      layer.on('click',(e)=>{ stopProp(e);
         showSidebar(`🇬🇧 UK Licence: ${licRef}`,[
           {rows:[['Licence ref',licRef],['Type',p.LICTYPE||'–'],['Status',`<span style="color:${status==='Extant'?'#00d080':'#f68d2e'}">${status}</span>`],['Blocks',p.BLOCKREF||'–'],['Fields',p.FIELDS||'–'],['Region',p.REGIONS||'–'],['Round',p.RNDNO?`${p.RNDTYPE||'Round'} ${p.RNDNO}`:'–'],['Start',fmtDate(p.LICSTARTDT)],['End',fmtDate(p.LICENDDT)]]},
           {heading:'Licensee(s)',rows:[[org,null]]},
