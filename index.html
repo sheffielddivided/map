@@ -5,191 +5,186 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Aker BP – Licence Map</title>
-  <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAAACXBIWXMAAA9hAAAPYQGoP6dpAAADGElEQVR4nO3BMQEAAADCoPVP7WsIoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAMBuAABHgAAAABJRU5ErkJggg==">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <!-- Esri Leaflet + Vector Tile support -->
   <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
   <script src="https://unpkg.com/esri-leaflet-vector@4.2.3/dist/esri-leaflet-vector.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap');
 
-```
-:root {
-  --brand:   #7d2248;
-  --brand-h: #9a2a58;
-  --disc:    #e8c942;
-  --black:   #000000;
-  --panel:   rgba(0,0,0,0.92);
-  --text:    #e8e8e8;
-  --muted:   #aaaaaa;
-  --div:     rgba(255,255,255,0.10);
-  --font:    'Lato', 'Segoe UI', sans-serif;
-}
+    :root {
+      --brand:   #7d2248;
+      --brand-h: #9a2a58;
+      --disc:    #e8c942;
+      --black:   #000000;
+      --panel:   rgba(0,0,0,0.92);
+      --text:    #e8e8e8;
+      --muted:   #aaaaaa;
+      --div:     rgba(255,255,255,0.10);
+      --font:    'Lato', 'Segoe UI', sans-serif;
+    }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: var(--font); background: #0a1628; color: var(--text); height: 100vh; display: flex; flex-direction: column; }
-#map { flex: 1; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: var(--font); background: #0a1628; color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+    #map { flex: 1; }
 
-/* ── Top control bar ── */
-#map-controls {
-  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 4px; z-index: 800;
-  background: var(--black);
-  border-radius: 0px; padding: 6px 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.6);
-}
-.legend-btn {
-  background: var(--brand); border: none; color: #fff;
-  padding: 6px 14px; border-radius: 5px; cursor: pointer;
-  font-family: var(--font); font-size: 11px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.8px;
-  transition: background 0.15s; white-space: nowrap;
-  opacity: 0.45;
-}
-.legend-btn:hover  { background: var(--brand-h); opacity: 1; }
-.legend-btn.active { background: var(--brand); opacity: 1; }
+    /* ── Header ── */
+    #app-header {
+      position: relative; z-index: 1000;
+      background: #000000;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 12px; height: 54px; flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.8);
+      gap: 12px;
+    }
+    #app-header .logo { display: flex; align-items: center; flex-shrink: 0; }
+    #app-header .hdr-controls { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 
-/* ── Loading ── */
-#loading { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: 16px; }
-#loading.hidden { display: none; }
-.spinner { width: 48px; height: 48px; border: 4px solid #222; border-top-color: var(--brand); border-radius: 50%; animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-#loading p { color: var(--muted); font-size: 13px; font-family: var(--font); }
+    /* Hide old floating bar */
+    #map-controls { display: none !important; }
 
-/* ── Sidebar ── */
-#sidebar { position: absolute; top: 16px; right: 16px; width: 320px; background: var(--black); border-radius: 0px; z-index: 800; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.7); max-height: calc(100vh - 32px); display: flex; flex-direction: column; }
-#sidebar.hidden { display: none; }
-.sidebar-header { background: var(--brand); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
-.sidebar-header h2 { font-size: 12px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
-.close-btn { background: none; border: none; color: rgba(255,255,255,0.7); cursor: pointer; font-size: 18px; line-height: 1; }
-.close-btn:hover { color: #fff; }
-.sidebar-content { padding: 10px 14px; overflow-y: auto; }
-.info-section-title { font-size: 10px; color: var(--brand); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin: 12px 0 4px; border-top: 1px solid var(--div); padding-top: 10px; }
-.info-section-title:first-child { border-top: none; margin-top: 0; padding-top: 0; }
-.info-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--div); font-size: 12px; gap: 8px; }
-.info-row:last-child { border-bottom: none; }
-.info-row-full { padding: 6px 0; font-size: 12px; color: #ccc; line-height: 1.6; border-bottom: 1px solid var(--div); }
-.info-row-full:last-child { border-bottom: none; }
-.info-label { color: var(--muted); white-space: nowrap; flex-shrink: 0; }
-.info-value { color: var(--text); font-weight: 500; text-align: right; }
+    @media (max-width: 480px) {
+      #app-header { height: auto; padding: 8px 10px; flex-wrap: wrap; }
+      #app-header .logo svg { height: 26px; }
+      #app-header .hdr-controls { width: 100%; justify-content: flex-start; padding-bottom: 6px; }
+      .legend-btn { font-size: 10px; padding: 5px 10px; }
+    }
+    .legend-btn {
+      background: rgba(125,34,72,0.45); border: none; color: rgba(255,255,255,0.7);
+      padding: 6px 14px; border-radius: 5px; cursor: pointer;
+      font-family: var(--font); font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      transition: background 0.15s, color 0.15s; white-space: nowrap;
+    }
+    .legend-btn:hover  { background: var(--brand-h); color: #fff; }
+    .legend-btn.active { background: var(--brand); color: #fff; }
 
-/* ── Statsbar ── */
-#statsbar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--black); border-radius: 0px; padding: 8px 20px; display: flex; gap: 20px; z-index: 800; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
-.stat { display: flex; align-items: center; gap: 8px; }
-.stat-dot { width: 12px; height: 12px; border-radius: 3px; }
-.dot-field { background: #00b373; } .dot-licence { background: #ce0f69; } .dot-unit { background: #ce0f69; }
-.stat-label { color: var(--muted); font-family: var(--font); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-.stat-count { color: #fff; font-weight: 700; font-size: 14px; margin-left: 2px; }
+    /* ── Loading ── */
+    #loading { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: 16px; }
+    #loading.hidden { display: none; }
+    .spinner { width: 48px; height: 48px; border: 4px solid #222; border-top-color: var(--brand); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { color: var(--muted); font-size: 13px; font-family: var(--font); }
 
-/* ── Legend ── */
-#maplegend { position: absolute; top: 16px; left: 16px; background: var(--black); border-radius: 0px; padding: 14px; z-index: 800; min-width: 230px; box-shadow: 0 2px 12px rgba(0,0,0,0.6); }
-#maplegend.hidden { display: none; }
-#maplegend h3 { font-size: 10px; color: var(--brand); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
-.legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 12px; color: #ccc; }
-.legend-swatch { width: 26px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+    /* ── Sidebar ── */
+    #sidebar { position: absolute; top: 70px; right: 16px; width: 320px; background: #000000 !important; border-radius: 0px; z-index: 800; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.7); max-height: calc(100vh - 86px); display: flex; flex-direction: column; }
+    #sidebar.hidden { display: none; }
+    .sidebar-header { background: var(--brand); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+    .sidebar-header h2 { font-size: 12px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+    .close-btn { background: none; border: none; color: rgba(255,255,255,0.7); cursor: pointer; font-size: 18px; line-height: 1; }
+    .close-btn:hover { color: #fff; }
+    .sidebar-content { padding: 10px 14px; overflow-y: auto; }
+    .info-section-title { font-size: 10px; color: var(--brand); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin: 12px 0 4px; border-top: 1px solid var(--div); padding-top: 10px; }
+    .info-section-title:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--div); font-size: 12px; gap: 8px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row-full { padding: 6px 0; font-size: 12px; color: #ccc; line-height: 1.6; border-bottom: 1px solid var(--div); }
+    .info-row-full:last-child { border-bottom: none; }
+    .info-label { color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+    .info-value { color: var(--text); font-weight: 500; text-align: right; }
 
-/* ── Error ── */
-#errormsg { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); background: #2a0808; color: #ff8080; padding: 12px 20px; border-radius: 0px; z-index: 1000; font-size: 12px; max-width: 500px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
-#errormsg.hidden { display: none; }
+    /* ── Statsbar ── */
+    #statsbar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: #000000 !important; border-radius: 0px; padding: 8px 20px; display: flex; gap: 20px; z-index: 800; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    .stat { display: flex; align-items: center; gap: 8px; }
+    .stat-dot { width: 12px; height: 12px; border-radius: 3px; }
+    .dot-field { background: #00b373; } .dot-licence { background: #ce0f69; } .dot-unit { background: #ce0f69; }
+    .stat-label { color: var(--muted); font-family: var(--font); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-count { color: #fff; font-weight: 700; font-size: 14px; margin-left: 2px; }
 
-/* ── Tooltips ── */
-.tooltip-dark { background: rgba(0,0,0,0.92) !important; border: none !important; color: var(--text) !important; border-radius: 0px !important; padding: 6px 10px !important; font-size: 12px !important; font-family: var(--font) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.6) !important; }
-.leaflet-tooltip.tooltip-dark::before { display: none !important; }
+    /* ── Legend ── */
+    #maplegend { position: absolute; top: 70px; left: 16px; background: #000000 !important; border-radius: 0px; padding: 14px; z-index: 800; min-width: 230px; box-shadow: 0 2px 12px rgba(0,0,0,0.6); }
+    #maplegend.hidden { display: none; }
+    #maplegend h3 { font-size: 10px; color: var(--brand); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+    .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 12px; color: #ccc; }
+    .legend-swatch { width: 26px; height: 14px; border-radius: 3px; flex-shrink: 0; }
 
-/* ── Map labels ── */
-.map-label {
-  background: transparent !important; border: none !important; box-shadow: none !important;
-  font-family: var(--font) !important; font-size: 11px !important; font-weight: 700 !important;
-  pointer-events: none !important; white-space: nowrap !important;
-  text-shadow: 0 0 3px #000, 0 0 6px #000, 0 0 10px #000 !important; padding: 0 !important;
-}
-body.basemap-light .map-label { text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 10px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff !important; }
-body.basemap-light .map-label-licence   { color: #9a0048 !important; }
-body.basemap-light .map-label-unit      { color: #9a0048 !important; }
-body.basemap-light .map-label-field     { color: #007a50 !important; }
-body.basemap-light .map-label-office    { color: #7d2248 !important; }
-body.basemap-light .map-label-discovery { color: #b8650a !important; }
-.map-label::before { display: none !important; }
-.map-label-licence   { color: #ce0f69 !important; font-size: 10px !important; }
-.map-label-unit      { color: #ce0f69 !important; font-size: 11px !important; }
-.map-label-field     { color: #00b373 !important; font-size: 11px !important; }
-.map-label-office    { color: #7d2248 !important; font-size: 11px !important; }
-.map-label-discovery { color: #e8c942 !important; font-size: 10px !important; }
+    /* ── Error ── */
+    #errormsg { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); background: #2a0808; color: #ff8080; padding: 12px 20px; border-radius: 0px; z-index: 1000; font-size: 12px; max-width: 500px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    #errormsg.hidden { display: none; }
 
-/* ── Settings panel ── */
-#customise-panel {
-  position: absolute; top: 16px; right: 16px; width: 310px;
-  background: var(--black); border-radius: 0px; z-index: 900;
-  max-height: calc(100vh - 32px); overflow-y: auto;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.7);
-  display: flex; flex-direction: column;
-}
-#customise-panel.hidden { display: none; }
-.cp-header {
-  background: var(--brand); padding: 10px 14px;
-  display: flex; justify-content: space-between; align-items: center;
-}
-.cp-header h2 { font-size: 12px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
-.cp-body { padding: 12px 14px; overflow-y: auto; }
-.cp-section { margin-bottom: 16px; }
-.cp-section:last-child { margin-bottom: 0; }
-.cp-section-title {
-  font-size: 10px; color: var(--brand); text-transform: uppercase;
-  letter-spacing: 1px; font-weight: 700; margin-bottom: 10px;
-  border-bottom: 1px solid var(--div); padding-bottom: 5px;
-}
-.cp-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; font-size: 12px; }
-.cp-row:last-child { margin-bottom: 0; }
-.cp-label { color: #ccc; flex: 1; }
-.cp-toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
-.cp-toggle input { opacity: 0; width: 0; height: 0; }
-.cp-slider { position: absolute; inset: 0; background: #333; border-radius: 20px; cursor: pointer; transition: background 0.2s; }
-.cp-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: #888; border-radius: 50%; transition: transform 0.2s, background 0.2s; }
-.cp-toggle input:checked + .cp-slider { background: var(--brand); }
-.cp-toggle input:checked + .cp-slider::before { transform: translateX(16px); background: #fff; }
-.cp-reset {
-  display: block; width: 100%; margin-top: 14px;
-  background: #1a1a1a; border: none; color: #ccc;
-  padding: 7px; border-radius: 4px; cursor: pointer;
-  font-size: 11px; font-family: var(--font);
-  text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;
-  transition: background 0.15s;
-}
-.cp-reset:hover { background: #2a2a2a; }
-.basemap-btn {
-  display: block; width: 100%; text-align: left;
-  background: #1a1a1a; border: none; color: #ccc;
-  padding: 6px 10px; border-radius: 4px; cursor: pointer;
-  font-size: 12px; margin-bottom: 3px; font-family: var(--font);
-  transition: background 0.15s;
-}
-.basemap-btn:last-child { margin-bottom: 0; }
-.basemap-btn:hover { background: #2a2a2a; }
-.basemap-btn.active { background: var(--brand); color: #fff; }
+    /* ── Tooltips ── */
+    .tooltip-dark { background: rgba(0,0,0,0.92) !important; border: none !important; color: var(--text) !important; border-radius: 0px !important; padding: 6px 10px !important; font-size: 12px !important; font-family: var(--font) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.6) !important; }
+    .leaflet-tooltip.tooltip-dark::before { display: none !important; }
 
-/* ── Header ── */
-header { background: var(--black); padding: 10px 20px; display: flex; align-items: center; gap: 16px; z-index: 1000; flex-shrink: 0; }
-.logo { display: flex; align-items: center; }
-header h1 { font-size: 13px; font-weight: 400; color: var(--muted); font-family: var(--font); letter-spacing: 0.3px; }
-.controls { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+    /* ── Map labels ── */
+    .map-label {
+      background: transparent !important; border: none !important; box-shadow: none !important;
+      font-family: var(--font) !important; font-size: 11px !important; font-weight: 700 !important;
+      pointer-events: none !important; white-space: nowrap !important;
+      text-shadow: 0 0 3px #000, 0 0 6px #000, 0 0 10px #000 !important; padding: 0 !important;
+    }
+    body.basemap-light .map-label { text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 10px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff !important; }
+    body.basemap-light .map-label-licence   { color: #9a0048 !important; }
+    body.basemap-light .map-label-unit      { color: #9a0048 !important; }
+    body.basemap-light .map-label-field     { color: #007a50 !important; }
+    body.basemap-light .map-label-office    { color: #7d2248 !important; }
+    body.basemap-light .map-label-discovery { color: #b8650a !important; }
+    .map-label::before { display: none !important; }
+    .map-label-licence   { color: #ce0f69 !important; font-size: 10px !important; }
+    .map-label-unit      { color: #ce0f69 !important; font-size: 11px !important; }
+    .map-label-field     { color: #00b373 !important; font-size: 11px !important; }
+    .map-label-office    { color: #7d2248 !important; font-size: 11px !important; }
+    .map-label-discovery { color: #e8c942 !important; font-size: 10px !important; }
 
-/* In standalone, map-controls is in the header — hide the floating overlay */
-#map-controls { display: none !important; }
+    /* ── Settings panel ── */
+    #customise-panel {
+      position: absolute; top: 70px; right: 16px; width: 310px;
+      background: #000000 !important; border-radius: 0px; z-index: 900;
+      max-height: calc(100vh - 32px); overflow-y: auto;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.7);
+      display: flex; flex-direction: column;
+    }
+    #customise-panel.hidden { display: none; }
+    .cp-header {
+      background: var(--brand); padding: 10px 14px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .cp-header h2 { font-size: 12px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+    .cp-body { padding: 12px 14px; overflow-y: auto; }
+    .cp-section { margin-bottom: 16px; }
+    .cp-section:last-child { margin-bottom: 0; }
+    .cp-section-title {
+      font-size: 10px; color: var(--brand); text-transform: uppercase;
+      letter-spacing: 1px; font-weight: 700; margin-bottom: 10px;
+      border-bottom: 1px solid var(--div); padding-bottom: 5px;
+    }
+    .cp-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; font-size: 12px; }
+    .cp-row:last-child { margin-bottom: 0; }
+    .cp-label { color: #ccc; flex: 1; }
+    .cp-toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+    .cp-toggle input { opacity: 0; width: 0; height: 0; }
+    .cp-slider { position: absolute; inset: 0; background: #333; border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+    .cp-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: #888; border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+    .cp-toggle input:checked + .cp-slider { background: var(--brand); }
+    .cp-toggle input:checked + .cp-slider::before { transform: translateX(16px); background: #fff; }
+    .cp-reset {
+      display: block; width: 100%; margin-top: 14px;
+      background: #1a1a1a; border: none; color: #ccc;
+      padding: 7px; border-radius: 4px; cursor: pointer;
+      font-size: 11px; font-family: var(--font);
+      text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;
+      transition: background 0.15s;
+    }
+    .cp-reset:hover { background: #2a2a2a; }
+    .basemap-btn {
+      display: block; width: 100%; text-align: left;
+      background: #1a1a1a; border: none; color: #ccc;
+      padding: 6px 10px; border-radius: 4px; cursor: pointer;
+      font-size: 12px; margin-bottom: 3px; font-family: var(--font);
+      transition: background 0.15s;
+    }
+    .basemap-btn:last-child { margin-bottom: 0; }
+    .basemap-btn:hover { background: #2a2a2a; }
+    .basemap-btn.active { background: var(--brand); color: #fff; }
 
-/* Adjust floating panel top for header height (~52px) */
-#sidebar         { top: 68px; max-height: calc(100vh - 84px); }
-#customise-panel { top: 68px; max-height: calc(100vh - 84px); }
-#maplegend       { top: 68px; }
-
-@media (max-width: 600px) {
-  header h1 { display: none; }
-  .logo svg { height: 26px; }
-  #sidebar, #customise-panel { top: 60px; right: 8px; left: 8px; width: auto; max-height: calc(100vh - 76px); }
-  #maplegend { top: 60px; left: 8px; right: 8px; min-width: unset; }
-}
-```
-
+    @media (max-width: 600px) {
+      #sidebar, #customise-panel { top: auto; bottom: 80px; right: 8px; left: 8px; width: auto; max-height: 55vh; }
+      #maplegend { top: 70px; left: 8px; right: 8px; min-width: unset; }
+      #statsbar { bottom: 60px; font-size: 11px; padding: 6px 14px; gap: 14px; }
+    }
   </style>
   <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAAACXBIWXMAAA9hAAAPYQGoP6dpAAADGElEQVR4nO3BMQEAAADCoPVP7WsIoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAMBuAABHgAAAABJRU5ErkJggg==">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -199,16 +194,34 @@ header h1 { font-size: 13px; font-weight: 400; color: var(--muted); font-family:
   <meta name="mobile-web-app-capable" content="yes">
 </head>
 <body>
-<header>
-  <div class="logo"><svg height="34" style="display:block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 568 128"><path d="M201.1 89.8h-46l-11.9 26.5h-9.8L173 29h10.5l39.6 87.3h-10.5l-11.5-26.5zm-22.9-51.7l-19.4 43.4h38.6l-19.2-43.4zM227.4 28.3h9v55.4l38.8-30.9h13.5l-31.1 24.1 33.5 39.5h-12l-28.3-33.6-14.3 10.9v22.7h-9l-.1-88.1z" fill="#6d6e6b"></path><path d="M354.8 96.1c-3.7 11.2-13.2 22.3-34.2 22.3-26 0-34.6-18.2-34.6-33.8 0-17.7 10.9-33.7 34.6-33.7 16.4 0 35.8 7.1 35.8 35.9H295c0 13.2 9.4 24 25.5 24 15.2 0 22-5 25.2-14.7h9.1zm-7.5-16.2c-2.6-15.7-14.1-21.5-26.2-21.5-11.6 0-24.1 6-26.2 21.5h52.4zM365.3 52.8h9v14.6h.2c3.3-7.6 9.3-16.5 24.3-16.5 1.8 0 3.6.1 5.4.5v9.3c-2.7-.5-5.5-.7-8.3-.7-9.8 0-21.6 6-21.6 24.1v32.4h-9V52.8zM409.5 29.1h49.6c17.1 0 24.3 9.7 24.3 22 0 8.4-4.6 16.3-15 18.7v.2c11.5 1.7 18.5 10.1 18.5 21.4 0 18.2-15.4 24.9-28.9 24.9h-48.6V29.1zm9 37.9h35.8c12.2 0 20-3.9 20-15.5 0-10.6-7.1-14.1-17-14.1h-38.8V67zm0 41h38c11.7 0 20.5-4.7 20.5-16.6 0-12.6-7.8-16.1-18.3-16.1h-40.2V108zM494.6 29.1h47.1c13.5 0 26.3 6.7 26.3 25.2 0 16.5-10.9 25.4-30.3 25.4h-34v36.7h-9l-.1-87.3zm9.1 42.3h35c15.2 0 19.6-7 19.6-17.1 0-13.1-7.3-16.9-17.7-16.9h-36.8l-.1 34z" fill="#6d6e6b"></path><linearGradient id="a" gradientUnits="userSpaceOnUse" x1="95.178" y1="74.202" x2="118.788" y2="67.432" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#ac6244"></stop><stop offset=".49" stop-color="#8d2700"></stop><stop offset="1" stop-color="#aa5e3f"></stop></linearGradient><path d="M119.8 53.5c.2-1.5.4-2.8.6-4v.1c-.7 4-4.4 1.8-5.9.8-7.7-5.1-19.5-10.1-17.1 3.5 2.2 12.7 18 18.3 17.8 21.1 2-6.8 3.5-13.8 4.5-20.8l.1-.7z" fill="url(#a)"></path><path d="M27.6 6.6c-.5.8.3 1.7 1.4 2.8 3.5-2.9.1-5.2-1.3-3l-.1.2zM24.2 31.4c-1.4-2.5-2.7-5.5-2.2-8.4-1.6 1.8-3 3.8-4 6-.5 1-.5 2.1 6.2 2.4zM15.4 43.1c-.3-2.3-2.5-3.5-3.2-2-.4.8-.2 2.6 3 3.9.2-.6.3-1.2.2-1.9z" fill="#54284e"></path><linearGradient id="b" gradientUnits="userSpaceOnUse" x1="-310.911" y1="-171.789" x2="-254.041" y2="-190.262" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset="0" stop-color="#8e006d"></stop><stop offset=".14" stop-color="#d7006d"></stop><stop offset=".33" stop-color="#f391b6"></stop><stop offset=".62" stop-color="#ea0080"></stop><stop offset="1" stop-color="#8e006d"></stop></linearGradient><path d="M71.4 48c-1.8-2.2-3.9-4.1-6.4-5.5-11-6.8-29.8-10.9-37.7-11-1.2 0-2.2 0-3.1-.1-6.7-.3-6.7-1.4-6.2-2.4 1-2.2 2.4-4.3 4.1-6 4.8-5.1 10.9-6.9 15.7-8.2C44 13 54.5 7.1 45.3 2.3s-14.7-.6-15.7.8c-.8 1.1-1.4 2.3-2 3.5l.1-.2c1.5-2.2 4.8.1 1.3 3l-.2.1c-3.9 3.1-8.1 10.2-10.4 15.4-3.2 7.1-6.3 16.2-6.3 16.2.8-1.5 2.9-.3 3.2 2 .1.6 0 1.3-.2 1.9-.5 1.4-1.1 2.7-1.9 3.9-3.2 5.5 1.9 10.2 6.6 11.1 4.1.8 27.2-1.2 35.5-2.2 1.3-.2 2.2-.3 2.7-.4 3.4-.6 18.2-3 13.4-9.4z" fill="url(#b)"></path><linearGradient id="c" gradientUnits="userSpaceOnUse" x1="1.764" y1="49.34" x2="17.5" y2="49.34" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#003824"></stop><stop offset="1" stop-color="#00822c"></stop></linearGradient><path d="M3.2 87c2.9 2.2 7.8 1.4 14.3-.1C9.8 78.8 7.2 72.6 4.4 73c-1.5.2-2.2 4.2-2.6 6.7-.2 4.4.4 6.6 1.4 7.3z" fill="url(#c)"></path><linearGradient id="d" gradientUnits="userSpaceOnUse" x1="-316.529" y1="-243.401" x2="-260.452" y2="-275.779" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset="0" stop-color="#003824"></stop><stop offset=".51" stop-color="#109840"></stop><stop offset="1" stop-color="#00822c"></stop></linearGradient><path d="M5.3 102.5l-.7-.2c1.9 3.8 4.2 7.4 6.9 10.7 15.4 18.9 46.1 15.6 53.2 13.1s1.6-7.6-2.7-10.1c-2.5-1.5-9.4-4.1-18.3-9.2-12.6-.3-27.8-1.4-38.4-4.3z" fill="url(#d)"></path><linearGradient id="e" gradientUnits="userSpaceOnUse" x1="-289.899" y1="-194.116" x2="-210.154" y2="-210.997" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset=".16" stop-color="#8d2719"></stop><stop offset=".51" stop-color="#f5ad2c"></stop><stop offset=".93" stop-color="#d03c27"></stop></linearGradient><path d="M108.8 33.1c-11 .1-22 1.7-32.7 4.6-3.9 1-7.6 2.6-11 4.8v.1c2.4 1.4 4.6 3.3 6.3 5.5 4.8 6.4-10 8.8-13.5 9.5-.5.1-1.4.2-2.7.4-.2 1.5-.2 3 0 4.5.4 3.3-1.1 6.7-4.8 7.5s-20.7 5.3-20.8 9c.1 1.8.6 3.5 1.5 5 2.1-.4 4.4-.8 6.7-1.1 16.4-2.1 47.3-6.3 49.2.8 8.6-4 13.9-8.7 17.3-10.3 4-1.9 10 3.8 10.8 1.7.2-2.8-15.7-8.4-17.8-21.1-2.3-13.6 9.5-8.6 17.1-3.5 1.5 1 5.2 3.2 5.9-.8v-.1c.9-6.3.7-6.7 1.1-10.8.5-5-7.9-5.9-12.6-5.7z" fill="url(#e)"></path><linearGradient id="f" gradientUnits="userSpaceOnUse" x1="1.482" y1="49.064" x2="83.137" y2="28.71" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#005d33"></stop><stop offset=".46" stop-color="#009a33"></stop><stop offset=".87" stop-color="#005d33"></stop></linearGradient><path d="M37.9 82.8c-2.3.3-4.6.7-6.7 1.1-5.1 1-9.8 2.2-13.7 3-6.5 1.5-11.4 2.3-14.3.1-1-.8-1.6-3-1.4-7.3v.2C1.2 84-.1 92.6 0 96.3c.1 3.5.8 4.8 4.6 6l.7.2c10.6 2.9 25.8 4 38.5 4.3 10.9.2 19.9-.2 22.3-.6 5.1-.8 4.5-4.4 3.8-6.9-.8-2.7-1.4-4.8 2.6-5.8 5.1-1.3 14.3-5 14.8-8.7.1-.4 0-.8-.1-1.2-2-7.1-32.9-2.9-49.3-.8z" fill="url(#f)"></path></svg></div>
-  <div class="controls">
-    <button class="legend-btn active" id="toggleLicences"  onclick="toggleLayer('licences')">Licences</button>
-    <button class="legend-btn active" id="toggleFields"    onclick="toggleLayer('fields')">Fields</button>
-    <button class="legend-btn active" id="toggleDisc"      onclick="toggleLayer('discoveries')">Discoveries</button>
-    <button class="legend-btn"        id="toggleCustomise" onclick="toggleCustomise()">&#9881; Settings</button>
+<header id="app-header">
+  <div class="logo">
+    <svg height="32" style="display:block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 568 128">
+      <path d="M201.1 89.8h-46l-11.9 26.5h-9.8L173 29h10.5l39.6 87.3h-10.5l-11.5-26.5zm-22.9-51.7l-19.4 43.4h38.6l-19.2-43.4zM227.4 28.3h9v55.4l38.8-30.9h13.5l-31.1 24.1 33.5 39.5h-12l-28.3-33.6-14.3 10.9v22.7h-9l-.1-88.1z" fill="#6d6e6b"/>
+      <path d="M354.8 96.1c-3.7 11.2-13.2 22.3-34.2 22.3-26 0-34.6-18.2-34.6-33.8 0-17.7 10.9-33.7 34.6-33.7 16.4 0 35.8 7.1 35.8 35.9H295c0 13.2 9.4 24 25.5 24 15.2 0 22-5 25.2-14.7h9.1zm-7.5-16.2c-2.6-15.7-14.1-21.5-26.2-21.5-11.6 0-24.1 6-26.2 21.5h52.4zM365.3 52.8h9v14.6h.2c3.3-7.6 9.3-16.5 24.3-16.5 1.8 0 3.6.1 5.4.5v9.3c-2.7-.5-5.5-.7-8.3-.7-9.8 0-21.6 6-21.6 24.1v32.4h-9V52.8zM409.5 29.1h49.6c17.1 0 24.3 9.7 24.3 22 0 8.4-4.6 16.3-15 18.7v.2c11.5 1.7 18.5 10.1 18.5 21.4 0 18.2-15.4 24.9-28.9 24.9h-48.6V29.1zm9 37.9h35.8c12.2 0 20-3.9 20-15.5 0-10.6-7.1-14.1-17-14.1h-38.8V67zm0 41h38c11.7 0 20.5-4.7 20.5-16.6 0-12.6-7.8-16.1-18.3-16.1h-40.2V108zM494.6 29.1h47.1c13.5 0 26.3 6.7 26.3 25.2 0 16.5-10.9 25.4-30.3 25.4h-34v36.7h-9l-.1-87.3zm9.1 42.3h35c15.2 0 19.6-7 19.6-17.1 0-13.1-7.3-16.9-17.7-16.9h-36.8l-.1 34z" fill="#6d6e6b"/>
+      <linearGradient id="sa" gradientUnits="userSpaceOnUse" x1="95.178" y1="74.202" x2="118.788" y2="67.432" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#ac6244"/><stop offset=".49" stop-color="#8d2700"/><stop offset="1" stop-color="#aa5e3f"/></linearGradient>
+      <path d="M119.8 53.5c.2-1.5.4-2.8.6-4v.1c-.7 4-4.4 1.8-5.9.8-7.7-5.1-19.5-10.1-17.1 3.5 2.2 12.7 18 18.3 17.8 21.1 2-6.8 3.5-13.8 4.5-20.8l.1-.7z" fill="url(#sa)"/>
+      <path d="M27.6 6.6c-.5.8.3 1.7 1.4 2.8 3.5-2.9.1-5.2-1.3-3l-.1.2zM24.2 31.4c-1.4-2.5-2.7-5.5-2.2-8.4-1.6 1.8-3 3.8-4 6-.5 1-.5 2.1 6.2 2.4zM15.4 43.1c-.3-2.3-2.5-3.5-3.2-2-.4.8-.2 2.6 3 3.9.2-.6.3-1.2.2-1.9z" fill="#54284e"/>
+      <linearGradient id="sb" gradientUnits="userSpaceOnUse" x1="-310.911" y1="-171.789" x2="-254.041" y2="-190.262" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset="0" stop-color="#8e006d"/><stop offset=".14" stop-color="#d7006d"/><stop offset=".33" stop-color="#f391b6"/><stop offset=".62" stop-color="#ea0080"/><stop offset="1" stop-color="#8e006d"/></linearGradient>
+      <path d="M71.4 48c-1.8-2.2-3.9-4.1-6.4-5.5-11-6.8-29.8-10.9-37.7-11-1.2 0-2.2 0-3.1-.1-6.7-.3-6.7-1.4-6.2-2.4 1-2.2 2.4-4.3 4.1-6 4.8-5.1 10.9-6.9 15.7-8.2C44 13 54.5 7.1 45.3 2.3s-14.7-.6-15.7.8c-.8 1.1-1.4 2.3-2 3.5l.1-.2c1.5-2.2 4.8.1 1.3 3l-.2.1c-3.9 3.1-8.1 10.2-10.4 15.4-3.2 7.1-6.3 16.2-6.3 16.2.8-1.5 2.9-.3 3.2 2 .1.6 0 1.3-.2 1.9-.5 1.4-1.1 2.7-1.9 3.9-3.2 5.5 1.9 10.2 6.6 11.1 4.1.8 27.2-1.2 35.5-2.2 1.3-.2 2.2-.3 2.7-.4 3.4-.6 18.2-3 13.4-9.4z" fill="url(#sb)"/>
+      <linearGradient id="sc" gradientUnits="userSpaceOnUse" x1="1.764" y1="49.34" x2="17.5" y2="49.34" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#003824"/><stop offset="1" stop-color="#00822c"/></linearGradient>
+      <path d="M3.2 87c2.9 2.2 7.8 1.4 14.3-.1C9.8 78.8 7.2 72.6 4.4 73c-1.5.2-2.2 4.2-2.6 6.7-.2 4.4.4 6.6 1.4 7.3z" fill="url(#sc)"/>
+      <linearGradient id="sd" gradientUnits="userSpaceOnUse" x1="-316.529" y1="-243.401" x2="-260.452" y2="-275.779" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset="0" stop-color="#003824"/><stop offset=".51" stop-color="#109840"/><stop offset="1" stop-color="#00822c"/></linearGradient>
+      <path d="M5.3 102.5l-.7-.2c1.9 3.8 4.2 7.4 6.9 10.7 15.4 18.9 46.1 15.6 53.2 13.1s1.6-7.6-2.7-10.1c-2.5-1.5-9.4-4.1-18.3-9.2-12.6-.3-27.8-1.4-38.4-4.3z" fill="url(#sd)"/>
+      <linearGradient id="se" gradientUnits="userSpaceOnUse" x1="-289.899" y1="-194.116" x2="-210.154" y2="-210.997" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset=".16" stop-color="#8d2719"/><stop offset=".51" stop-color="#f5ad2c"/><stop offset=".93" stop-color="#d03c27"/></linearGradient>
+      <path d="M108.8 33.1c-11 .1-22 1.7-32.7 4.6-3.9 1-7.6 2.6-11 4.8v.1c2.4 1.4 4.6 3.3 6.3 5.5 4.8 6.4-10 8.8-13.5 9.5-.5.1-1.4.2-2.7.4-.2 1.5-.2 3 0 4.5.4 3.3-1.1 6.7-4.8 7.5s-20.7 5.3-20.8 9c.1 1.8.6 3.5 1.5 5 2.1-.4 4.4-.8 6.7-1.1 16.4-2.1 47.3-6.3 49.2.8 8.6-4 13.9-8.7 17.3-10.3 4-1.9 10 3.8 10.8 1.7.2-2.8-15.7-8.4-17.8-21.1-2.3-13.6 9.5-8.6 17.1-3.5 1.5 1 5.2 3.2 5.9-.8v-.1c.9-6.3.7-6.7 1.1-10.8.5-5-7.9-5.9-12.6-5.7z" fill="url(#se)"/>
+      <linearGradient id="sf" gradientUnits="userSpaceOnUse" x1="1.482" y1="49.064" x2="83.137" y2="28.71" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#005d33"/><stop offset=".46" stop-color="#009a33"/><stop offset=".87" stop-color="#005d33"/></linearGradient>
+      <path d="M37.9 82.8c-2.3.3-4.6.7-6.7 1.1-5.1 1-9.8 2.2-13.7 3-6.5 1.5-11.4 2.3-14.3.1-1-.8-1.6-3-1.4-7.3v.2C1.2 84-.1 92.6 0 96.3c.1 3.5.8 4.8 4.6 6l.7.2c10.6 2.9 25.8 4 38.5 4.3 10.9.2 19.9-.2 22.3-.6 5.1-.8 4.5-4.4 3.8-6.9-.8-2.7-1.4-4.8 2.6-5.8 5.1-1.3 14.3-5 14.8-8.7.1-.4 0-.8-.1-1.2-2-7.1-32.9-2.9-49.3-.8z" fill="url(#sf)"/>
+    </svg>
+  </div>
+  <div class="hdr-controls">
+    <button class="legend-btn active" id="toggleLicences"    onclick="toggleLayer('licences')">Licences</button>
+    <button class="legend-btn active" id="toggleFields"      onclick="toggleLayer('fields')">Fields</button>
+    <button class="legend-btn active" id="toggleDiscoveries" onclick="toggleLayer('discoveries')">Discoveries</button>
+    <button class="legend-btn"        id="toggleCustomise"   onclick="toggleCustomise()">&#9881; Settings</button>
   </div>
 </header>
-<div id="map-controls" style="display:none"></div>
+<div id="map-controls"></div>
 <div id="map"></div>
 <div id="loading"><div class="spinner"></div><p id="loadingMsg">Loading data from Sodir...</p></div>
 <div id="customise-panel" class="hidden">
@@ -218,58 +231,56 @@ header h1 { font-size: 13px; font-weight: 400; color: var(--muted); font-family:
   </div>
   <div class="cp-body">
 
-```
-<button class="cp-reset" style="margin-top:0;margin-bottom:12px" onclick="toggleLegend()">&#9432; Show / hide legend</button>
+    <button class="cp-reset" style="margin-top:0;margin-bottom:12px" onclick="toggleLegend()">&#9432; Show / hide legend</button>
 
-<div class="cp-section">
-  <div class="cp-section-title">Visibility</div>
-  <div class="cp-row">
-    <span class="cp-label">Show carbon storage licences</span>
-    <label class="cp-toggle"><input type="checkbox" id="vis-carbon" onchange="toggleCarbonLicences(this.checked)"><span class="cp-slider"></span></label>
-  </div>
-  <div class="cp-row">
-    <span class="cp-label">Show shut-down fields</span>
-    <label class="cp-toggle"><input type="checkbox" id="vis-shutdown" onchange="toggleShutdown(this.checked)"><span class="cp-slider"></span></label>
-  </div>
-  <div class="cp-row">
-    <span class="cp-label">Show other NCS fields</span>
-    <label class="cp-toggle"><input type="checkbox" id="vis-otherfields" onchange="toggleOtherFields(this.checked)"><span class="cp-slider"></span></label>
-  </div>
-  <div class="cp-row">
-    <span class="cp-label">Show other NCS discoveries</span>
-    <label class="cp-toggle"><input type="checkbox" id="vis-otherdisc" onchange="toggleOtherDiscoveries(this.checked)"><span class="cp-slider"></span></label>
-  </div>
-</div>
+    <div class="cp-section">
+      <div class="cp-section-title">Visibility</div>
+      <div class="cp-row">
+        <span class="cp-label">Show carbon storage licences</span>
+        <label class="cp-toggle"><input type="checkbox" id="vis-carbon" onchange="toggleCarbonLicences(this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Show shut-down fields</span>
+        <label class="cp-toggle"><input type="checkbox" id="vis-shutdown" onchange="toggleShutdown(this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Show other NCS fields</span>
+        <label class="cp-toggle"><input type="checkbox" id="vis-otherfields" onchange="toggleOtherFields(this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Show other NCS discoveries</span>
+        <label class="cp-toggle"><input type="checkbox" id="vis-otherdisc" onchange="toggleOtherDiscoveries(this.checked)"><span class="cp-slider"></span></label>
+      </div>
+    </div>
 
-<div class="cp-section">
-  <div class="cp-section-title">Labels on map</div>
-  <div class="cp-row">
-    <span class="cp-label">Licence labels</span>
-    <label class="cp-toggle"><input type="checkbox" id="lbl-licences" onchange="toggleLabels('licences',this.checked);toggleLabels('units',this.checked);toggleLabels('ukLicences',this.checked)"><span class="cp-slider"></span></label>
-  </div>
-  <div class="cp-row">
-    <span class="cp-label">Field labels</span>
-    <label class="cp-toggle"><input type="checkbox" id="lbl-fields" onchange="toggleLabels('fields',this.checked)"><span class="cp-slider"></span></label>
-  </div>
-  <div class="cp-row">
-    <span class="cp-label">Discovery labels</span>
-    <label class="cp-toggle"><input type="checkbox" id="lbl-discoveries" onchange="toggleLabels('discoveries',this.checked)"><span class="cp-slider"></span></label>
-  </div>
-</div>
+    <div class="cp-section">
+      <div class="cp-section-title">Labels on map</div>
+      <div class="cp-row">
+        <span class="cp-label">Licence labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-licences" onchange="toggleLabels('licences',this.checked);toggleLabels('units',this.checked);toggleLabels('ukLicences',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Field labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-fields" onchange="toggleLabels('fields',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Discovery labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-discoveries" onchange="toggleLabels('discoveries',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+    </div>
 
-<div class="cp-section">
-  <div class="cp-section-title">Basemap</div>
-  <div class="cp-basemap-grid">
-    <button class="basemap-btn" data-name="Sodir"     onclick="switchBasemap(this.dataset.name)">Standard</button>
-    <button class="basemap-btn active" data-name="Ocean"     onclick="switchBasemap(this.dataset.name)">Ocean</button>
-    <button class="basemap-btn"        data-name="Dark"      onclick="switchBasemap(this.dataset.name)">Dark</button>
-    <button class="basemap-btn"        data-name="OSM"       onclick="switchBasemap(this.dataset.name)">OpenStreetMap</button>
-    <button class="basemap-btn"        data-name="NatGeo"    onclick="switchBasemap(this.dataset.name)">Nat. Geographic</button>
-  </div>
-</div>
+    <div class="cp-section">
+      <div class="cp-section-title">Basemap</div>
+      <div class="cp-basemap-grid">
+        <button class="basemap-btn"        data-name="Sodir"     onclick="switchBasemap(this.dataset.name)">Standard</button>
+        <button class="basemap-btn active" data-name="Ocean"     onclick="switchBasemap(this.dataset.name)">Ocean</button>
+        <button class="basemap-btn"        data-name="Dark"      onclick="switchBasemap(this.dataset.name)">Dark</button>
+        <button class="basemap-btn"        data-name="OSM"       onclick="switchBasemap(this.dataset.name)">OpenStreetMap</button>
+        <button class="basemap-btn"        data-name="NatGeo"    onclick="switchBasemap(this.dataset.name)">Nat. Geographic</button>
+      </div>
+    </div>
 
-<button class="cp-reset" onclick="resetCustomise()">&#8635; Reset to defaults</button>
-```
+    <button class="cp-reset" onclick="resetCustomise()">&#8635; Reset to defaults</button>
 
   </div>
 </div>
@@ -327,11 +338,9 @@ const map = L.map('map', { zoomControl: false }).setView([68, 10], 5);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 // ─── BASEMAPS ────────────────────────────────────────────────────────────────
-// Sodir vector tile basemap (ED50 / NCS-optimised)
 const SODIR_VT_URL = 'https://vectortileservices-eu1.arcgis.com/RPib7qXCWNRDsyk1/arcgis/rest/services/Basemap_simple_4326/VectorTileServer';
 
 function makeSodirLayer() {
-  // L.esri.Vector.vectorTileLayer accepts the VectorTileServer root URL
   return L.esri.Vector.vectorTileLayer(SODIR_VT_URL);
 }
 
@@ -343,23 +352,19 @@ const BASEMAPS = {
   'Ocean':     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri, GEBCO, NOAA', maxZoom: 13 }),
 };
 
-// Basemaps that have a light background → use dark label text
 const LIGHT_BASEMAPS = new Set(['Sodir', 'OSM', 'NatGeo', 'Ocean']);
 
 let currentBasemap = BASEMAPS['Ocean'];
 currentBasemap.addTo(map);
-// Sodir basemap is light-coloured
 document.body.classList.add('basemap-light');
 
 async function switchBasemap(name) {
   if (currentBasemap) map.removeLayer(currentBasemap);
-  // Sodir VT layer must be recreated each time (esri-leaflet-vector limitation)
   if (name === 'Sodir') {
     BASEMAPS['Sodir'] = makeSodirLayer();
   }
   currentBasemap = BASEMAPS[name];
   currentBasemap.addTo(map);
-  // Keep tile layer behind vector layers
   const pane = map.getPane('tilePane');
   if (pane) pane.style.zIndex = 200;
   document.querySelectorAll('.basemap-btn').forEach(b =>
@@ -368,7 +373,6 @@ async function switchBasemap(name) {
   document.body.classList.toggle('basemap-light', LIGHT_BASEMAPS.has(name));
 }
 
-// Leaflet panes – draw order (higher z-index = on top)
 map.createPane('discoveryPane'); map.getPane('discoveryPane').style.zIndex = 425;
 map.createPane('officePane');    map.getPane('officePane').style.zIndex    = 430;
 map.createPane('licencePane');   map.getPane('licencePane').style.zIndex   = 400;
@@ -387,7 +391,7 @@ let showFields=true, showLicences=true, showUnits=true, showDiscoveries=true, sh
 function toggleLayer(t) {
   if(t==='fields')      { showFields=!showFields; document.getElementById('toggleFields').classList.toggle('active',showFields); showFields?map.addLayer(fieldLayer):map.removeLayer(fieldLayer); }
   if(t==='licences')    { showLicences=!showLicences; showUnits=showLicences; showUKLicences=showLicences; document.getElementById('toggleLicences').classList.toggle('active',showLicences); showLicences?(map.addLayer(licenceLayer),map.addLayer(unitLayer),map.addLayer(ukLicenceLayer)):(map.removeLayer(licenceLayer),map.removeLayer(unitLayer),map.removeLayer(ukLicenceLayer)); }
-  if(t==='discoveries') { showDiscoveries=!showDiscoveries; document.getElementById('toggleDisc').classList.toggle('active',showDiscoveries); showDiscoveries?map.addLayer(discoveryLayer):map.removeLayer(discoveryLayer); }
+  if(t==='discoveries') { showDiscoveries=!showDiscoveries; document.getElementById('toggleDiscoveries').classList.toggle('active',showDiscoveries); showDiscoveries?map.addLayer(discoveryLayer):map.removeLayer(discoveryLayer); }
 }
 
 function toggleLegend()  { document.getElementById('maplegend').classList.toggle('hidden'); }
@@ -398,8 +402,6 @@ map.on('click', () => closeSidebar());
 function stopProp(e) { L.DomEvent.stopPropagation(e); }
 function showError(msg)  { const el=document.getElementById('errormsg'); el.textContent=msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),12000); }
 function setLoading(msg) { const el=document.getElementById('loading'); msg?(document.getElementById('loadingMsg').textContent=msg,el.classList.remove('hidden')):el.classList.add('hidden'); }
-
-// ─── API helpers ─────────────────────────────────────────────────────────────
 
 async function queryAll(layerId, where, outFields, withGeo=false) {
   let all=[], offset=0;
@@ -444,8 +446,6 @@ function isShutDown(status) {
   return s.includes('shut')||s.includes('abandon')||s.includes('closed')||s.includes('cease');
 }
 
-// ─── Info sidebar ─────────────────────────────────────────────────────────────
-
 function showSidebar(title, sections) {
   document.getElementById('customise-panel').classList.add('hidden');
   document.getElementById('sidebarTitle').textContent = title;
@@ -468,8 +468,6 @@ function showSidebar(title, sections) {
 function polyStyle(col, dashed, dimmed) {
   return { color:col, weight:dimmed?1:2, fillColor:col, fillOpacity:dimmed?0.04:0.55, dashArray:dashed?'7 4':null, opacity:dimmed?0.30:1.0 };
 }
-
-// ─── Main data load ───────────────────────────────────────────────────────────
 
 async function loadData() {
   try {
@@ -607,8 +605,6 @@ async function loadData() {
   }
 }
 
-// ─── Render functions ─────────────────────────────────────────────────────────
-
 function renderLicences(geojson) {
   if(!geojson) return;
   licenceLayer.clearLayers();
@@ -732,7 +728,6 @@ function renderFields(geojson) {
   }).addTo(fieldLayer);
 }
 
-// ── Offices ───────────────────────────────────────────────────────────────────
 const OFFICES = [
   {name:'Fornebu',      label:'Fornebu',      address:'Oksenøyveien 10, 1366 Lysaker',           lat:59.8953,lng:10.6267},
   {name:'Stavanger',    label:'Stavanger',    address:'Jåttåflaten 28, 4020 Stavanger',          lat:58.8943,lng:5.6964},
@@ -750,8 +745,6 @@ const OFFICES = [
     m.addTo(officeLayer);
   });
 })();
-
-// ── Discoveries ───────────────────────────────────────────────────────────────
 
 async function loadAkerbpDiscoveries(licGeo) {
   let rows=[], offset=0;
@@ -796,10 +789,8 @@ function renderDiscoveries() {
       layer.on('mouseover',()=>layer.setStyle&&layer.setStyle({fillOpacity:other?0.55:1.0,weight:other?2:3}));
       layer.on('mouseout', ()=>layer.setStyle&&layer.setStyle({fillOpacity:other?0.25:0.95,weight:other?1.5:2,opacity:other?0.70:1.0}));
       layer.on('click',async (e)=>{ stopProp(e);
-        // Show sidebar immediately with known data
         showSidebar('Discovery: '+name,[{rows:[['Name',name],['Status',p.dscCurrentActivityStatus||''],['HC type',p.dscHcType||null],['Discovery year',p.dscDiscoveryYear||null],['Operator',p.cmpLongName||null],['Area',p.nmaName||null],['Aker BP',other?'No':'<span style="color:#e8c942">Yes</span>'],['Related field',p.fldName||null],...(p.dscFactPageUrl?[['Sodir',`<a href="${p.dscFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`]]:[])]
         },{heading:'Description',rows:[['','<span style="color:#8ab0d0;font-style:italic">Loading...</span>']]}]);
-        // Fetch description from layer 7001 (try both EN and NO)
         try {
           const qs=new URLSearchParams({where:`dscNpdidDiscovery = ${p.dscNpdidDiscovery}`,outFields:'dscDescriptionHeading,dscDescriptionText,dscCultureCode',f:'json',returnGeometry:'false'});
           const d=await(await fetch(`${BASE}/7001/query?${qs}`)).json();
@@ -821,7 +812,6 @@ function renderDiscoveries() {
   }).addTo(discoveryLayer);
 }
 
-// ── UK Licences (NSTA) ────────────────────────────────────────────────────────
 const C_UK_LIC='#4993b4';
 
 async function loadUKLicences() {
@@ -865,8 +855,6 @@ function renderUKLicences(geojson) {
   }).addTo(ukLicenceLayer);
 }
 
-// ── Customise helpers ─────────────────────────────────────────────────────────
-
 function toggleCarbonLicences(v){ showCarbonLicences=v; renderUnits(window._unitGeo); }
 function toggleShutdown(v)       { showShutdown=v;        renderFields(window._fieldGeo); }
 function toggleOtherDiscoveries(v){ showOtherDiscoveries=v; renderDiscoveries(); }
@@ -905,12 +893,11 @@ function toggleCustomise() {
   if(!panel.classList.contains('hidden')) document.getElementById('sidebar').classList.add('hidden');
 }
 
-// Auto-close customise panel when clicking outside it
 document.addEventListener('click', function(e) {
   const panel = document.getElementById('customise-panel');
   if (panel.classList.contains('hidden')) return;
   const btn = document.getElementById('toggleCustomise');
-  if (!panel.contains(e.target) && !btn.contains(e.target)) {
+  if (!panel.contains(e.target) && (!btn || !btn.contains(e.target))) {
     panel.classList.add('hidden');
   }
 });
