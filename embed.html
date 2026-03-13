@@ -10,8 +10,10 @@
   <!-- Esri Leaflet + Vector Tile support -->
   <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
   <script src="https://unpkg.com/esri-leaflet-vector@4.2.3/dist/esri-leaflet-vector.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap');
 
 ```
 :root {
@@ -39,15 +41,14 @@ body { font-family: var(--font); background: #0a1628; color: var(--text); height
   box-shadow: 0 2px 12px rgba(0,0,0,0.6);
 }
 .legend-btn {
-  background: var(--brand); border: none; color: #fff;
+  background: rgba(125,34,72,0.45); border: none; color: rgba(255,255,255,0.7);
   padding: 6px 14px; border-radius: 5px; cursor: pointer;
   font-family: var(--font); font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.8px;
-  transition: background 0.15s; white-space: nowrap;
-  opacity: 0.45;
+  transition: background 0.15s, color 0.15s; white-space: nowrap;
 }
-.legend-btn:hover  { background: var(--brand-h); opacity: 1; }
-.legend-btn.active { background: var(--brand); opacity: 1; }
+.legend-btn:hover  { background: var(--brand-h); color: #fff; }
+.legend-btn.active { background: var(--brand); color: #fff; }
 
 /* ── Loading ── */
 #loading { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: 16px; }
