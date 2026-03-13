@@ -240,7 +240,7 @@ body.basemap-light .map-label-discovery { color: #b8650a !important; }
 <div class="cp-section">
   <div class="cp-section-title">Basemap</div>
   <div class="cp-basemap-grid">
-    <button class="basemap-btn" data-name="Sodir"     onclick="switchBasemap(this.dataset.name)">Standard</button>
+    <button class="basemap-btn"        data-name="Sodir"     onclick="switchBasemap(this.dataset.name)">Standard</button>
     <button class="basemap-btn active" data-name="Ocean"     onclick="switchBasemap(this.dataset.name)">Ocean</button>
     <button class="basemap-btn"        data-name="Dark"      onclick="switchBasemap(this.dataset.name)">Dark</button>
     <button class="basemap-btn"        data-name="OSM"       onclick="switchBasemap(this.dataset.name)">OpenStreetMap</button>
@@ -307,11 +307,9 @@ const map = L.map('map', { zoomControl: false }).setView([68, 10], 5);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 // ─── BASEMAPS ────────────────────────────────────────────────────────────────
-// Sodir vector tile basemap (ED50 / NCS-optimised)
 const SODIR_VT_URL = 'https://vectortileservices-eu1.arcgis.com/RPib7qXCWNRDsyk1/arcgis/rest/services/Basemap_simple_4326/VectorTileServer';
 
 function makeSodirLayer() {
-  // L.esri.Vector.vectorTileLayer accepts the VectorTileServer root URL
   return L.esri.Vector.vectorTileLayer(SODIR_VT_URL);
 }
 
@@ -323,23 +321,19 @@ const BASEMAPS = {
   'Ocean':     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri, GEBCO, NOAA', maxZoom: 13 }),
 };
 
-// Basemaps that have a light background → use dark label text
 const LIGHT_BASEMAPS = new Set(['Sodir', 'OSM', 'NatGeo', 'Ocean']);
 
 let currentBasemap = BASEMAPS['Ocean'];
 currentBasemap.addTo(map);
-// Sodir basemap is light-coloured
 document.body.classList.add('basemap-light');
 
 async function switchBasemap(name) {
   if (currentBasemap) map.removeLayer(currentBasemap);
-  // Sodir VT layer must be recreated each time (esri-leaflet-vector limitation)
   if (name === 'Sodir') {
     BASEMAPS['Sodir'] = makeSodirLayer();
   }
   currentBasemap = BASEMAPS[name];
   currentBasemap.addTo(map);
-  // Keep tile layer behind vector layers
   const pane = map.getPane('tilePane');
   if (pane) pane.style.zIndex = 200;
   document.querySelectorAll('.basemap-btn').forEach(b =>
@@ -348,7 +342,6 @@ async function switchBasemap(name) {
   document.body.classList.toggle('basemap-light', LIGHT_BASEMAPS.has(name));
 }
 
-// Leaflet panes – draw order (higher z-index = on top)
 map.createPane('discoveryPane'); map.getPane('discoveryPane').style.zIndex = 425;
 map.createPane('officePane');    map.getPane('officePane').style.zIndex    = 430;
 map.createPane('licencePane');   map.getPane('licencePane').style.zIndex   = 400;
@@ -378,8 +371,6 @@ map.on('click', () => closeSidebar());
 function stopProp(e) { L.DomEvent.stopPropagation(e); }
 function showError(msg)  { const el=document.getElementById('errormsg'); el.textContent=msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),12000); }
 function setLoading(msg) { const el=document.getElementById('loading'); msg?(document.getElementById('loadingMsg').textContent=msg,el.classList.remove('hidden')):el.classList.add('hidden'); }
-
-// ─── API helpers ─────────────────────────────────────────────────────────────
 
 async function queryAll(layerId, where, outFields, withGeo=false) {
   let all=[], offset=0;
@@ -424,8 +415,6 @@ function isShutDown(status) {
   return s.includes('shut')||s.includes('abandon')||s.includes('closed')||s.includes('cease');
 }
 
-// ─── Info sidebar ─────────────────────────────────────────────────────────────
-
 function showSidebar(title, sections) {
   document.getElementById('customise-panel').classList.add('hidden');
   document.getElementById('sidebarTitle').textContent = title;
@@ -448,8 +437,6 @@ function showSidebar(title, sections) {
 function polyStyle(col, dashed, dimmed) {
   return { color:col, weight:dimmed?1:2, fillColor:col, fillOpacity:dimmed?0.04:0.55, dashArray:dashed?'7 4':null, opacity:dimmed?0.30:1.0 };
 }
-
-// ─── Main data load ───────────────────────────────────────────────────────────
 
 async function loadData() {
   try {
@@ -587,8 +574,6 @@ async function loadData() {
   }
 }
 
-// ─── Render functions ─────────────────────────────────────────────────────────
-
 function renderLicences(geojson) {
   if(!geojson) return;
   licenceLayer.clearLayers();
@@ -712,7 +697,6 @@ function renderFields(geojson) {
   }).addTo(fieldLayer);
 }
 
-// ── Offices ───────────────────────────────────────────────────────────────────
 const OFFICES = [
   {name:'Fornebu',      label:'Fornebu',      address:'Oksenøyveien 10, 1366 Lysaker',           lat:59.8953,lng:10.6267},
   {name:'Stavanger',    label:'Stavanger',    address:'Jåttåflaten 28, 4020 Stavanger',          lat:58.8943,lng:5.6964},
@@ -730,8 +714,6 @@ const OFFICES = [
     m.addTo(officeLayer);
   });
 })();
-
-// ── Discoveries ───────────────────────────────────────────────────────────────
 
 async function loadAkerbpDiscoveries(licGeo) {
   let rows=[], offset=0;
@@ -776,10 +758,8 @@ function renderDiscoveries() {
       layer.on('mouseover',()=>layer.setStyle&&layer.setStyle({fillOpacity:other?0.55:1.0,weight:other?2:3}));
       layer.on('mouseout', ()=>layer.setStyle&&layer.setStyle({fillOpacity:other?0.25:0.95,weight:other?1.5:2,opacity:other?0.70:1.0}));
       layer.on('click',async (e)=>{ stopProp(e);
-        // Show sidebar immediately with known data
         showSidebar('Discovery: '+name,[{rows:[['Name',name],['Status',p.dscCurrentActivityStatus||''],['HC type',p.dscHcType||null],['Discovery year',p.dscDiscoveryYear||null],['Operator',p.cmpLongName||null],['Area',p.nmaName||null],['Aker BP',other?'No':'<span style="color:#e8c942">Yes</span>'],['Related field',p.fldName||null],...(p.dscFactPageUrl?[['Sodir',`<a href="${p.dscFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`]]:[])]
         },{heading:'Description',rows:[['','<span style="color:#8ab0d0;font-style:italic">Loading...</span>']]}]);
-        // Fetch description from layer 7001 (try both EN and NO)
         try {
           const qs=new URLSearchParams({where:`dscNpdidDiscovery = ${p.dscNpdidDiscovery}`,outFields:'dscDescriptionHeading,dscDescriptionText,dscCultureCode',f:'json',returnGeometry:'false'});
           const d=await(await fetch(`${BASE}/7001/query?${qs}`)).json();
@@ -801,7 +781,6 @@ function renderDiscoveries() {
   }).addTo(discoveryLayer);
 }
 
-// ── UK Licences (NSTA) ────────────────────────────────────────────────────────
 const C_UK_LIC='#4993b4';
 
 async function loadUKLicences() {
@@ -845,8 +824,6 @@ function renderUKLicences(geojson) {
   }).addTo(ukLicenceLayer);
 }
 
-// ── Customise helpers ─────────────────────────────────────────────────────────
-
 function toggleCarbonLicences(v){ showCarbonLicences=v; renderUnits(window._unitGeo); }
 function toggleShutdown(v)       { showShutdown=v;        renderFields(window._fieldGeo); }
 function toggleOtherDiscoveries(v){ showOtherDiscoveries=v; renderDiscoveries(); }
@@ -885,7 +862,6 @@ function toggleCustomise() {
   if(!panel.classList.contains('hidden')) document.getElementById('sidebar').classList.add('hidden');
 }
 
-// Auto-close customise panel when clicking outside it
 document.addEventListener('click', function(e) {
   const panel = document.getElementById('customise-panel');
   if (panel.classList.contains('hidden')) return;
