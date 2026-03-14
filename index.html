@@ -373,11 +373,11 @@ async function switchBasemap(name) {
   document.body.classList.toggle('basemap-light', LIGHT_BASEMAPS.has(name));
 }
 
-map.createPane('discoveryPane'); map.getPane('discoveryPane').style.zIndex = 425;
+map.createPane('discoveryPane'); map.getPane('discoveryPane').style.zIndex = 415;
 map.createPane('officePane');    map.getPane('officePane').style.zIndex    = 430;
 map.createPane('licencePane');   map.getPane('licencePane').style.zIndex   = 400;
 map.createPane('unitPane');      map.getPane('unitPane').style.zIndex      = 410;
-map.createPane('fieldPane');     map.getPane('fieldPane').style.zIndex     = 420;
+map.createPane('fieldPane');     map.getPane('fieldPane').style.zIndex     = 425;
 
 const discoveryLayer = L.layerGroup().addTo(map);
 const officeLayer    = L.layerGroup().addTo(map);
