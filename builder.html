@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aker BP – Custom Map Builder</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+
+    :root {
+      --brand:   #7d2248;
+      --brand-h: #9a2a58;
+      --disc:    #e8c942;
+      --black:   #000000;
+      --panel:   rgba(0,0,0,0.92);
+      --text:    #e8e8e8;
+      --muted:   #aaaaaa;
+      --div:     rgba(255,255,255,0.10);
+      --font:    'Lato', 'Segoe UI', sans-serif;
+      --map-bg:  #0a1628;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: var(--font); background: #0a1628; color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+    #map { flex: 1; background: var(--map-bg); }
+    .leaflet-control-attribution { display: none; }
+
+    /* ── Header ── */
+    #app-header {
+      position: relative; z-index: 1000;
+      background: #000000;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 12px; height: 54px; flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.8);
+      gap: 12px;
+    }
+    #app-header .logo { display: flex; align-items: center; flex-shrink: 0; gap: 10px; }
+    #app-header .logo .title { font-size: 13px; font-weight: 700; letter-spacing: 0.5px; color: #ccc; text-transform: uppercase; }
+    #app-header .hdr-controls { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+
+    @media (max-width: 480px) {
+      #app-header { height: auto; padding: 8px 10px; flex-wrap: wrap; }
+      #app-header .logo svg { height: 26px; }
+      #app-header .hdr-controls { width: 100%; justify-content: flex-start; padding-bottom: 6px; }
+      .legend-btn { font-size: 10px; padding: 5px 10px; }
+    }
+    .legend-btn {
+      background: rgba(125,34,72,0.45); border: none; color: rgba(255,255,255,0.7);
+      padding: 6px 14px; border-radius: 5px; cursor: pointer;
+      font-family: var(--font); font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      transition: background 0.15s, color 0.15s; white-space: nowrap;
+    }
+    .legend-btn:hover  { background: var(--brand-h); color: #fff; }
+    .legend-btn.active { background: var(--brand); color: #fff; }
+
+    /* ── Loading ── */
+    #loading { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: 16px; }
+    #loading.hidden { display: none; }
+    .spinner { width: 48px; height: 48px; border: 4px solid #222; border-top-color: var(--brand); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { color: var(--muted); font-size: 13px; font-family: var(--font); }
+
+    /* ── Sidebar ── */
+    #sidebar { position: absolute; top: var(--header-h, 70px); right: 16px; width: 320px; background: #000000 !important; border-radius: 0px; z-index: 850; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.7); max-height: calc(100vh - var(--header-h, 70px) - 16px); display: flex; flex-direction: column; }
+    #sidebar.hidden { display: none; }
+    .sidebar-header { background: var(--brand); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+    .sidebar-header h2 { font-size: 12px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+    .close-btn { background: none; border: none; color: rgba(255,255,255,0.7); cursor: pointer; font-size: 18px; line-height: 1; }
+    .close-btn:hover { color: #fff; }
+    .sidebar-content { padding: 10px 14px; overflow-y: auto; }
+    .info-section-title { font-size: 10px; color: var(--brand); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin: 12px 0 4px; border-top: 1px solid var(--div); padding-top: 10px; }
+    .info-section-title:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--div); font-size: 12px; gap: 8px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row-full { padding: 6px 0; font-size: 12px; color: #ccc; line-height: 1.6; border-bottom: 1px solid var(--div); }
+    .info-row-full:last-child { border-bottom: none; }
+    .info-label { color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+    .info-value { color: var(--text); font-weight: 500; text-align: right; }
+
+    /* ── Statsbar ── */
+    #statsbar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: #000000 !important; border-radius: 0px; padding: 8px 20px; display: flex; gap: 20px; z-index: 800; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    .stat { display: flex; align-items: center; gap: 8px; }
+    .stat-dot { width: 12px; height: 12px; border-radius: 3px; }
+    .stat-label { color: var(--muted); font-family: var(--font); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-count { color: #fff; font-weight: 700; font-size: 14px; margin-left: 2px; }
+
+    /* ── Legend ── */
+    #maplegend { position: absolute; top: var(--header-h, 70px); left: 16px; background: #000000 !important; border-radius: 0px; padding: 14px; z-index: 800; min-width: 230px; box-shadow: 0 2px 12px rgba(0,0,0,0.6); }
+    #maplegend.hidden { display: none; }
+    #maplegend h3 { font-size: 10px; color: var(--brand); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+    .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 12px; color: #ccc; }
+    .legend-swatch { width: 26px; height: 14px; border-radius: 3px; flex-shrink: 0; border: 2px solid; }
+
+    /* ── Error ── */
+    #errormsg { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); background: #2a0808; color: #ff8080; padding: 12px 20px; border-radius: 0px; z-index: 1000; font-size: 12px; max-width: 500px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    #errormsg.hidden { display: none; }
+
+    /* ── Tooltips ── */
+    .tooltip-dark { background: rgba(0,0,0,0.92) !important; border: none !important; color: var(--text) !important; border-radius: 0px !important; padding: 6px 10px !important; font-size: 12px !important; font-family: var(--font) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.6) !important; }
+    .leaflet-tooltip.tooltip-dark::before { display: none !important; }
+
+    /* ── Map labels ── */
+    .map-label {
+      background: transparent !important; border: none !important; box-shadow: none !important;
+      font-family: var(--font) !important; font-size: 11px !important; font-weight: 700 !important;
+      pointer-events: none !important; white-space: nowrap !important;
+      text-shadow: 0 0 3px #000, 0 0 6px #000, 0 0 10px #000 !important; padding: 0 !important;
+    }
+    body.light-canvas .map-label { text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 10px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff !important; }
+    body.light-canvas .map-label-licence   { color: #9a0048 !important; }
+    body.light-canvas .map-label-unit      { color: #9a0048 !important; }
+    body.light-canvas .map-label-field     { color: #007a50 !important; }
+    body.light-canvas .map-label-office    { color: #7d2248 !important; }
+    body.light-canvas .map-label-discovery { color: #b8650a !important; }
+    body.light-canvas .map-label-border    { color: #444 !important; }
+    .map-label::before { display: none !important; }
+    .map-label-licence   { color: #ce0f69 !important; font-size: 10px !important; }
+    .map-label-unit      { color: #ce0f69 !important; font-size: 11px !important; }
+    .map-label-field     { color: #00b373 !important; font-size: 11px !important; }
+    .map-label-office    { color: #7d2248 !important; font-size: 11px !important; }
+    .map-label-discovery { color: #e8c942 !important; font-size: 10px !important; }
+    .map-label-border    { color: #ccc !important; font-size: 9px !important; font-weight: 400 !important; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* ── Settings panel ── */
+    #customise-panel {
+      position: absolute; top: var(--header-h, 70px); right: 16px; width: 340px;
+      background: #000000 !important; border-radius: 0px; z-index: 900;
+      max-height: calc(100vh - var(--header-h, 70px) - 16px); overflow-y: auto;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.7);
+      display: flex; flex-direction: column;
+    }
+    #customise-panel.hidden { display: none; }
+    .cp-header {
+      background: var(--brand); padding: 10px 14px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .cp-header h2 { font-size: 12px; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+    .cp-body { padding: 12px 14px; overflow-y: auto; }
+    .cp-section { margin-bottom: 16px; }
+    .cp-section:last-child { margin-bottom: 0; }
+    .cp-section-title {
+      font-size: 10px; color: var(--brand); text-transform: uppercase;
+      letter-spacing: 1px; font-weight: 700; margin-bottom: 10px;
+      border-bottom: 1px solid var(--div); padding-bottom: 5px;
+    }
+    .cp-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; font-size: 12px; }
+    .cp-row:last-child { margin-bottom: 0; }
+    .cp-label { color: #ccc; flex: 1; }
+    .cp-toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+    .cp-toggle input { opacity: 0; width: 0; height: 0; }
+    .cp-slider { position: absolute; inset: 0; background: #333; border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+    .cp-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: #888; border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+    .cp-toggle input:checked + .cp-slider { background: var(--brand); }
+    .cp-toggle input:checked + .cp-slider::before { transform: translateX(16px); background: #fff; }
+    .cp-reset {
+      display: block; width: 100%; margin-top: 14px;
+      background: #1a1a1a; border: none; color: #ccc;
+      padding: 7px; border-radius: 4px; cursor: pointer;
+      font-size: 11px; font-family: var(--font);
+      text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;
+      transition: background 0.15s;
+    }
+    .cp-reset:hover { background: #2a2a2a; }
+
+    .cp-color-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; gap: 8px; font-size: 12px; }
+    .cp-color-row:last-child { margin-bottom: 0; }
+    .cp-color-pair { display: flex; gap: 6px; flex-shrink: 0; }
+    .cp-color-pair input[type=color] {
+      width: 26px; height: 22px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px;
+      padding: 0; background: transparent; cursor: pointer;
+    }
+    .cp-color-caption { display: flex; gap: 6px; margin-bottom: 4px; font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .cp-color-caption span { width: 26px; text-align: center; }
+    .cp-bg-row { display: flex; align-items: center; gap: 10px; }
+    .cp-bg-row input[type=color] { width: 40px; height: 28px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 0; background: transparent; cursor: pointer; }
+    .cp-swatches { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .cp-swatch-btn { width: 22px; height: 22px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.25); cursor: pointer; }
+
+    @media (max-width: 600px) {
+      #sidebar, #customise-panel { top: var(--header-h, 70px); bottom: auto; right: 8px; left: 8px; width: auto; max-height: calc(100vh - var(--header-h, 70px) - 16px); }
+      #maplegend { top: var(--header-h, 70px); left: 8px; right: 8px; min-width: unset; }
+      #statsbar { bottom: 60px; font-size: 11px; padding: 6px 14px; gap: 14px; }
+    }
+  </style>
+  <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,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YvYVL738cn5efn5+vmma3VUuhOCPPPLoyJEjv/mN60897dSHHnrw+uu/+eaf//zly6/43vfumHbitAvOv+CC886Pt7VZlsUY8/v9wWBQKbVr1+7fLLrLLb8RpTu/iSgciRTk5/t8vh721s2jMMaOOeaYzCQyXR+UUjKZSJaXl699b92DDzy4Lmf0jRAiPz8/K6WPCnK8t+69zR9tqSiv2Llz50EZTzf39djjjydTKcF5c3Ozbdu//NV/h8Phv/1tLQDVtf1QRPTjH/9kb0UF5zwSjZaWlsRisU2bNs2efeWFF15w4QUXTJg4oay0zOczlVJV1dW7du585513X16+fM+ecnQcI5RMJpcsubu4uPjtt9dkU/L74/HHn/zLX9YcsP+bgGQyubeycvPmzRUVe5HTdQZg586dP/zRj7VSu3fvztpODx48ePDgwYMHDx48ePDgwYMHDx48ePDgwYMHDx48ePDgoe/g29/+9v69d3fccUd333/kkUf2//6FF17Yw5/47ne/u/9Pxo0bd7B7le56dJyGhoYPPvjgoYcemjVrVp+b7e6IJ0dlZWWXHUADBgxIpVIHS45PPvlk/5/84he/ODRydMJ7773XaaBKH0e/5/LAgQPnzJmz/+c33HBDd21j3WHGjBmjRo3a//P58+dz/g943tmJJ564atWqkSNHeuT47PCd73yn0yd+v/8b3/jGwW7nq1/9anf8u+CCC/4hu1paWrp48WKPHJ8dpk6dOmPGjNxP5s6d22m2vwMiHA5ffvnl2bd79+7tDW/2x+bNm7OjVAYMGDBv3rza2g7DX2fNmlVaWuqR4/DCHf/epfHIfZv7tR4we/bscDicfXvXXXe9++672bdf/OIXCwsLD2r3tNY1NTWPP/7417/eYXYGxtjUqVM9chxeLFu2LHvhL7nkkhEjRrjr559//sSJE931d955Z8OGXs19c+2112bXpZRPPPHEI4+0z6hkmubVVx/iXMFr167t9MnB8swjx0HDtu177703ezveeOON7vq///u/5xqA3mxq1KhR06dPz75dsWJFVVXV0qVLc9vKe+9ZOuFzn+s801xDQ4NHjsOO+++/PzuZyYIFC6LR6Pjx47Picffu3c8//3wvzUbuyGnXZjQ1Nb388su5ymbKlCkHKz+vueaaBx98MPdDpdT69es9chx21NfXP/roo+56JBK57rrrvvOd72Qv8913322bMXaMsfnz52ffNjc3v/jii7ksOSjjMXHixGxiw9UcneTnq6++2kmievgHoFO6yXUZ48aNc2e511rv3r27ra3NXW9tbc3LywOwfPnynpNg5513Xu4X7r///ux/CSFqamqy/+XOKdjzXvWMmpoaL8/x2WHr1q1//OMf3fVhw4YFAgF3/eGHH25ubj5YKQoga4oAOI7z5JNPZt+WlJRcdNFFh7yr69atmzlz5o6/Y1brzxjiCLAoixYt6mQPlFJLlizpzW/z8vIuu+yy3E+6nCQ017MsW7aslzsmpWxtbS0vL1+3bt2zzz77+uuvf2YzNnnkaA8utmzZMmHChOwny5cv/+STT3rz2yuvvDJrbHqDWbNmlZWV1dTUdPeFzZs3T5o06cjw40dInbBTyLpo0aJe/vBgA1QhxNy5c48SkXeEkOOxxx6rq6tz1zdu3Lhq1are/GrcuHEnn3zywf6tThrFI0dfRzKZLCkpcYsaxx9//KGZjSVLlnQ3nVd5eXn2a5MmTZo2bZpHjiMZnPN58+blfvLss8929+VOybRDzpZ65OgfuPDCCwcOHJh9W11dvab7B2M/99xzuW+vuuqqnmf88cjRv9Hp7n/++ed7mFJnzZo1uZPdFhQUXHrppfDgwYMHDx48ePDgwYMHDx48ePDgwYMHDx48ePDgwYMHDx48ePDg4bPE/wOfrWO8eD9bPAAAAABJRU5ErkJggg==">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Map Builder">
+  <meta name="theme-color" content="#000000">
+  <meta name="mobile-web-app-capable" content="yes">
+</head>
+<body>
+<header id="app-header">
+  <div class="logo">
+    <svg height="32" style="display:block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 568 128">
+      <path d="M201.1 89.8h-46l-11.9 26.5h-9.8L173 29h10.5l39.6 87.3h-10.5l-11.5-26.5zm-22.9-51.7l-19.4 43.4h38.6l-19.2-43.4zM227.4 28.3h9v55.4l38.8-30.9h13.5l-31.1 24.1 33.5 39.5h-12l-28.3-33.6-14.3 10.9v22.7h-9l-.1-88.1z" fill="#6d6e6b"/>
+      <path d="M354.8 96.1c-3.7 11.2-13.2 22.3-34.2 22.3-26 0-34.6-18.2-34.6-33.8 0-17.7 10.9-33.7 34.6-33.7 16.4 0 35.8 7.1 35.8 35.9H295c0 13.2 9.4 24 25.5 24 15.2 0 22-5 25.2-14.7h9.1zm-7.5-16.2c-2.6-15.7-14.1-21.5-26.2-21.5-11.6 0-24.1 6-26.2 21.5h52.4zM365.3 52.8h9v14.6h.2c3.3-7.6 9.3-16.5 24.3-16.5 1.8 0 3.6.1 5.4.5v9.3c-2.7-.5-5.5-.7-8.3-.7-9.8 0-21.6 6-21.6 24.1v32.4h-9V52.8zM409.5 29.1h49.6c17.1 0 24.3 9.7 24.3 22 0 8.4-4.6 16.3-15 18.7v.2c11.5 1.7 18.5 10.1 18.5 21.4 0 18.2-15.4 24.9-28.9 24.9h-48.6V29.1zm9 37.9h35.8c12.2 0 20-3.9 20-15.5 0-10.6-7.1-14.1-17-14.1h-38.8V67zm0 41h38c11.7 0 20.5-4.7 20.5-16.6 0-12.6-7.8-16.1-18.3-16.1h-40.2V108zM494.6 29.1h47.1c13.5 0 26.3 6.7 26.3 25.2 0 16.5-10.9 25.4-30.3 25.4h-34v36.7h-9l-.1-87.3zm9.1 42.3h35c15.2 0 19.6-7 19.6-17.1 0-13.1-7.3-16.9-17.7-16.9h-36.8l-.1 34z" fill="#6d6e6b"/>
+      <linearGradient id="sa" gradientUnits="userSpaceOnUse" x1="95.178" y1="74.202" x2="118.788" y2="67.432" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#ac6244"/><stop offset=".49" stop-color="#8d2700"/><stop offset="1" stop-color="#aa5e3f"/></linearGradient>
+      <path d="M119.8 53.5c.2-1.5.4-2.8.6-4v.1c-.7 4-4.4 1.8-5.9.8-7.7-5.1-19.5-10.1-17.1 3.5 2.2 12.7 18 18.3 17.8 21.1 2-6.8 3.5-13.8 4.5-20.8l.1-.7z" fill="url(#sa)"/>
+      <path d="M27.6 6.6c-.5.8.3 1.7 1.4 2.8 3.5-2.9.1-5.2-1.3-3l-.1.2zM24.2 31.4c-1.4-2.5-2.7-5.5-2.2-8.4-1.6 1.8-3 3.8-4 6-.5 1-.5 2.1 6.2 2.4zM15.4 43.1c-.3-2.3-2.5-3.5-3.2-2-.4.8-.2 2.6 3 3.9.2-.6.3-1.2.2-1.9z" fill="#54284e"/>
+      <linearGradient id="sb" gradientUnits="userSpaceOnUse" x1="-310.911" y1="-171.789" x2="-254.041" y2="-190.262" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset="0" stop-color="#8e006d"/><stop offset=".14" stop-color="#d7006d"/><stop offset=".33" stop-color="#f391b6"/><stop offset=".62" stop-color="#ea0080"/><stop offset="1" stop-color="#8e006d"/></linearGradient>
+      <path d="M71.4 48c-1.8-2.2-3.9-4.1-6.4-5.5-11-6.8-29.8-10.9-37.7-11-1.2 0-2.2 0-3.1-.1-6.7-.3-6.7-1.4-6.2-2.4 1-2.2 2.4-4.3 4.1-6 4.8-5.1 10.9-6.9 15.7-8.2C44 13 54.5 7.1 45.3 2.3s-14.7-.6-15.7.8c-.8 1.1-1.4 2.3-2 3.5l.1-.2c1.5-2.2 4.8.1 1.3 3l-.2.1c-3.9 3.1-8.1 10.2-10.4 15.4-3.2 7.1-6.3 16.2-6.3 16.2.8-1.5 2.9-.3 3.2 2 .1.6 0 1.3-.2 1.9-.5 1.4-1.1 2.7-1.9 3.9-3.2 5.5 1.9 10.2 6.6 11.1 4.1.8 27.2-1.2 35.5-2.2 1.3-.2 2.2-.3 2.7-.4 3.4-.6 18.2-3 13.4-9.4z" fill="url(#sb)"/>
+      <linearGradient id="sc" gradientUnits="userSpaceOnUse" x1="1.764" y1="49.34" x2="17.5" y2="49.34" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#003824"/><stop offset="1" stop-color="#00822c"/></linearGradient>
+      <path d="M3.2 87c2.9 2.2 7.8 1.4 14.3-.1C9.8 78.8 7.2 72.6 4.4 73c-1.5.2-2.2 4.2-2.6 6.7-.2 4.4.4 6.6 1.4 7.3z" fill="url(#sc)"/>
+      <linearGradient id="sd" gradientUnits="userSpaceOnUse" x1="-316.529" y1="-243.401" x2="-260.452" y2="-275.779" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset="0" stop-color="#003824"/><stop offset=".51" stop-color="#109840"/><stop offset="1" stop-color="#00822c"/></linearGradient>
+      <path d="M5.3 102.5l-.7-.2c1.9 3.8 4.2 7.4 6.9 10.7 15.4 18.9 46.1 15.6 53.2 13.1s1.6-7.6-2.7-10.1c-2.5-1.5-9.4-4.1-18.3-9.2-12.6-.3-27.8-1.4-38.4-4.3z" fill="url(#sd)"/>
+      <linearGradient id="se" gradientUnits="userSpaceOnUse" x1="-289.899" y1="-194.116" x2="-210.154" y2="-210.997" gradientTransform="scale(1 -1) rotate(-3.35 2355.292 -5724.007)"><stop offset=".16" stop-color="#8d2719"/><stop offset=".51" stop-color="#f5ad2c"/><stop offset=".93" stop-color="#d03c27"/></linearGradient>
+      <path d="M108.8 33.1c-11 .1-22 1.7-32.7 4.6-3.9 1-7.6 2.6-11 4.8v.1c2.4 1.4 4.6 3.3 6.3 5.5 4.8 6.4-10 8.8-13.5 9.5-.5.1-1.4.2-2.7.4-.2 1.5-.2 3 0 4.5.4 3.3-1.1 6.7-4.8 7.5s-20.7 5.3-20.8 9c.1 1.8.6 3.5 1.5 5 2.1-.4 4.4-.8 6.7-1.1 16.4-2.1 47.3-6.3 49.2.8 8.6-4 13.9-8.7 17.3-10.3 4-1.9 10 3.8 10.8 1.7.2-2.8-15.7-8.4-17.8-21.1-2.3-13.6 9.5-8.6 17.1-3.5 1.5 1 5.2 3.2 5.9-.8v-.1c.9-6.3.7-6.7 1.1-10.8.5-5-7.9-5.9-12.6-5.7z" fill="url(#se)"/>
+      <linearGradient id="sf" gradientUnits="userSpaceOnUse" x1="1.482" y1="49.064" x2="83.137" y2="28.71" gradientTransform="matrix(1 0 0 -1 0 130)"><stop offset="0" stop-color="#005d33"/><stop offset=".46" stop-color="#009a33"/><stop offset=".87" stop-color="#005d33"/></linearGradient>
+      <path d="M37.9 82.8c-2.3.3-4.6.7-6.7 1.1-5.1 1-9.8 2.2-13.7 3-6.5 1.5-11.4 2.3-14.3.1-1-.8-1.6-3-1.4-7.3v.2C1.2 84-.1 92.6 0 96.3c.1 3.5.8 4.8 4.6 6l.7.2c10.6 2.9 25.8 4 38.5 4.3 10.9.2 19.9-.2 22.3-.6 5.1-.8 4.5-4.4 3.8-6.9-.8-2.7-1.4-4.8 2.6-5.8 5.1-1.3 14.3-5 14.8-8.7.1-.4 0-.8-.1-1.2-2-7.1-32.9-2.9-49.3-.8z" fill="url(#sf)"/>
+    </svg>
+    <span class="title">Custom Map Builder</span>
+  </div>
+  <div class="hdr-controls">
+    <button class="legend-btn" id="toggleLegendBtn" onclick="toggleLegend()">&#9432; Legend</button>
+    <button class="legend-btn" id="toggleCustomise" onclick="toggleCustomise()">&#9881; Style &amp; Layers</button>
+  </div>
+</header>
+<div id="map"></div>
+<div id="loading"><div class="spinner"></div><p id="loadingMsg">Loading data from Sodir...</p></div>
+
+<div id="customise-panel" class="hidden">
+  <div class="cp-header">
+    <h2>Style &amp; Layers</h2>
+    <button class="close-btn" onclick="toggleCustomise()">&#x2715;</button>
+  </div>
+  <div class="cp-body">
+
+    <div class="cp-section">
+      <div class="cp-section-title">Background</div>
+      <div class="cp-bg-row">
+        <input type="color" id="col-bg" value="#0a1628" oninput="setBackground(this.value)">
+        <div class="cp-swatches">
+          <button class="cp-swatch-btn" style="background:#0a1628" title="Navy" onclick="applyBackgroundSwatch('#0a1628')"></button>
+          <button class="cp-swatch-btn" style="background:#000000" title="Black" onclick="applyBackgroundSwatch('#000000')"></button>
+          <button class="cp-swatch-btn" style="background:#ffffff" title="White" onclick="applyBackgroundSwatch('#ffffff')"></button>
+          <button class="cp-swatch-btn" style="background:#f4f1ea" title="Paper" onclick="applyBackgroundSwatch('#f4f1ea')"></button>
+          <button class="cp-swatch-btn" style="background:#dce9f0" title="Ice blue" onclick="applyBackgroundSwatch('#dce9f0')"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="cp-section">
+      <div class="cp-section-title">Layers shown</div>
+      <div class="cp-row">
+        <span class="cp-label">Norwegian licences</span>
+        <label class="cp-toggle"><input type="checkbox" checked onchange="toggleGroup('licences',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Business arrangement areas</span>
+        <label class="cp-toggle"><input type="checkbox" checked onchange="toggleGroup('units',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">UK licences</span>
+        <label class="cp-toggle"><input type="checkbox" checked onchange="toggleGroup('uk',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Fields</span>
+        <label class="cp-toggle"><input type="checkbox" checked onchange="toggleGroup('fields',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Discoveries</span>
+        <label class="cp-toggle"><input type="checkbox" checked onchange="toggleGroup('discoveries',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Offices</span>
+        <label class="cp-toggle"><input type="checkbox" checked onchange="toggleGroup('offices',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Country borders</span>
+        <label class="cp-toggle"><input type="checkbox" id="vis-borders" checked onchange="toggleGroup('borders',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+    </div>
+
+    <div class="cp-section">
+      <div class="cp-section-title">Extra polygons</div>
+      <div class="cp-row">
+        <span class="cp-label">Show carbon storage licences</span>
+        <label class="cp-toggle"><input type="checkbox" id="vis-carbon" onchange="toggleCarbonLicences(this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Show shut-down fields</span>
+        <label class="cp-toggle"><input type="checkbox" id="vis-shutdown" onchange="toggleShutdown(this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Show other NCS fields</span>
+        <label class="cp-toggle"><input type="checkbox" id="vis-otherfields" onchange="toggleOtherFields(this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Show other NCS discoveries</span>
+        <label class="cp-toggle"><input type="checkbox" id="vis-otherdisc" onchange="toggleOtherDiscoveries(this.checked)"><span class="cp-slider"></span></label>
+      </div>
+    </div>
+
+    <div class="cp-section">
+      <div class="cp-section-title">Polygon colours</div>
+      <div class="cp-color-caption"><span style="flex:1"></span><span>Fill</span><span>Line</span></div>
+      <div class="cp-color-row">
+        <span class="cp-label">Norwegian licences</span>
+        <span class="cp-color-pair">
+          <input type="color" value="#ce0f69" title="Fill" oninput="setColor('licFill',this.value)">
+          <input type="color" value="#ce0f69" title="Outline" oninput="setColor('licStroke',this.value)">
+        </span>
+      </div>
+      <div class="cp-color-row">
+        <span class="cp-label">UK licences</span>
+        <span class="cp-color-pair">
+          <input type="color" value="#4993b4" title="Fill" oninput="setColor('ukFill',this.value)">
+          <input type="color" value="#4993b4" title="Outline" oninput="setColor('ukStroke',this.value)">
+        </span>
+      </div>
+      <div class="cp-color-row">
+        <span class="cp-label">Business arrangement areas</span>
+        <span class="cp-color-pair">
+          <input type="color" value="#ce0f69" title="Fill" oninput="setColor('unitFill',this.value)">
+          <input type="color" value="#ce0f69" title="Outline" oninput="setColor('unitStroke',this.value)">
+        </span>
+      </div>
+      <div class="cp-color-row">
+        <span class="cp-label">Fields</span>
+        <span class="cp-color-pair">
+          <input type="color" value="#00b373" title="Fill" oninput="setColor('fldFill',this.value)">
+          <input type="color" value="#00b373" title="Outline" oninput="setColor('fldStroke',this.value)">
+        </span>
+      </div>
+      <div class="cp-color-row">
+        <span class="cp-label">Shut-down fields</span>
+        <span class="cp-color-pair">
+          <input type="color" value="#6b6880" title="Fill" oninput="setColor('fldSdFill',this.value)">
+          <input type="color" value="#6b6880" title="Outline" oninput="setColor('fldSdStroke',this.value)">
+        </span>
+      </div>
+      <div class="cp-color-row">
+        <span class="cp-label">Discoveries</span>
+        <span class="cp-color-pair">
+          <input type="color" value="#e8c942" title="Fill" oninput="setColor('discFill',this.value)">
+          <input type="color" value="#e8c942" title="Outline" oninput="setColor('discStroke',this.value)">
+        </span>
+      </div>
+      <div class="cp-color-row">
+        <span class="cp-label">Country borders</span>
+        <span class="cp-color-pair">
+          <input type="color" value="#ffffff" title="Fill" oninput="setColor('borderFill',this.value)">
+          <input type="color" value="#888888" title="Outline" oninput="setColor('borderStroke',this.value)">
+        </span>
+      </div>
+    </div>
+
+    <div class="cp-section">
+      <div class="cp-section-title">Labels on map</div>
+      <div class="cp-row">
+        <span class="cp-label">Licence labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-licences" onchange="toggleLabels('licences',this.checked);toggleLabels('units',this.checked);toggleLabels('ukLicences',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Field labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-fields" onchange="toggleLabels('fields',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Discovery labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-discoveries" onchange="toggleLabels('discoveries',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Office labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-offices" checked onchange="toggleLabels('offices',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+      <div class="cp-row">
+        <span class="cp-label">Country name labels</span>
+        <label class="cp-toggle"><input type="checkbox" id="lbl-borders" onchange="toggleLabels('borders',this.checked)"><span class="cp-slider"></span></label>
+      </div>
+    </div>
+
+    <button class="cp-reset" onclick="resetCustomise()">&#8635; Reset to defaults</button>
+
+  </div>
+</div>
+
+<div id="maplegend" class="hidden">
+  <h3>Legend</h3>
+  <div class="legend-item"><div class="legend-swatch" id="lg-lic" style="background:#ce0f69;border-color:#ce0f69"></div>Norwegian licence</div>
+  <div class="legend-item"><div class="legend-swatch" id="lg-uk" style="background:#4993b4;border-color:#4993b4"></div>UK licence</div>
+  <div class="legend-item"><div class="legend-swatch" id="lg-unit" style="background:#ce0f69;border-color:#ce0f69"></div>Business arrangement area</div>
+  <div class="legend-item"><div class="legend-swatch" id="lg-fld" style="background:#00b373;border-color:#00b373"></div>Field</div>
+  <div class="legend-item"><div class="legend-swatch" id="lg-fldsd" style="background:#6b6880;border-color:#6b6880"></div>Field – shut down</div>
+  <div class="legend-item"><div class="legend-swatch" id="lg-disc" style="background:#e8c942;border-color:#e8c942;border-radius:50%;width:14px;height:14px;"></div>Discovery</div>
+  <div class="legend-item"><div class="legend-swatch" id="lg-border" style="background:#ffffff;border-color:#888888"></div>Country border</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.9);border-color:#7d2248;border-radius:50%;width:14px;height:14px;"></div>Office</div>
+</div>
+
+<div id="sidebar" class="hidden">
+  <div class="sidebar-header"><h2 id="sidebarTitle">Info</h2><button class="close-btn" onclick="closeSidebar()">&#x2715;</button></div>
+  <div class="sidebar-content" id="sidebarContent"></div>
+</div>
+<div id="statsbar">
+  <div class="stat"><div class="stat-dot" style="background:#ce0f69"></div><span class="stat-label">Licences:</span><span class="stat-count" id="licenceCount">-</span></div>
+  <div class="stat"><div class="stat-dot" style="background:#00b373"></div><span class="stat-label">Fields:</span><span class="stat-count" id="fieldCount">-</span></div>
+  <div class="stat"><div class="stat-dot" style="background:#e8c942"></div><span class="stat-label">Discoveries:</span><span class="stat-count" id="discoveryCount">-</span></div>
+</div>
+
+<div id="errormsg" class="hidden"></div>
+
+<script>
+const BASE      = 'https://factmaps.sodir.no/api/rest/services/DataService/Data/MapServer';
+const AKERBP_ID = 28544099;
+const NSTA_BASE = 'https://services-eu1.arcgis.com/OZMfUznmLTnWccBc/arcgis/rest/services/UKCS%20offshore%20petroleum%20licences%20WGS84/FeatureServer';
+const BORDERS_URL = 'https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json';
+
+// Default colours, kept for "Reset to defaults"
+const DEFAULT_COLORS = {
+  licFill:'#ce0f69',  licStroke:'#ce0f69',
+  ukFill:'#4993b4',   ukStroke:'#4993b4',
+  unitFill:'#ce0f69', unitStroke:'#ce0f69',
+  fldFill:'#00b373',  fldStroke:'#00b373',
+  fldSdFill:'#6b6880',fldSdStroke:'#6b6880',
+  discFill:'#e8c942', discStroke:'#e8c942',
+  borderFill:'#ffffff', borderStroke:'#888888',
+};
+const DEFAULT_BG = '#0a1628';
+
+let COLORS = { ...DEFAULT_COLORS };
+
+// Label visibility state
+const labelState = { licences:false, units:false, fields:false, offices:true, discoveries:false, ukLicences:false, borders:false };
+
+// Feature visibility flags
+let showCarbonLicences    = false;
+let showShutdown          = false;
+let showOtherFields       = false;
+let showOtherDiscoveries  = false;
+
+const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([68, 10], 5);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+map.createPane('borderPane');    map.getPane('borderPane').style.zIndex    = 350;
+map.createPane('discoveryPane'); map.getPane('discoveryPane').style.zIndex = 415;
+map.createPane('officePane');    map.getPane('officePane').style.zIndex    = 430;
+map.createPane('licencePane');   map.getPane('licencePane').style.zIndex   = 400;
+map.createPane('unitPane');      map.getPane('unitPane').style.zIndex      = 410;
+map.createPane('fieldPane');     map.getPane('fieldPane').style.zIndex     = 425;
+
+const borderLayer    = L.layerGroup().addTo(map);
+const discoveryLayer = L.layerGroup().addTo(map);
+const officeLayer    = L.layerGroup().addTo(map);
+const licenceLayer   = L.layerGroup().addTo(map);
+const unitLayer      = L.layerGroup().addTo(map);
+const fieldLayer     = L.layerGroup().addTo(map);
+const ukLicenceLayer = L.layerGroup().addTo(map);
+
+const LAYER_GROUPS = { licences:licenceLayer, units:unitLayer, uk:ukLicenceLayer, fields:fieldLayer, discoveries:discoveryLayer, offices:officeLayer, borders:borderLayer };
+
+function toggleGroup(key, visible) {
+  const layer = LAYER_GROUPS[key];
+  if(!layer) return;
+  visible ? map.addLayer(layer) : map.removeLayer(layer);
+}
+
+// ─── Background colour (replaces basemap) ─────────────────────────────────
+function setBackground(hex) {
+  document.documentElement.style.setProperty('--map-bg', hex);
+  document.getElementById('col-bg').value = hex;
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  const luminance = (0.299*r + 0.587*g + 0.114*b) / 255;
+  document.body.classList.toggle('light-canvas', luminance > 0.6);
+}
+function applyBackgroundSwatch(hex) { setBackground(hex); }
+
+function toggleLegend()  { document.getElementById('maplegend').classList.toggle('hidden'); document.getElementById('toggleLegendBtn').classList.toggle('active'); }
+function closeSidebar()  { document.getElementById('sidebar').classList.add('hidden'); }
+
+map.on('click', () => closeSidebar());
+
+function stopProp(e) { L.DomEvent.stopPropagation(e); }
+function showError(msg)  { const el=document.getElementById('errormsg'); el.textContent=msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),12000); }
+function setLoading(msg) { const el=document.getElementById('loading'); msg?(document.getElementById('loadingMsg').textContent=msg,el.classList.remove('hidden')):el.classList.add('hidden'); }
+
+async function queryAll(layerId, where, outFields, withGeo=false) {
+  let all=[], offset=0;
+  while(true) {
+    const params = { where, outFields, f:'json', returnGeometry:withGeo?'true':'false', resultRecordCount:'2000', resultOffset:String(offset), ...(withGeo?{outSR:'4326'}:{}) };
+    const body = new URLSearchParams(params);
+    let d;
+    try {
+      const resp = await fetch(`${BASE}/${layerId}/query`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()});
+      d = await resp.json();
+    } catch(e) {
+      const qs = new URLSearchParams(params);
+      const resp = await fetch(`${BASE}/${layerId}/query?${qs}`);
+      d = await resp.json();
+    }
+    if(d.error) throw new Error(`Layer ${layerId}: ${d.error.message}`);
+    const rows = d.features||[];
+    all = all.concat(rows);
+    if(!d.exceededTransferLimit || rows.length===0) break;
+    offset += rows.length;
+  }
+  return all;
+}
+
+function toGeoJSON(esriFeatures) {
+  return { type:'FeatureCollection', features:esriFeatures.map(f=>({type:'Feature',geometry:esriGeom(f.geometry),properties:f.attributes})).filter(f=>f.geometry) };
+}
+
+function esriGeom(g) {
+  if(!g) return null;
+  if(g.rings) { if(!g.rings.length) return null; return g.rings.length===1?{type:'Polygon',coordinates:g.rings}:{type:'MultiPolygon',coordinates:g.rings.map(r=>[r])}; }
+  if(g.x!==undefined) return {type:'Point',coordinates:[g.x,g.y]};
+  if(g.type) return g;
+  return null;
+}
+
+function fmtPct(v) { return (v==null||v==='')?null:parseFloat(v).toFixed(1)+' %'; }
+
+function isShutDown(status) {
+  if(!status) return false;
+  const s = status.toLowerCase();
+  return s.includes('shut')||s.includes('abandon')||s.includes('closed')||s.includes('cease');
+}
+
+function showSidebar(title, sections) {
+  document.getElementById('customise-panel').classList.add('hidden');
+  document.getElementById('sidebarTitle').textContent = title;
+  let html = '';
+  for(const s of sections) {
+    if(s.heading) html += `<div class="info-section-title">${s.heading}</div>`;
+    for(const [label,value] of (s.rows||[])) {
+      if(value===null||value===undefined||value==='') continue;
+      if(label==='') {
+        html += `<div class="info-row-full">${value}</div>`;
+      } else {
+        html += `<div class="info-row"><span class="info-label">${label}</span><span class="info-value">${value}</span></div>`;
+      }
+    }
+  }
+  document.getElementById('sidebarContent').innerHTML = html;
+  document.getElementById('sidebar').classList.remove('hidden');
+}
+
+function polyStyle(fillCol, strokeCol, dashed, dimmed) {
+  return { color:strokeCol, weight:dimmed?1:2, fillColor:fillCol, fillOpacity:dimmed?0.04:0.55, dashArray:dashed?'7 4':null, opacity:dimmed?0.30:1.0 };
+}
+
+async function loadData() {
+  try {
+    setLoading('Fetching licence operator roles...');
+    const licOperRows = await queryAll(3008,`cmpNpdidCompany = ${AKERBP_ID} AND prlOperDateValidTo IS NULL`,'prlNpdidLicence');
+    const operatorLicIds = new Set(licOperRows.map(f=>f.attributes.prlNpdidLicence));
+
+    setLoading('Fetching licence ownership shares...');
+    const licShareRows = await queryAll(3007,`cmpNpdidCompany = ${AKERBP_ID} AND prlLicenseeDateValidTo IS NULL`,'prlNpdidLicence,prlLicenseeInterest');
+    const licShareMap = {};
+    licShareRows.forEach(f=>{ licShareMap[f.attributes.prlNpdidLicence]=f.attributes.prlLicenseeInterest; });
+
+    setLoading('Fetching all licensees...');
+    const allLicIds = [...new Set([...operatorLicIds,...Object.keys(licShareMap).map(Number)])];
+    let allLicenseeRows = [];
+    for(let i=0;i<allLicIds.length;i+=500) {
+      const batch=allLicIds.slice(i,i+500).join(',');
+      const rows=await queryAll(3007,`prlNpdidLicence IN (${batch}) AND prlLicenseeDateValidTo IS NULL`,'prlNpdidLicence,cmpLongName,prlLicenseeInterest,prlLicenseeSdfi');
+      allLicenseeRows=allLicenseeRows.concat(rows);
+    }
+    const licLicenseeMap = {};
+    allLicenseeRows.forEach(f=>{ const a=f.attributes; if(!licLicenseeMap[a.prlNpdidLicence])licLicenseeMap[a.prlNpdidLicence]=[]; licLicenseeMap[a.prlNpdidLicence].push({company:a.cmpLongName,share:a.prlLicenseeInterest,sdfi:a.prlLicenseeSdfi}); });
+
+    setLoading('Loading licence geometries...');
+    const allInvolvedLicIds = [...new Set([...operatorLicIds,...Object.keys(licShareMap).map(Number)])];
+    let licGeoRows = [];
+    for(let i=0;i<allInvolvedLicIds.length;i+=100) {
+      const batch=allInvolvedLicIds.slice(i,i+100).join(',');
+      const rows=await queryAll(3000,`prlNpdidLicence IN (${batch})`,'prlNpdidLicence,prlName,prlMainArea,prlStatus,prlPhaseCurrent,prlCurrentArea,prlFactPageUrl',true);
+      licGeoRows=licGeoRows.concat(rows);
+    }
+    const seenLicIds=new Set();
+    const dedupedLicRows=licGeoRows.filter(f=>{ const id=f.attributes.prlNpdidLicence; if(seenLicIds.has(id))return false; seenLicIds.add(id); return true; });
+    const licGeo=toGeoJSON(dedupedLicRows);
+    licGeo.features.forEach(f=>{ const p=f.properties; p.isOperator=operatorLicIds.has(p.prlNpdidLicence); p._myShare=licShareMap[p.prlNpdidLicence]??null; p._allLicensees=licLicenseeMap[p.prlNpdidLicence]||[]; });
+
+    setLoading('Fetching BAA operator roles...');
+    const unitOperRows=await queryAll(3302,`cmpNpdidCompany = ${AKERBP_ID} AND baaOperatorDateValidTo IS NULL`,'baaNpdidBsnsArrArea,baaName');
+    const unitOperIds=new Set(unitOperRows.map(f=>f.attributes.baaNpdidBsnsArrArea));
+
+    setLoading('Fetching BAA ownership shares...');
+    const unitShareRows=await queryAll(3304,`cmpNpdidCompany = ${AKERBP_ID} AND baaLicenseeDateValidTo IS NULL`,'baaNpdidBsnsArrArea,baaLicenseeInterest');
+    const unitMyShareMap={};
+    unitShareRows.forEach(f=>{ unitMyShareMap[f.attributes.baaNpdidBsnsArrArea]=f.attributes.baaLicenseeInterest; });
+
+    const allUnitIds=[...new Set([...unitOperIds,...Object.keys(unitMyShareMap).map(Number)])];
+    let allUnitLicenseeRows=[];
+    if(allUnitIds.length>0) {
+      const rows=await queryAll(3304,`baaNpdidBsnsArrArea IN (${allUnitIds.join(',')}) AND baaLicenseeDateValidTo IS NULL`,'baaNpdidBsnsArrArea,cmpLongName,baaLicenseeInterest,baaLicenseeSdfi');
+      allUnitLicenseeRows=rows;
+    }
+    const unitLicenseeMap={};
+    allUnitLicenseeRows.forEach(f=>{ const a=f.attributes; if(!unitLicenseeMap[a.baaNpdidBsnsArrArea])unitLicenseeMap[a.baaNpdidBsnsArrArea]=[]; unitLicenseeMap[a.baaNpdidBsnsArrArea].push({company:a.cmpLongName,share:a.baaLicenseeInterest,sdfi:a.baaLicenseeSdfi}); });
+
+    setLoading('Loading BAA geometries...');
+    const unitGeoMap={};
+    async function fetchBaaPage(where, outFields, offset) {
+      const qs=new URLSearchParams({where,outFields,f:'json',returnGeometry:'true',outSR:'4326'});
+      if(offset>0) qs.set('resultOffset',String(offset));
+      return (await fetch(`${BASE}/3300/query?${qs}`)).json();
+    }
+    try {
+      let offset=0;
+      while(true) {
+        const d=await fetchBaaPage(`cmpNpdidCompany = ${AKERBP_ID}`,'baaNpdidBsnsArrArea,baaName,baaKind,baaActive,baaFactPageUrl',offset);
+        if(d.error){console.error('Layer 3300:',d.error.message);break;}
+        const rows=d.features||[];
+        rows.forEach(r=>{unitGeoMap[r.attributes.baaNpdidBsnsArrArea]=r;});
+        if(!d.exceededTransferLimit||rows.length===0) break;
+        offset+=rows.length;
+      }
+    } catch(e){console.error('Unit geo error:',e.message);}
+    const missingUnitIds=allUnitIds.filter(id=>!unitGeoMap[id]);
+    for(const id of missingUnitIds) {
+      try { const d=await fetchBaaPage(`baaNpdidBsnsArrArea = ${id}`,'baaNpdidBsnsArrArea,baaName,baaKind,baaActive,baaFactPageUrl',0); if(!d.error)(d.features||[]).forEach(r=>{unitGeoMap[r.attributes.baaNpdidBsnsArrArea]=r;}); } catch(e){}
+    }
+    const unitGeo=toGeoJSON(Object.values(unitGeoMap));
+    unitGeo.features.forEach(f=>{ const p=f.properties; p.isOperator=unitOperIds.has(p.baaNpdidBsnsArrArea); p._myShare=unitMyShareMap[p.baaNpdidBsnsArrArea]??null; p._allLicensees=unitLicenseeMap[p.baaNpdidBsnsArrArea]||[]; });
+
+    setLoading('Fetching field operator roles...');
+    const fldOperRows=await queryAll(7110,`cmpNpdidCompany = ${AKERBP_ID} AND fldOperatorTo IS NULL`,'fldNpdidField');
+    const operatorFieldIds=new Set(fldOperRows.map(f=>f.attributes.fldNpdidField));
+
+    setLoading('Fetching field ownership shares...');
+    const fldShareRows=await queryAll(7108,`cmpNpdidCompany = ${AKERBP_ID} AND fldLicenseeTo IS NULL`,'fldNpdidField,fldCompanyShare,fldOwnerKind,fldOwnerName');
+    const fldMyShareMap={};
+    fldShareRows.forEach(f=>{ const a=f.attributes; if(!fldMyShareMap[a.fldNpdidField])fldMyShareMap[a.fldNpdidField]={total:0,owners:[]}; fldMyShareMap[a.fldNpdidField].total+=parseFloat(a.fldCompanyShare)||0; fldMyShareMap[a.fldNpdidField].owners.push({kind:a.fldOwnerKind,name:a.fldOwnerName,share:a.fldCompanyShare}); });
+
+    setLoading('Fetching all field licensees...');
+    const allFldIds=[...new Set([...operatorFieldIds,...Object.keys(fldMyShareMap).map(Number)])];
+    let allFldLicenseeRows=[];
+    for(let i=0;i<allFldIds.length;i+=500) {
+      const batch=allFldIds.slice(i,i+500).join(',');
+      const rows=await queryAll(7108,`fldNpdidField IN (${batch}) AND fldLicenseeTo IS NULL`,'fldNpdidField,cmpLongName,fldCompanyShare,fldOwnerKind,fldOwnerName,fldSdfiShare');
+      allFldLicenseeRows=allFldLicenseeRows.concat(rows);
+    }
+    const fldLicenseeMap={};
+    allFldLicenseeRows.forEach(f=>{ const a=f.attributes; if(!fldLicenseeMap[a.fldNpdidField])fldLicenseeMap[a.fldNpdidField]=[]; fldLicenseeMap[a.fldNpdidField].push({company:a.cmpLongName,share:a.fldCompanyShare,ownerKind:a.fldOwnerKind,ownerName:a.fldOwnerName,sdfi:a.fldSdfiShare}); });
+
+    setLoading('Loading field geometries...');
+    let fldGeoRows=[];
+    for(let i=0;i<allFldIds.length;i+=500) {
+      const batch=allFldIds.slice(i,i+500).join(',');
+      const rows=await queryAll(7100,`fldNpdidField IN (${batch})`,'fldNpdidField,fldName,fldMainArea,fldCurrentActivitySatus,fldHcType,fldDiscoveryYear,fldOwnerName,fldFactPageUrl',true);
+      fldGeoRows=fldGeoRows.concat(rows);
+    }
+    const fieldGeo=toGeoJSON(fldGeoRows);
+    fieldGeo.features.forEach(f=>{ const p=f.properties; p.isOperator=operatorFieldIds.has(p.fldNpdidField); p._myShare=fldMyShareMap[p.fldNpdidField]??null; p._allLicensees=fldLicenseeMap[p.fldNpdidField]||[]; p._shutDown=isShutDown(p.fldCurrentActivitySatus); });
+
+    window._licGeo   = licGeo;
+    window._unitGeo  = unitGeo;
+    window._fieldGeo = fieldGeo;
+    renderLicences(licGeo);
+    renderUnits(unitGeo);
+    renderFields(fieldGeo);
+
+    document.getElementById('licenceCount').textContent = licGeo.features.length;
+    document.getElementById('fieldCount').textContent   = fieldGeo.features.length;
+
+    setLoading('Loading Aker BP discoveries...');
+    await loadAkerbpDiscoveries(licGeo);
+
+    loadUKLicences().catch(e=>console.warn('UK licences failed:',e));
+
+    const allF=[...licGeo.features,...unitGeo.features,...fieldGeo.features];
+    if(allF.length>0) {
+      try { const bounds=L.geoJSON({type:'FeatureCollection',features:allF}).getBounds(); if(bounds.isValid())map.fitBounds(bounds,{padding:[50,50]}); } catch(e){}
+    }
+    setLoading(null);
+
+  } catch(err) {
+    console.error(err);
+    setLoading(null);
+    showError('Error: '+err.message);
+  }
+}
+
+function renderLicences(geojson) {
+  if(!geojson) return;
+  licenceLayer.clearLayers();
+  L.geoJSON(geojson, {
+    pane:'licencePane',
+    style(f) { return polyStyle(COLORS.licFill, COLORS.licStroke, !f.properties.isOperator, false); },
+    onEachFeature(feature,layer) {
+      const p=feature.properties;
+      const role=p.isOperator?'Operator':'Licensee';
+      const myShare=fmtPct(p._myShare);
+      const baseStyle=()=>polyStyle(COLORS.licFill, COLORS.licStroke, !p.isOperator, false);
+      layer.on('mouseover',()=>layer.setStyle({fillOpacity:0.42,weight:2.5}));
+      layer.on('mouseout', ()=>layer.setStyle(baseStyle()));
+      layer.on('click',(e)=>{ stopProp(e);
+        const lhRows=p._allLicensees.length>0?p._allLicensees.sort((a,b)=>(b.share||0)-(a.share||0)).map(l=>[l.company||'?',fmtPct(l.share)+(l.sdfi?` (SDFI: ${fmtPct(l.sdfi)})`:'')]):[['No data available',null]];
+        showSidebar('Licence: '+(p.prlName||'?'),[
+          {rows:[['Licence no.',p.prlName],['Aker BP role',`<span style="color:${COLORS.licStroke}">${role}</span>`],['Aker BP share',myShare],['Area',p.prlMainArea],['Status',p.prlStatus],['Phase',p.prlPhaseCurrent],['Area (km²)',p.prlCurrentArea]]},
+          {heading:'All licensees',rows:lhRows},
+          {heading:'Links',rows:[['Sodir',p.prlFactPageUrl?`<a href="${p.prlFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`:null]]}
+        ]);
+      });
+      if(p.prlName) {
+        if(labelState.licences) { layer.bindTooltip(p.prlName,{permanent:true,direction:'center',className:'map-label map-label-licence',offset:[0,0]}); }
+        else { layer.bindTooltip(`<strong>${p.prlName}</strong><br><span style="color:${COLORS.licStroke};font-size:11px">${role}${myShare?' · '+myShare:''}</span>`,{sticky:true,className:'tooltip-dark'}); }
+      }
+    }
+  }).addTo(licenceLayer);
+}
+
+function renderUnits(geojson) {
+  if(!geojson) return;
+  unitLayer.clearLayers();
+  const filtered=showCarbonLicences?geojson:{type:'FeatureCollection',features:geojson.features.filter(f=>!String(f.properties.baaName||'').toUpperCase().startsWith('EXL'))};
+  L.geoJSON(filtered,{
+    pane:'unitPane',
+    style(f) { return {color:COLORS.unitStroke,weight:2.5,fillColor:COLORS.unitFill,fillOpacity:0.30,dashArray:f.properties.isOperator?null:'7 4',pane:'unitPane'}; },
+    onEachFeature(feature,layer) {
+      const p=feature.properties;
+      const role=p.isOperator?'Operator':'Licensee';
+      const myShare=fmtPct(p._myShare);
+      const baseStyle=()=>({color:COLORS.unitStroke,weight:2.5,fillColor:COLORS.unitFill,fillOpacity:0.30,dashArray:p.isOperator?null:'7 4'});
+      layer.on('mouseover',()=>layer.setStyle({fillOpacity:0.55,weight:3.5}));
+      layer.on('mouseout', ()=>layer.setStyle(baseStyle()));
+      layer.on('click',(e)=>{ stopProp(e);
+        const lhRows=p._allLicensees.length>0?p._allLicensees.sort((a,b)=>(b.share||0)-(a.share||0)).map(l=>[l.company||'?',fmtPct(l.share)+(l.sdfi?` (SDFI: ${fmtPct(l.sdfi)})`:'')]):[['No data available',null]];
+        showSidebar('BAA: '+(p.baaName||'?'),[
+          {rows:[['Name',p.baaName],['Type',p.baaKind],['Aker BP role',`<span style="color:${COLORS.unitStroke}">${role}</span>`],['Aker BP share',myShare],['Active',p.baaActive==='Y'?'Yes':'No']]},
+          {heading:'All licensees',rows:lhRows},
+          {heading:'Links',rows:[['Sodir',p.baaFactPageUrl?`<a href="${p.baaFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`:null]]}
+        ]);
+      });
+      if(p.baaName) {
+        if(labelState.units) { layer.bindTooltip(p.baaName,{permanent:true,direction:'center',className:'map-label map-label-unit',offset:[0,0]}); }
+        else { layer.bindTooltip(`<strong>${p.baaName}</strong><br><span style="color:${COLORS.unitStroke};font-size:11px">${role}${myShare?' · '+myShare:''}</span>`,{sticky:true,className:'tooltip-dark'}); }
+      }
+    }
+  }).addTo(unitLayer);
+}
+
+function renderFields(geojson) {
+  if(!geojson) return;
+  fieldLayer.clearLayers();
+  let features=geojson.features.slice();
+  if(!showShutdown) features=features.filter(f=>!f.properties._shutDown);
+  if(showOtherFields&&window._allFieldGeo) features=[...window._allFieldGeo.features,...features];
+  const filtered={type:'FeatureCollection',features};
+  L.geoJSON(filtered,{
+    pane:'fieldPane',
+    pointToLayer(f,latlng) {
+      const p=f.properties; const col=p._shutDown?COLORS.fldSdStroke:COLORS.fldStroke; const fill=p._shutDown?COLORS.fldSdFill:COLORS.fldFill;
+      return L.circleMarker(latlng,{pane:'fieldPane',radius:p._other?6:8,fillColor:fill,color:col,weight:p._other?1:2,fillOpacity:p._other?0.15:(p._shutDown?0.25:0.9)});
+    },
+    style(f) {
+      const p=f.properties; const shut=p._shutDown;
+      const col=shut?COLORS.fldSdStroke:COLORS.fldStroke; const fill=shut?COLORS.fldSdFill:COLORS.fldFill;
+      if(p._other) return {color:COLORS.fldStroke,weight:1.5,fillColor:COLORS.fldFill,fillOpacity:0.28,opacity:0.85,dashArray:'5 4'};
+      return {color:col,weight:shut?1.5:2.5,fillColor:fill,fillOpacity:shut?0.35:0.80,opacity:shut?0.80:1.0};
+    },
+    onEachFeature(feature,layer) {
+      const p=feature.properties; const shut=p._shutDown; const col=shut?COLORS.fldSdStroke:COLORS.fldStroke; const fill=shut?COLORS.fldSdFill:COLORS.fldFill;
+      const role=p._other?'No Aker BP interest':(shut?'Shut down':(p.isOperator?'Operator':'Owner'));
+      const myShare=p._myShare?fmtPct(p._myShare.total):null;
+      const lhRows=p._allLicensees.length>0?p._allLicensees.sort((a,b)=>(b.share||0)-(a.share||0)).map(l=>{ return [l.company||'?',fmtPct(l.share)+(l.sdfi?` (SDFI: ${fmtPct(l.sdfi)})`:'')]; }):[];
+      layer.on('mouseover',()=>layer.setStyle&&layer.setStyle({fillOpacity:p._other?0.50:(shut?0.55:1.0),weight:p._other?2:(shut?2:3)}));
+      layer.on('mouseout', ()=>layer.setStyle&&layer.setStyle(p._other?{color:COLORS.fldStroke,fillColor:COLORS.fldFill,fillOpacity:0.28,weight:1.5,opacity:0.85,dashArray:'5 4'}:(shut?{fillOpacity:0.35,weight:1.5,color:col,fillColor:fill,opacity:0.80}:{fillOpacity:0.80,weight:2.5,color:col,fillColor:fill,opacity:1.0})));
+      layer.on('click',async (e)=>{ stopProp(e);
+        const fname=p.fldName||'?';
+        showSidebar('Field: '+fname,[
+          {rows:[['Field name',p.fldName],...(p._other?[]:[['Aker BP role',`<span style="color:${col}">${role}</span>`],['Aker BP share',myShare]]),['Area',p.fldMainArea],['Status',p.fldCurrentActivitySatus],['HC type',p.fldHcType],['Discovery',p.fldDiscoveryYear]]},
+          ...(lhRows.length>0?[{heading:'Ownership structure',rows:lhRows}]:[]),
+          {heading:'Links',rows:[['Sodir',p.fldFactPageUrl?`<a href="${p.fldFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`:null]]},
+          {heading:'Development & Status',rows:[['','<span style="color:#8ab0d0;font-style:italic">Loading...</span>']]}
+        ]);
+        try {
+          const qs=new URLSearchParams({where:`fldNpdidField = ${p.fldNpdidField} AND fldDescriptionHeading IN ('Development','Status')`,outFields:'fldDescriptionHeading,fldDescriptionText',f:'json',returnGeometry:'false'});
+          const d=await(await fetch(`${BASE}/7102/query?${qs}`)).json();
+          const feats=d.features||[];
+          const dev=feats.find(f=>f.attributes.fldDescriptionHeading==='Development')?.attributes.fldDescriptionText||null;
+          const sta=feats.find(f=>f.attributes.fldDescriptionHeading==='Status')?.attributes.fldDescriptionText||null;
+          const descSections=[];
+          if(dev||sta) {
+            descSections.push({heading:'Development & Status',rows:[
+              ...(dev?[['',`<span style="font-weight:600;color:#a0c0d8">Development</span>`],['',`<span style="line-height:1.6">${dev}</span>`]]:[] ),
+              ...(dev&&sta?[['','']]:[] ),
+              ...(sta?[['',`<span style="font-weight:600;color:#a0c0d8">Status</span>`],['',`<span style="line-height:1.6">${sta}</span>`]]:[] ),
+            ]});
+          }
+          showSidebar('Field: '+fname,[
+            {rows:[['Field name',p.fldName],...(p._other?[]:[['Aker BP role',`<span style="color:${col}">${role}</span>`],['Aker BP share',myShare]]),['Area',p.fldMainArea],['Status',p.fldCurrentActivitySatus],['HC type',p.fldHcType],['Discovery',p.fldDiscoveryYear]]},
+            ...(lhRows.length>0?[{heading:'Ownership structure',rows:lhRows}]:[]),
+            {heading:'Links',rows:[['Sodir',p.fldFactPageUrl?`<a href="${p.fldFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`:null]]},
+            ...descSections
+          ]);
+        } catch(e) { console.warn('Field description fetch failed:',e); }
+      });
+      const name=p.fldName||'?';
+      if(p._other) { layer.bindTooltip(`<strong>${name}</strong><br><span style="color:${COLORS.fldStroke};font-size:11px">Other NCS field</span>`,{sticky:true,className:'tooltip-dark'}); }
+      else if(labelState.fields) { layer.bindTooltip(name,{permanent:true,direction:'top',className:'map-label map-label-field',offset:[0,-4]}); }
+      else { layer.bindTooltip(`<strong>${name}</strong><br><span style="color:${col};font-size:11px">${role}${myShare?' · '+myShare:''}</span>`,{sticky:true,className:'tooltip-dark'}); }
+    }
+  }).addTo(fieldLayer);
+}
+
+const OFFICES = [
+  {name:'Fornebu',      label:'Fornebu',      address:'Oksenøyveien 10, 1366 Lysaker',           lat:59.8953,lng:10.6267},
+  {name:'Stavanger',    label:'Stavanger',    address:'Jåttåflaten 28, 4020 Stavanger',          lat:58.8943,lng:5.6964},
+  {name:'Trondheim',    label:'Trondheim',    address:'Munkegata 26, 7011 Trondheim',            lat:63.4305,lng:10.3951},
+  {name:'Sandnesjøen',  label:'Sandnesjøen',  address:'Øyvind Lambes vei 55, 8803 Sandnesjøen', lat:66.0236,lng:12.6354},
+  {name:'Harstad',      label:'Harstad',      address:'Storåkeren 11, 9411 Harstad',             lat:68.7988,lng:16.5447},
+];
+
+(function renderOffices(){
+  OFFICES.forEach(o=>{
+    const m=L.circleMarker([o.lat,o.lng],{pane:'officePane',radius:7,fillColor:'#ffffff',color:'#7d2248',weight:2.5,fillOpacity:0.95});
+    m.bindTooltip(o.label,{permanent:true,direction:'right',className:'map-label map-label-office',offset:[8,0]});
+    m._officeData=o;
+    m.on('click',(e)=>{ stopProp(e); showSidebar('Aker BP – '+o.name,[{rows:[['Address',o.address],['Phone','(+47) 51 35 30 00'],['Maps',`<a href="https://www.google.com/maps/search/${encodeURIComponent(o.address)}" target="_blank" style="color:#4a9eff">Open in Maps &#x2197;</a>`]]}]); });
+    m.addTo(officeLayer);
+  });
+})();
+
+async function loadAkerbpDiscoveries(licGeo) {
+  let rows=[], offset=0;
+  while(true) {
+    const body=new URLSearchParams({where:"dscCurrentActivityStatus NOT IN ('Included in other discovery','Producing','Shut down')",outFields:'dscNpdidDiscovery,dscName,dscCurrentActivityStatus,dscFactPageUrl,dscDiscoveryYear,dscHcType,cmpLongName,cmpNpdidCompany,nmaName,fldName,fldNpdidField',f:'json',returnGeometry:'true',outSR:'4326',resultRecordCount:'500',resultOffset:String(offset)});
+    const d=await(await fetch(`${BASE}/7000/query`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()})).json();
+    if(d.error){console.warn('Discovery query:',d.error.message);break;}
+    rows=rows.concat(d.features||[]);
+    if(!d.exceededTransferLimit||(d.features||[]).length===0) break;
+    offset+=(d.features||[]).length;
+  }
+
+  setLoading('Loading Aker BP discovery interests...');
+  const akerbpDiscIds=new Set();
+  try {
+    const rows7003=await queryAll(7003,`cmpNpdidCompany = ${AKERBP_ID}`,'dscNpdidDiscovery');
+    rows7003.forEach(f=>akerbpDiscIds.add(f.attributes.dscNpdidDiscovery));
+  } catch(e){console.warn('Layer 7003:',e.message);}
+
+  const akerbpDisc=[], otherDisc=[];
+  rows.forEach(f=>{ if(akerbpDiscIds.has(f.attributes.dscNpdidDiscovery))akerbpDisc.push(f); else otherDisc.push(f); });
+
+  const toGeoD=(arr,isOther)=>{ const geo=toGeoJSON(arr); geo.features.forEach(f=>{f.properties._other=isOther;f.properties._isDiscovery=true;}); return geo; };
+  window._discAkerbpGeo=toGeoD(akerbpDisc,false);
+  window._discOtherGeo=toGeoD(otherDisc,true);
+
+  renderDiscoveries();
+  document.getElementById('discoveryCount').textContent=akerbpDisc.length;
+  setLoading(null);
+}
+
+function renderDiscoveries() {
+  discoveryLayer.clearLayers();
+  if(!window._discAkerbpGeo) return;
+  const features=[...(showOtherDiscoveries&&window._discOtherGeo?window._discOtherGeo.features:[]),...window._discAkerbpGeo.features];
+  L.geoJSON({type:'FeatureCollection',features},{
+    pane:'discoveryPane',
+    pointToLayer(f,latlng) { const other=f.properties._other; return L.circleMarker(latlng,{pane:'discoveryPane',radius:other?5:7,fillColor:COLORS.discFill,color:COLORS.discStroke,weight:other?1.5:2,fillOpacity:other?0.30:0.95,dashArray:other?'4 3':null}); },
+    style(f) { const other=f.properties._other; return {color:COLORS.discStroke,weight:other?1.5:2,fillColor:COLORS.discFill,fillOpacity:other?0.25:0.95,opacity:other?0.70:1.0,dashArray:other?'4 3':null}; },
+    onEachFeature(feature,layer) {
+      const p=feature.properties; const other=p._other; const name=p.dscName||'?';
+      layer.on('mouseover',()=>layer.setStyle&&layer.setStyle({fillOpacity:other?0.55:1.0,weight:other?2:3}));
+      layer.on('mouseout', ()=>layer.setStyle&&layer.setStyle({fillOpacity:other?0.25:0.95,weight:other?1.5:2,opacity:other?0.70:1.0}));
+      layer.on('click',async (e)=>{ stopProp(e);
+        showSidebar('Discovery: '+name,[{rows:[['Name',name],['Status',p.dscCurrentActivityStatus||''],['HC type',p.dscHcType||null],['Discovery year',p.dscDiscoveryYear||null],['Operator',p.cmpLongName||null],['Area',p.nmaName||null],['Aker BP',other?'No':'<span style="color:#e8c942">Yes</span>'],['Related field',p.fldName||null],...(p.dscFactPageUrl?[['Sodir',`<a href="${p.dscFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`]]:[])]
+        },{heading:'Description',rows:[['','<span style="color:#8ab0d0;font-style:italic">Loading...</span>']]}]);
+        try {
+          const qs=new URLSearchParams({where:`dscNpdidDiscovery = ${p.dscNpdidDiscovery}`,outFields:'dscDescriptionHeading,dscDescriptionText,dscCultureCode',f:'json',returnGeometry:'false'});
+          const d=await(await fetch(`${BASE}/7001/query?${qs}`)).json();
+          const feats=d.features||[];
+          const en=feats.find(f=>f.attributes.dscCultureCode==='en');
+          const no=feats.find(f=>f.attributes.dscCultureCode==='no');
+          const feat=(en||no)?.attributes||null;
+          const descText=feat?.dscDescriptionText||null;
+          showSidebar('Discovery: '+name,[
+            {rows:[['Name',name],['Status',p.dscCurrentActivityStatus||''],['HC type',p.dscHcType||null],['Discovery year',p.dscDiscoveryYear||null],['Operator',p.cmpLongName||null],['Area',p.nmaName||null],['Aker BP',other?'No':'<span style="color:#e8c942">Yes</span>'],['Related field',p.fldName||null],...(p.dscFactPageUrl?[['Sodir',`<a href="${p.dscFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`]]:[])
+            ]},
+            ...(descText?[{heading:'Description',rows:[['',`<span style="line-height:1.6">${descText}</span>`]]}]:[])
+          ]);
+        } catch(e) { console.warn('Description fetch failed:',e); }
+      });
+      if(!other&&labelState.discoveries) { layer.bindTooltip(name,{permanent:true,direction:'right',className:'map-label map-label-discovery',offset:[6,0]}); }
+      else { layer.bindTooltip(`<strong>${name}</strong><br><span style="color:${COLORS.discStroke};font-size:11px">${p.dscHcType||''}</span>`,{sticky:true,className:'tooltip-dark'}); }
+    }
+  }).addTo(discoveryLayer);
+}
+
+async function loadUKLicences() {
+  const where=encodeURIComponent(`ADMORGNO='12908310' OR LICORG LIKE '%12908310%'`);
+  const url=`${NSTA_BASE}/0/query?where=${where}&outFields=LICREF,LICNO,LICPREFIX,LICTYPE,LICSTATUS,LICORG,ADMORG,ADMORGNO,BLOCKREF,FIELDS,LICSTARTDT,LICENDDT,RNDNO,RNDTYPE,REGIONS,URL&returnGeometry=true&outSR=4326&f=geojson`;
+  const resp=await fetch(url);
+  if(!resp.ok) throw new Error(`NSTA HTTP ${resp.status}`);
+  const geojson=await resp.json();
+  if(!geojson.features?.length) return;
+  window._ukGeo=geojson;
+  renderUKLicences(geojson);
+  const norCount=parseInt(document.getElementById('licenceCount').textContent)||0;
+  document.getElementById('licenceCount').textContent=norCount+geojson.features.length;
+}
+
+function renderUKLicences(geojson) {
+  ukLicenceLayer.clearLayers();
+  L.geoJSON(geojson,{
+    pane:'licencePane',
+    style:()=>polyStyle(COLORS.ukFill, COLORS.ukStroke, false, false),
+    onEachFeature(feature,layer) {
+      const p=feature.properties;
+      const licRef=p.LICREF||`P${p.LICNO}`;
+      const status=p.LICSTATUS||'–';
+      const org=p.LICORG||p.ADMORG||'–';
+      const fmtDate=ts=>{ if(!ts)return '–'; try{return new Date(ts).toLocaleDateString('en-GB',{year:'numeric',month:'short'})}catch{return '–'} };
+      layer.on('mouseover',()=>layer.setStyle({fillOpacity:0.42,weight:2.5}));
+      layer.on('mouseout', ()=>layer.setStyle(polyStyle(COLORS.ukFill, COLORS.ukStroke, false, false)));
+      layer.on('click',(e)=>{ stopProp(e);
+        showSidebar(`🇬🇧 UK Licence: ${licRef}`,[
+          {rows:[['Licence ref',licRef],['Type',p.LICTYPE||'–'],['Status',`<span style="color:${status==='Extant'?'#00d080':'#f68d2e'}">${status}</span>`],['Blocks',p.BLOCKREF||'–'],['Fields',p.FIELDS||'–'],['Region',p.REGIONS||'–'],['Round',p.RNDNO?`${p.RNDTYPE||'Round'} ${p.RNDNO}`:'–'],['Start',fmtDate(p.LICSTARTDT)],['End',fmtDate(p.LICENDDT)]]},
+          {heading:'Licensee(s)',rows:[[org,null]]},
+          {heading:'Links',rows:[['NSTA licence doc',p.URL?`<a href="${p.URL}" target="_blank" style="color:#4a9eff">Open PDF &#x2197;</a>`:null],['NSTA data portal',`<a href="https://open-data-ukcs-transition.hub.arcgis.com" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`]]}
+        ]);
+      });
+      if(licRef) {
+        if(labelState.ukLicences) { layer.bindTooltip(licRef,{permanent:true,direction:'center',className:'map-label map-label-licence',offset:[0,0]}); }
+        else { layer.bindTooltip(`<strong>${licRef}</strong><br><span style="color:${COLORS.ukStroke};font-size:11px">🇬🇧 UK Licence</span>`,{sticky:true,className:'tooltip-dark'}); }
+      }
+    }
+  }).addTo(ukLicenceLayer);
+}
+
+// ─── Country borders (reference layer, replaces basemap) ──────────────────
+async function loadCountryBorders() {
+  const resp = await fetch(BORDERS_URL);
+  if(!resp.ok) throw new Error(`Borders HTTP ${resp.status}`);
+  const geojson = await resp.json();
+  window._borderGeo = geojson;
+  renderBorders();
+}
+
+function renderBorders() {
+  borderLayer.clearLayers();
+  if(!window._borderGeo) return;
+  L.geoJSON(window._borderGeo,{
+    pane:'borderPane',
+    style:()=>({color:COLORS.borderStroke,weight:1.2,fillColor:COLORS.borderFill,fillOpacity:0.10,interactive:true}),
+    onEachFeature(feature,layer) {
+      const name=feature.properties?.name||'?';
+      if(labelState.borders) { layer.bindTooltip(name,{permanent:true,direction:'center',className:'map-label map-label-border',offset:[0,0]}); }
+      else { layer.bindTooltip(name,{sticky:true,className:'tooltip-dark'}); }
+    }
+  }).addTo(borderLayer);
+}
+
+function toggleCarbonLicences(v){ showCarbonLicences=v; renderUnits(window._unitGeo); }
+function toggleShutdown(v)       { showShutdown=v;        renderFields(window._fieldGeo); }
+function toggleOtherDiscoveries(v){ showOtherDiscoveries=v; renderDiscoveries(); }
+
+function toggleOtherFields(v) {
+  showOtherFields=v;
+  if(v&&!window._allFieldGeo) loadAllFields();
+  else renderFields(window._fieldGeo);
+}
+
+async function loadAllFields() {
+  if(window._allFieldGeo){renderFields(window._fieldGeo);return;}
+  setLoading('Loading all NCS fields...');
+  try {
+    const akerbpIds=new Set((window._fieldGeo?.features||[]).map(f=>f.properties.fldNpdidField));
+    let rows=[], offset=0;
+    while(true) {
+      const body=new URLSearchParams({where:"fldCurrentActivitySatus NOT IN ('Shut down','Abandoned','Returned to authorities')",outFields:'fldNpdidField,fldName,fldMainArea,fldCurrentActivitySatus,fldHcType,fldDiscoveryYear,fldFactPageUrl',f:'json',returnGeometry:'true',outSR:'4326',resultRecordCount:'500',resultOffset:String(offset)});
+      const d=await(await fetch(`${BASE}/7100/query`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()})).json();
+      if(d.error) throw new Error(d.error.message);
+      rows=rows.concat(d.features||[]);
+      if(!d.exceededTransferLimit||(d.features||[]).length===0) break;
+      offset+=(d.features||[]).length;
+    }
+    const geo=toGeoJSON(rows.filter(f=>!akerbpIds.has(f.attributes.fldNpdidField)));
+    geo.features.forEach(f=>{ f.properties._other=true; f.properties._shutDown=false; f.properties.isOperator=false; f.properties._myShare=null; f.properties._allLicensees=[]; });
+    window._allFieldGeo=geo;
+  } catch(e){ showError('Error loading other fields: '+e.message); }
+  setLoading(null);
+  renderFields(window._fieldGeo);
+}
+
+function toggleCustomise() {
+  const panel=document.getElementById('customise-panel');
+  panel.classList.toggle('hidden');
+  if(!panel.classList.contains('hidden')) document.getElementById('sidebar').classList.add('hidden');
+}
+
+document.addEventListener('click', function(e) {
+  const panel = document.getElementById('customise-panel');
+  if (panel.classList.contains('hidden')) return;
+  const btn = document.getElementById('toggleCustomise');
+  if (!panel.contains(e.target) && (!btn || !btn.contains(e.target))) {
+    panel.classList.add('hidden');
+  }
+});
+
+function toggleLabels(type, visible) {
+  labelState[type]=visible;
+  if(type==='licences') renderLicences(window._licGeo);
+  else if(type==='units') renderUnits(window._unitGeo);
+  else if(type==='fields') renderFields(window._fieldGeo);
+  else if(type==='discoveries') renderDiscoveries();
+  else if(type==='ukLicences'&&window._ukGeo) renderUKLicences(window._ukGeo);
+  else if(type==='borders') renderBorders();
+  else if(type==='offices') {
+    officeLayer.eachLayer(l=>{
+      if(!l._officeData) return;
+      l.unbindTooltip();
+      if(visible) { l.bindTooltip(l._officeData.name,{permanent:true,direction:'right',className:'map-label map-label-office',offset:[8,0]}); }
+      else { l.bindTooltip(`<strong>${l._officeData.name}</strong><br><span style="font-size:11px;color:#8ab0d0">${l._officeData.address}</span>`,{sticky:true,className:'tooltip-dark'}); }
+    });
+  }
+}
+
+// ─── Colour customisation ──────────────────────────────────────────────────
+const COLOR_RENDER_MAP = {
+  licFill:    ()=>renderLicences(window._licGeo),
+  licStroke:  ()=>renderLicences(window._licGeo),
+  ukFill:     ()=>renderUKLicences(window._ukGeo),
+  ukStroke:   ()=>renderUKLicences(window._ukGeo),
+  unitFill:   ()=>renderUnits(window._unitGeo),
+  unitStroke: ()=>renderUnits(window._unitGeo),
+  fldFill:    ()=>renderFields(window._fieldGeo),
+  fldStroke:  ()=>renderFields(window._fieldGeo),
+  fldSdFill:  ()=>renderFields(window._fieldGeo),
+  fldSdStroke:()=>renderFields(window._fieldGeo),
+  discFill:   ()=>renderDiscoveries(),
+  discStroke: ()=>renderDiscoveries(),
+  borderFill: ()=>renderBorders(),
+  borderStroke:()=>renderBorders(),
+};
+
+function updateLegend() {
+  const map = { 'lg-lic':['licFill','licStroke'], 'lg-uk':['ukFill','ukStroke'], 'lg-unit':['unitFill','unitStroke'], 'lg-fld':['fldFill','fldStroke'], 'lg-fldsd':['fldSdFill','fldSdStroke'], 'lg-disc':['discFill','discStroke'], 'lg-border':['borderFill','borderStroke'] };
+  for(const [id,[fillKey,strokeKey]] of Object.entries(map)) {
+    const el=document.getElementById(id);
+    if(el) { el.style.background=COLORS[fillKey]; el.style.borderColor=COLORS[strokeKey]; }
+  }
+}
+
+function setColor(key, value) {
+  COLORS[key]=value;
+  (COLOR_RENDER_MAP[key]||(()=>{}))();
+  updateLegend();
+}
+
+function resetCustomise() {
+  // Labels
+  ['licences','fields','discoveries','units','borders','ukLicences'].forEach(t=>{ labelState[t]=false; });
+  labelState.offices=true;
+  document.querySelectorAll('#customise-panel [id^="lbl-"]').forEach(el=>{ el.checked = el.id==='lbl-offices'; });
+  toggleLabels('offices', true);
+
+  // Extra polygons
+  showCarbonLicences=false; document.getElementById('vis-carbon').checked=false;
+  showShutdown=false; document.getElementById('vis-shutdown').checked=false;
+  showOtherFields=false; document.getElementById('vis-otherfields').checked=false; window._allFieldGeo=null;
+  showOtherDiscoveries=false; document.getElementById('vis-otherdisc').checked=false;
+
+  // Colours
+  COLORS = { ...DEFAULT_COLORS };
+  document.querySelectorAll('.cp-color-pair input[type=color]').forEach(el=>{
+    const onAttr=el.getAttribute('oninput')||'';
+    const m=onAttr.match(/setColor\('(\w+)'/);
+    if(m) el.value = DEFAULT_COLORS[m[1]];
+  });
+
+  // Re-render everything once, with the reset state above applied
+  renderLicences(window._licGeo); renderUnits(window._unitGeo); renderFields(window._fieldGeo); renderDiscoveries(); renderBorders();
+  if(window._ukGeo) renderUKLicences(window._ukGeo);
+  updateLegend();
+
+  // Background
+  setBackground(DEFAULT_BG);
+
+  // Layer visibility
+  document.querySelectorAll('#customise-panel .cp-row input[type=checkbox]:not([id])').forEach(el=>{ el.checked=true; });
+  document.getElementById('vis-borders').checked=true;
+  Object.keys(LAYER_GROUPS).forEach(k=>toggleGroup(k,true));
+
+  document.getElementById('maplegend').classList.add('hidden');
+  document.getElementById('toggleLegendBtn').classList.remove('active');
+}
+
+function updateHeaderHeight() {
+  const h = document.getElementById('app-header').getBoundingClientRect().height;
+  document.documentElement.style.setProperty('--header-h', Math.ceil(h) + 16 + 'px');
+}
+updateHeaderHeight();
+window.addEventListener('resize', updateHeaderHeight);
+
+setBackground(DEFAULT_BG);
+loadData();
+loadCountryBorders().catch(e=>console.warn('Country borders failed:',e));
+</script>
+
+</body>
+</html>
