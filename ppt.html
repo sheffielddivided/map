@@ -150,6 +150,17 @@
       </div>
     </details>
 
+    <details open>
+      <summary>Sektorer</summary>
+      <div class="sec">
+        <label class="row"><input type="checkbox" id="secNo" /> Norge</label>
+        <label class="row"><input type="checkbox" id="secUk" /> Storbritannia</label>
+        <label class="row"><input type="checkbox" id="secDk" /> Danmark</label>
+        <label class="row"><input type="checkbox" id="secLines" /> Sektorgrenser</label>
+        <div class="hint">Danske data har ikke rørledninger eller funn, felt mangler hydrokarbontype, og brønnene går til 2019.</div>
+      </div>
+    </details>
+
     <details id="sec3d">
       <summary>3D-effekt</summary>
       <div class="sec">
@@ -267,7 +278,10 @@
 // Konstanter og oppslag
 // ════════════════════════════════════════════════════════════════════════════
 const FONT = 'Arial, Helvetica, sans-serif';
-const DATA_FILES = ['fields', 'discoveries', 'licences', 'wells', 'pipelines', 'facilities', 'quadrants'];
+const DATA_FILES = ['fields', 'discoveries', 'licences', 'pipelines', 'facilities', 'quadrants'];
+// Store lag som lastes først når de slås på.
+const LAZY_FILES = ['wells', 'blocks'];
+const SECTORS = { no: 'Norge', uk: 'Storbritannia', dk: 'Danmark' };
 
 const THEMES = {
   light: { sea: '#e8f0f6', land: '#f4f2ee', coast: '#b9c2cb', depth: '#d6e3ee', border: '#a9b0b8', ink: '#2b3440', halo: '#ffffff', grid: '#8a9bb0', box: '#ffffff', other: '#c3c8cf' },
@@ -290,6 +304,7 @@ const DSC_STATUS = {
   'Production likely but unclarified': 'Utvinning sannsynlig, men uavklart',
   'Production not evaluated': 'Utvinning ikke evaluert',
   'Production is unlikely': 'Utvinning lite sannsynlig',
+  'Undeveloped': 'Uutbygd funn (UK)',
 };
 const FLD_STATUS = { 'Producing': 'I produksjon', 'Shut down': 'Nedstengt', 'Approved for production': 'Godkjent for utbygging (PUD)' };
 
@@ -306,7 +321,7 @@ function wellClass(content) {
   for (const [k, c] of Object.entries(WELL_CLASSES)) if (c.match.includes(content)) return k;
   return 'other';
 }
-const PIPE_MEDIUM = { 'Gas': { name: 'Gass', color: '#d6336c' }, 'Oil': { name: 'Olje', color: '#2f9e44' }, 'Condensate': { name: 'Kondensat', color: '#e8590c' }, 'Co2 injection': { name: 'CO₂', color: '#7048e8' } };
+const PIPE_MEDIUM = { 'Gas': { name: 'Gass', color: '#d6336c' }, 'Oil': { name: 'Olje', color: '#2f9e44' }, 'Condensate': { name: 'Kondensat', color: '#e8590c' }, 'Co2 injection': { name: 'CO₂', color: '#7048e8' }, 'Mixed': { name: 'Flerfase', color: '#9c36b5' } };
 
 const CITIES = [
   ['Oslo', 10.75, 59.91], ['Stavanger', 5.73, 58.97], ['Bergen', 5.32, 60.39], ['Florø', 5.03, 61.60],
@@ -318,6 +333,9 @@ const CITIES = [
 
 const VIEW_PRESETS = [
   { name: 'Hele sokkelen', bounds: [[1.5, 56], [36, 74.5]], proj: 'lcc' },
+  { name: 'Hele Nordsjøen', bounds: [[-3.5, 52.8], [9, 62]] },
+  { name: 'Sentrale Nordsjø', bounds: [[-1.5, 55.6], [5.2, 58.8]] },
+  { name: 'Vest for Shetland', bounds: [[-6.5, 59.2], [-0.5, 62.2]] },
   { name: 'Nordsjøen', bounds: [[1.5, 56.2], [7.5, 62]] },
   { name: 'Nordlige Nordsjø', bounds: [[1.8, 59.3], [5.5, 62]] },
   { name: 'Norskehavet', bounds: [[4.5, 62], [14, 67.5]] },
@@ -356,7 +374,7 @@ const EN = {
   'Kopier som PNG til utklippstavlen (lim inn i PowerPoint med Ctrl+V)': 'Copy as PNG to the clipboard (paste into PowerPoint with Ctrl+V)',
   'Last ned PNG': 'Download PNG',
   'Last ned SVG – kan settes inn i PowerPoint og konverteres til figur for redigering': 'Download SVG – can be inserted in PowerPoint and converted to shapes for editing',
-  'Data fra Sodir per {0}': 'Sodir data as of {0}',
+  'Data oppdatert {0}': 'Data updated {0}',
   // Utsnitt
   'Utsnitt': 'View', 'Zoom til utvalg': 'Zoom to selection', 'Zoom til valgt selskap, eller til alt som er synlig': 'Zoom to the selected company, or to everything visible',
   'Projeksjon': 'Projection', 'Transvers Mercator, nord opp (anbefalt)': 'Transverse Mercator, north up (recommended)',
@@ -420,7 +438,12 @@ const EN = {
   'Kartet er kopiert – lim inn i PowerPoint med Ctrl+V': 'Map copied – paste into PowerPoint with Ctrl+V', 'Kopiering feilet: {0}': 'Copy failed: {0}',
   'Lenken er kopiert': 'Link copied', 'Kunne ikke kopiere lenken': 'Could not copy the link', 'Gi malen et navn først': 'Give the template a name first',
   'Malen «{0}» er lagret': 'Template “{0}” saved', 'Tilbakestille alle innstillinger?': 'Reset all settings?', 'Ingenting å zoome til': 'Nothing to zoom to',
-  'Kunne ikke lagre i nettleseren': 'Could not save in this browser', 'Lastet «{0}»': 'Loaded “{0}”', 'Slette malen «{0}»?': 'Delete the template “{0}”?',
+  'Kunne ikke lagre i nettleseren': 'Could not save in this browser',
+  'Sektorer': 'Sectors', 'Norge': 'Norway', 'Storbritannia': 'United Kingdom', 'Danmark': 'Denmark', 'Sektorgrenser': 'Sector boundaries',
+  'Danske data har ikke rørledninger eller funn, felt mangler hydrokarbontype, og brønnene går til 2019.': 'Danish data has no pipelines or discoveries, fields lack hydrocarbon type, and wells end in 2019.',
+  'Hele Nordsjøen': 'Entire North Sea', 'Sentrale Nordsjø': 'Central North Sea', 'Vest for Shetland': 'West of Shetland',
+  'Uutbygd funn (UK)': 'Undeveloped discovery (UK)', 'Flerfase': 'Multiphase', 'Sektor': 'Sector', 'Kilde': 'Source',
+  'Sokkeldirektoratet (NLOD)': 'Norwegian Offshore Directorate (NLOD)', 'Energistyrelsen': 'Danish Energy Agency', 'data per {0}': 'data as of {0}', 'Lastet «{0}»': 'Loaded “{0}”', 'Slette malen «{0}»?': 'Delete the template “{0}”?',
   'kart': 'map',
 };
 function t(str, ...args) {
@@ -470,7 +493,8 @@ function defaultState() {
     view: null,                       // { center: [lon, lat], scale }
     layers: Object.fromEntries(LAYERS.map(l => [l.key, { ...l.def }])),
     colorByHC: false,
-    dscStatus: ['Production in clarification phase', 'Production likely but unclarified', 'Production not evaluated'],
+    dscStatus: ['Production in clarification phase', 'Production likely but unclarified', 'Production not evaluated', 'Undeveloped'],
+    sectors: { no: true, uk: true, dk: true }, sectorLines: true,
     wells: { wildcat: true, appraisal: true, from: CURRENT_YEAR - 10, to: CURRENT_YEAR, classes: Object.keys(WELL_CLASSES), colorByContent: true },
     pipes: { byMedium: false, byDim: true },
     fac: { surface: true, subsea: false, onshore: true },
@@ -549,24 +573,39 @@ async function loadData() {
   BASE = {
     land: topojson.feature(base, o.land),
     borders: topojson.feature(base, o.borders),
+    sectors: o.sectors ? topojson.feature(base, o.sectors) : null,
     depth: ['d200', 'd1000', 'd2000', 'd3000'].map(k => topojson.feature(base, o[k])),
   };
-  const counts = new Map();
+  const counts = new Map(), ccs = new Map();
   for (const src of ['fields', 'discoveries', 'licences']) {
     for (const f of D[src].features) {
       const names = new Set([f.properties.op, ...f.properties.lic.map(l => l[0])].filter(Boolean));
-      names.forEach(n => counts.set(n, (counts.get(n) || 0) + 1));
+      names.forEach(n => {
+        counts.set(n, (counts.get(n) || 0) + 1);
+        if (!ccs.has(n)) ccs.set(n, new Set());
+        ccs.get(n).add(f.properties.cc || 'no');
+      });
     }
   }
-  COMPANIES = [...counts].map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'no'));
+  COMPANIES = [...counts].map(([name, n]) => ({ name, n, cc: ['no', 'uk', 'dk'].filter(c => ccs.get(name).has(c)) }))
+    .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'no'));
+  // Eldre lenker og maler kan inneholde juridiske selskapsnavn («Aker BP ASA»); oversett til konsernnavn.
+  const aliases = await loadJSON('data/companies.json').catch(() => ({}));
+  const known = new Set(COMPANIES.map(c => c.name));
+  S.companies = [...new Set(S.companies.map(n => aliases[n] || n))].filter(n => known.has(n));
 }
 
-let blocksPromise = null;
-function ensureBlocks() {
-  if (D.blocks) return Promise.resolve();
-  if (!blocksPromise) blocksPromise = loadJSON('data/blocks.json').then(j => { j.features.forEach(f => rewind(f.geometry)); D.blocks = j; render(); });
-  return blocksPromise;
+const lazyPromises = {};
+function ensureLazy(name) {
+  if (D[name]) return Promise.resolve();
+  if (!lazyPromises[name]) {
+    lazyPromises[name] = loadJSON(`data/${name}.json`)
+      .then(j => { j.features.forEach(f => rewind(f.geometry)); D[name] = j; render(); })
+      .catch(e => { delete lazyPromises[name]; toast(t('Kunne ikke laste kartdata: {0}', e.message)); });
+  }
+  return lazyPromises[name];
 }
+const inSector = f => S.sectors[f.properties.cc || 'no'] !== false;
 
 // ════════════════════════════════════════════════════════════════════════════
 // Selskap
@@ -792,8 +831,9 @@ function textWidth(txt, size, weight = 'normal') {
 // Hvilke features som vises for et lag, med farge og etikett.
 function layerItems(L) {
   const st = S.layers[L.key];
-  if (!st.on || !D[L.src]) return [];
-  let feats = D[L.src].features;
+  if (!st.on) return [];
+  if (!D[L.src]) { if (LAZY_FILES.includes(L.src)) ensureLazy(L.src); return []; }
+  let feats = D[L.src].features.filter(inSector);
   if (L.filter) feats = feats.filter(f => L.filter(f.properties));
   if (L.key === 'discoveries') feats = feats.filter(f => S.dscStatus.includes(f.properties.status));
   if (L.key === 'wells') {
@@ -857,10 +897,16 @@ function render() {
   if (S.borders) g.append('path').attr('d', path(BASE.borders)).attr('fill', 'none').attr('stroke', T.border).attr('stroke-width', 0.8).attr('stroke-dasharray', '3 2');
 
   if (S.blocks) {
-    if (D.blocks) g.append('path').attr('d', path(D.blocks)).attr('fill', 'none').attr('stroke', T.grid).attr('stroke-width', 0.35).attr('stroke-opacity', 0.6);
-    else ensureBlocks();
+    if (D.blocks) g.append('path').attr('d', path({ type: 'FeatureCollection', features: D.blocks.features.filter(inSector) }))
+      .attr('fill', 'none').attr('stroke', T.grid).attr('stroke-width', 0.35).attr('stroke-opacity', 0.6);
+    else ensureLazy('blocks');
   }
-  if (S.quads) g.append('path').attr('d', path(D.quadrants)).attr('fill', 'none').attr('stroke', T.grid).attr('stroke-width', 0.8).attr('stroke-opacity', 0.8);
+  if (S.quads) g.append('path').attr('d', path({ type: 'FeatureCollection', features: D.quadrants.features.filter(inSector) }))
+    .attr('fill', 'none').attr('stroke', T.grid).attr('stroke-width', 0.8).attr('stroke-opacity', 0.8);
+  if (S.sectorLines && BASE.sectors) {
+    g.append('path').attr('d', path(BASE.sectors)).attr('fill', 'none').attr('stroke', T.ink).attr('stroke-opacity', 0.55)
+      .attr('stroke-width', 1.4).attr('stroke-dasharray', '9 3 2 3').attr('stroke-linejoin', 'round');
+  }
 
   if (persp.tilted && S.haze && !S.transparent) {
     // Dis mot horisonten over bakgrunnskartet (ikke over feltene) gir dybdefølelse.
@@ -891,6 +937,19 @@ function render() {
 
     if (L.kind === 'poly') {
       for (const it of items) {
+        if (it.f.geometry.type === 'Point') {
+          // Britiske uutbygde funn finnes bare som punkter.
+          const xy = P(it.f.geometry.coordinates);
+          if (!xy || xy[0] < -20 || xy[1] < -20 || xy[0] > w + 20 || xy[1] > h + 20) continue;
+          const fk = `${key}:${it.p.id}`;
+          featIndex.set(fk, { L, p: it.p });
+          const r = 4.2 * k, fill = it.other ? S.otherColor : (it.partner ? lighten(it.color, 0.55) : it.color);
+          if (it.other) drewOther = true;
+          lg.append('path').attr('d', `M${xy[0]},${xy[1] - r}L${xy[0] + r},${xy[1]}L${xy[0]},${xy[1] + r}L${xy[0] - r},${xy[1]}Z`)
+            .attr('fill', fill).attr('stroke', d3.color(fill).darker(0.8).formatHex()).attr('stroke-width', 0.8).attr('data-k', fk);
+          if (st.labels && !(it.other && S.labelsOnlySel)) labels.push(labelCandidate(key, it, xy, labelPriority[key], 'right'));
+          continue;
+        }
         const d = path(it.f);
         if (!d) continue;
         const fk = `${key}:${it.p.id}`;
@@ -951,10 +1010,10 @@ function render() {
   }
 
   if (S.quads) {
-    for (const f of D.quadrants.features) {
+    for (const f of D.quadrants.features.filter(inSector)) {
       const c = path.centroid(f);
       if (!isFinite(c[0]) || c[0] < 0 || c[1] < 0 || c[0] > w || c[1] > h) continue;
-      labels.push({ key: `quad:${f.properties.name}`, text: f.properties.name, x: c[0], y: c[1], anchor: 'center', size: S.labelSize * 1.15, weight: 'bold', color: T.grid, priority: 1, faint: true });
+      labels.push({ key: `quad:${f.properties.cc || 'no'}:${f.properties.name}`, text: f.properties.name, x: c[0], y: c[1], anchor: 'center', size: S.labelSize * 1.15, weight: 'bold', color: T.grid, priority: 1, faint: true });
     }
   }
 
@@ -1014,7 +1073,7 @@ function polyLabelPoint(f) {
 function labelCandidate(key, it, [x, y], priority, anchor) {
   const p = it.p, T = theme();
   let text = p.name;
-  if (key === 'licences') text = 'PL ' + p.name;
+  if (key === 'licences') text = licenceName(p);
   if (S.labelShare && it.cm && it.cm.match && it.cm.share > 0) text += ` (${fmtShare(it.cm.share)})`;
   const isField = key === 'producing' || key === 'approved';
   return {
@@ -1024,6 +1083,8 @@ function labelCandidate(key, it, [x, y], priority, anchor) {
     priority: priority + (it.other ? -5 : 0) + (it.cm && it.cm.match ? 3 : 0),
   };
 }
+// Norske lisenser heter «PL 242»; britiske (P32) og danske (1/06, DUC) har prefikset i navnet.
+function licenceName(p) { return (p.cc || 'no') === 'no' ? 'PL ' + p.name : p.name; }
 function fmtShare(v) { return (Math.round(v * 100) / 100).toLocaleString(LOCALE(), { maximumFractionDigits: 2 }) + (S.lang === 'en' ? '%' : ' %'); }
 
 function placeLabels(cands, T, obstacles = []) {
@@ -1087,7 +1148,11 @@ function drawOverlay(T) {
   if (S.scale && !persp.tilted) drawScaleBar(g, T);
   if (S.north) drawNorth(g, T);
   if (S.source) {
-    const txt = `${t('Kilde: Sokkeldirektoratet (NLOD)')}${META.updated ? t(', data per {0}', fmtDate(META.updated)) : ''} · Natural Earth`;
+    const src = [];
+    if (S.sectors.no) src.push(t('Sokkeldirektoratet (NLOD)'));
+    if (S.sectors.uk) src.push('NSTA (OGL)');
+    if (S.sectors.dk) src.push(t('Energistyrelsen'));
+    const txt = `${t('Kilde')}: ${src.join(', ')}${META.updated ? ', ' + t('data per {0}', fmtDate(META.updated)) : ''} · Natural Earth`;
     g.append('text').attr('x', w - 8).attr('y', h - 7).attr('text-anchor', 'end').attr('font-family', FONT).attr('font-size', 12)
       .attr('fill', ink).attr('fill-opacity', 0.65).text(txt);
   }
@@ -1288,13 +1353,14 @@ function tipHtml(L, p) {
   const rows = [];
   const add = (k, v) => v != null && v !== '' && rows.push(`<div><span class="m">${t(k)}:</span> ${esc(v)}</div>`);
   let title = p.name;
-  if (L.key === 'licences') title = 'PL ' + p.name;
+  if (L.key === 'licences') title = licenceName(p);
   if (L.src === 'fields') { add('Status', t(FLD_STATUS[p.status])); add('Type', HC[p.hc] && t(HC[p.hc].name)); add('Funnår', p.year); }
   if (L.key === 'discoveries') { add('Status', t(DSC_STATUS[p.status])); add('Type', HC[p.hc] && t(HC[p.hc].name)); add('Funnår', p.year); }
   if (L.key === 'wells') { add('Formål', p.purpose === 'WILDCAT' ? t('Undersøkelse') : p.purpose === 'APPRAISAL' ? t('Avgrensning') : p.purpose); add('Resultat', t(WELL_CLASSES[wellClass(p.content)].name)); add('År', p.year); add('Funn', p.dsc); }
   if (L.key === 'pipelines') { add('Medium', PIPE_MEDIUM[p.medium] ? t(PIPE_MEDIUM[p.medium].name) : p.medium); add('Dimensjon', p.dim ? p.dim + '"' : null); add('Fra – til', p.from && p.to ? `${p.from} – ${p.to}` : null); }
   if (L.key === 'facilities') { add('Type', p.kind); add('Tilhører', p.field); }
   add('Operatør', p.op);
+  if (p.cc) add('Sektor', t(SECTORS[p.cc]));
   let lic = '';
   if (p.lic && p.lic.length) {
     const sel = new Set(S.companies);
@@ -1447,7 +1513,7 @@ function buildCompanyUI() {
   const sel = new Set(S.companies);
   COMPANIES.filter(c => !q || c.name.toLowerCase().includes(q)).forEach(c => {
     const l = document.createElement('label');
-    l.innerHTML = `<input type="checkbox" ${sel.has(c.name) ? 'checked' : ''}><span>${esc(c.name)}</span><span class="cnt">${c.n}</span>`;
+    l.innerHTML = `<input type="checkbox" ${sel.has(c.name) ? 'checked' : ''}><span>${esc(c.name)}</span><span class="cnt" title="${c.cc.map(x => t(SECTORS[x])).join(', ')}">${c.cc.map(x => x.toUpperCase()).join(' · ')}</span>`;
     l.querySelector('input').onchange = e => {
       if (e.target.checked) S.companies.push(c.name); else S.companies = S.companies.filter(n => n !== c.name);
       buildCompanyChips(); render();
@@ -1538,6 +1604,10 @@ function syncAllControls() {
   bindValue('bearing', () => S.bearing, v => { S.bearing = +v; $('bearingVal').textContent = deg(v); setupProjection(); }, 'input');
   bindValue('extrude', () => S.extrude, v => { S.extrude = +v; $('extrudeVal').textContent = v; setupProjection(); }, 'input');
   $('tiltVal').textContent = deg(S.tilt); $('bearingVal').textContent = deg(S.bearing); $('extrudeVal').textContent = S.extrude;
+  bindCheck('secNo', () => S.sectors.no, v => S.sectors.no = v);
+  bindCheck('secUk', () => S.sectors.uk, v => S.sectors.uk = v);
+  bindCheck('secDk', () => S.sectors.dk, v => S.sectors.dk = v);
+  bindCheck('secLines', () => S.sectorLines, v => S.sectorLines = v);
   bindCheck('extFields', () => S.extFields, v => S.extFields = v);
   bindCheck('extDsc', () => S.extDsc, v => S.extDsc = v);
   bindCheck('shadow', () => S.shadow, v => S.shadow = v);
@@ -1631,7 +1701,7 @@ function buildPresetButtons() {
   });
 }
 
-function updateStatus() { $('status').textContent = META.updated ? t('Data fra Sodir per {0}', fmtDate(META.updated)) : ''; }
+function updateStatus() { $('status').textContent = META.updated ? t('Data oppdatert {0}', fmtDate(META.updated)) : ''; }
 
 // Oppdaterer all tekst i grensesnittet til gjeldende språk (kartet tegnes på nytt av kalleren).
 function applyLanguage() {

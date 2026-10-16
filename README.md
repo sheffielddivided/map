@@ -3,10 +3,11 @@ Aker BP map
 
 ## PPT-kart (`ppt.html`)
 
-Lager egendefinerte kart over norsk sokkel til PowerPoint-presentasjoner.
+Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-presentasjoner.
 
 - **Kartlag:** felt i produksjon, felt under utbygging, nedstengte felt, funn, aktive lisenser,
   transportrørledninger, innretninger og letebrønner (filtrert på år, formål og resultat).
+- **Sektorer:** norsk, britisk og dansk sektor kan slås av og på hver for seg, med sektorgrenser.
 - **Selskapsfilter:** velg ett eller flere selskaper som operatør og/eller partner. De kan fremheves
   (andre vises i grått) eller vises alene, med valgfri eierandel i etiketten. Gjelder felt, funn og lisenser.
 - **Bakgrunn:** vektorkart med kystlinje, dybdekurver, landegrenser, byer og kvadrant-/blokknett.
@@ -24,16 +25,28 @@ Lager egendefinerte kart over norsk sokkel til PowerPoint-presentasjoner.
 
 ### Data
 
-`data/*.json` hentes fra [Sodir FactMaps](https://factmaps.sodir.no) (NLOD 2.0) med
-`fetch_data.py`, som kun bruker Python-standardbiblioteket. GitHub Action-en
-`.github/workflows/update-map-data.yml` kjører skriptet daglig og committer bare når dataene
-faktisk er endret. Skriptet kan også kjøres lokalt:
+`fetch_data.py` (kun Python-standardbiblioteket) henter alle lag og skriver `data/*.json`. Hver
+feature har `cc` = `no`, `uk` eller `dk`.
+
+| Sektor | Kilde | Lag |
+| --- | --- | --- |
+| Norge | [Sodir FactMaps](https://factmaps.sodir.no) (NLOD 2.0) | felt, funn, lisenser, letebrønner, rørledninger, innretninger, kvadranter, blokker |
+| Storbritannia | [NSTA Open Data](https://opendata-nstauthority.hub.arcgis.com) (Open Government Licence v3.0) | felt (med rettighetshavere), uutbygde funn (punkter), lisens-delområder med eierandel, lete-/avgrensningsbrønner, transportrør ≥ 16", plattformer/FPSO/terminaler, havbunnsrammer, kvadranter, blokker |
+| Danmark | Energistyrelsens shapefiler via [sheffielddivided/ens](https://github.com/sheffielddivided/ens) | felt (status fra månedsproduksjonen, eierandeler fra `ownership.json`), lisenser, letebrønner (til 2019), innretninger, blokker |
+
+Selskapsnavn normaliseres til konsernnavn (`GROUPS` i skriptet), så ett valg dekker datterselskaper
+i alle land. `data/companies.json` kobler juridiske navn til konsernnavn, slik at eldre lenker og
+maler fortsatt virker.
+
+GitHub Action-en `.github/workflows/update-map-data.yml` kjører skriptet daglig og committer bare
+når dataene faktisk er endret. Feiler én kilde, beholdes forrige data for det landet. Skriptet kan
+også kjøres lokalt:
 
 ```
 python fetch_data.py
 ```
 
-`data/basemap.json` (kystlinje, landegrenser og dybdekurver) er statisk. Den er bygget én gang fra
+`data/basemap.json` (kystlinje, landegrenser, dybdekurver og sektorgrenser) er statisk. Den er bygget én gang fra
 [Natural Earth](https://www.naturalearthdata.com) 10m (public domain) med
 [mapshaper](https://github.com/mbloch/mapshaper):
 
@@ -46,6 +59,9 @@ mapshaper -i ne_10m_land.shp ne_10m_minor_islands.shp combine-files -merge-layer
 mapshaper -i land.json borders.json d200.json d1000.json d2000.json d3000.json combine-files \
   -o basemap.json format=topojson quantization=100000
 ```
+
+Sektorgrensene (`sectors`) er de felles kantene mellom hvert lands blokknett (Sodir, NSTA og ENS),
+laget med `mapshaper -i no.json uk.json dk.json combine-files snap -merge-layers force -dissolve2 cc -innerlines`.
 
 Siden må serveres over HTTP(S), f.eks. via GitHub Pages eller lokalt med
 `python -m http.server`. Den fungerer ikke åpnet direkte som fil.
