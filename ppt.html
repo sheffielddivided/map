@@ -108,6 +108,10 @@
   <div class="grow"></div>
   <span class="status" id="status"></span>
   <div class="group">
+    <label for="lang">Språk</label>
+    <select id="lang"><option value="no">Norsk</option><option value="en">English</option></select>
+  </div>
+  <div class="group">
     <label for="res">Oppløsning</label>
     <select id="res">
       <option value="1920">Full HD (1920 px)</option>
@@ -342,6 +346,119 @@ const LAYERS = [
 const LAYER = Object.fromEntries(LAYERS.map(l => [l.key, l]));
 
 // ════════════════════════════════════════════════════════════════════════════
+// Språk. Norsk er kildespråket; EN slår opp engelsk tekst med den norske som nøkkel.
+// {0}, {1} … erstattes med argumentene til t().
+// ════════════════════════════════════════════════════════════════════════════
+const EN = {
+  // Topplinje
+  'PPT-kart': 'PPT Map', 'Språk': 'Language', '16:9 helside': '16:9 full slide', '16:9 halvside (8:9)': '16:9 half slide (8:9)',
+  'Kvadrat': 'Square', 'Stående 3:4': 'Portrait 3:4', 'Egendefinert …': 'Custom …', 'Oppløsning': 'Resolution', 'Kopier': 'Copy',
+  'Kopier som PNG til utklippstavlen (lim inn i PowerPoint med Ctrl+V)': 'Copy as PNG to the clipboard (paste into PowerPoint with Ctrl+V)',
+  'Last ned PNG': 'Download PNG',
+  'Last ned SVG – kan settes inn i PowerPoint og konverteres til figur for redigering': 'Download SVG – can be inserted in PowerPoint and converted to shapes for editing',
+  'Data fra Sodir per {0}': 'Sodir data as of {0}',
+  // Utsnitt
+  'Utsnitt': 'View', 'Zoom til utvalg': 'Zoom to selection', 'Zoom til valgt selskap, eller til alt som er synlig': 'Zoom to the selected company, or to everything visible',
+  'Projeksjon': 'Projection', 'Transvers Mercator, nord opp (anbefalt)': 'Transverse Mercator, north up (recommended)',
+  'UTM sone 31 (3° Ø)': 'UTM zone 31 (3° E)', 'UTM sone 32 (9° Ø)': 'UTM zone 32 (9° E)', 'UTM sone 33 (15° Ø)': 'UTM zone 33 (15° E)',
+  'UTM sone 34 (21° Ø)': 'UTM zone 34 (21° E)', 'UTM sone 35 (27° Ø)': 'UTM zone 35 (27° E)', 'Lambert konform (hele sokkelen)': 'Lambert conformal (entire shelf)',
+  'Dra for å panorere, scroll for å zoome. Etiketter kan dras til ny plass – dobbeltklikk skjuler en etikett.': 'Drag to pan, scroll to zoom. Labels can be dragged to a new position – double-click hides a label.',
+  'Hele sokkelen': 'Entire shelf', 'Nordsjøen': 'North Sea', 'Nordlige Nordsjø': 'Northern North Sea', 'Norskehavet': 'Norwegian Sea', 'Barentshavet': 'Barents Sea',
+  'Zoom inn': 'Zoom in', 'Zoom ut': 'Zoom out',
+  // 3D
+  '3D-effekt': '3D effect', 'Lett skrå': 'Slight tilt', 'Skrå': 'Tilted', 'Dramatisk': 'Dramatic', 'Vipping': 'Tilt', 'Rotasjon': 'Rotation',
+  'Klosshøyde': 'Block height', 'Felt som klosser': 'Fields as blocks', 'Funn som klosser': 'Discoveries as blocks', 'Skygge': 'Shadow',
+  'Dis mot horisonten': 'Haze towards the horizon',
+  'Klossene vises når kartet er vippet. Målestokken skjules i perspektiv fordi den ikke er gyldig over hele kartet.': 'Blocks are shown when the map is tilted. The scale bar is hidden in perspective because it is not valid across the whole map.',
+  // Selskap
+  'Selskap': 'Company', 'Søk etter selskap …': 'Search for a company …', 'Rolle': 'Role', 'Operatør eller partner': 'Operator or partner',
+  'Operatør': 'Operator', 'Partner': 'Partner', 'Visning': 'Display', 'Fremhev': 'Highlight', 'Vis kun valgte': 'Show selected only',
+  'Skill operatør (mørk) og partner (lys)': 'Distinguish operator (dark) and partner (light)', 'Etiketter kun for valgte': 'Labels for selected only',
+  'Vis eierandel i etiketten': 'Show equity share in label', 'Farge for andre selskaper': 'Colour for other companies',
+  'Gjelder felt, funn og lisenser.': 'Applies to fields, discoveries and licences.', 'Fjern': 'Remove', 'Fjern alle': 'Remove all',
+  // Kartlag
+  'Kartlag': 'Map layers', 'Farge': 'Colour', 'Vis etiketter': 'Show labels',
+  'Lisenser (aktive)': 'Licences (active)', 'Funn': 'Discoveries', 'Nedstengte felt': 'Shut-down fields', 'Felt godkjent for utbygging': 'Fields approved for development',
+  'Felt i produksjon': 'Producing fields', 'Rørledninger (transport)': 'Pipelines (transport)', 'Innretninger': 'Facilities', 'Letebrønner': 'Exploration wells',
+  'Farge etter hydrokarbontype (felt og funn)': 'Colour by hydrocarbon type (fields and discoveries)',
+  'Farge etter medium (gass/olje/kondensat)': 'Colour by medium (gas/oil/condensate)', 'Linjetykkelse etter dimensjon': 'Line width by diameter',
+  'Overflateinnretninger': 'Surface facilities', 'Havbunnsinnretninger': 'Subsea facilities', 'Landanlegg': 'Onshore facilities',
+  'Undersøkelse': 'Wildcat', 'Avgrensning': 'Appraisal', 'År': 'Year', 'Farge etter resultat': 'Colour by result',
+  // Statuser og typer
+  'Utvinning i avklaringsfase': 'Production in clarification phase', 'Utvinning sannsynlig, men uavklart': 'Production likely but unclarified',
+  'Utvinning ikke evaluert': 'Production not evaluated', 'Utvinning lite sannsynlig': 'Production unlikely',
+  'I produksjon': 'Producing', 'Nedstengt': 'Shut down', 'Godkjent for utbygging (PUD)': 'Approved for development (PDO)',
+  'Olje': 'Oil', 'Olje/gass': 'Oil/gas', 'Olje/kondensat': 'Oil/condensate', 'Gass/kondensat': 'Gas/condensate', 'Gass': 'Gas', 'Kondensat': 'Condensate',
+  'Olje og gass': 'Oil and gas', 'Spor av hydrokarboner': 'Hydrocarbon shows', 'Tørr': 'Dry', 'Annet / ukjent': 'Other / unknown',
+  // Tegnforklaring
+  'Lisens': 'Licence', 'Nedstengt felt': 'Shut-down field', 'Felt under utbygging': 'Field under development', 'Rørledning': 'Pipeline',
+  'Innretning': 'Facility', 'Letebrønn': 'Exploration well', 'Innretning (overflate)': 'Facility (surface)', 'Havbunnsinnretning': 'Subsea facility',
+  'Lys fyll = funn': 'Light fill = discovery', 'Stiplet kant = under utbygging': 'Dashed outline = under development',
+  'Brønner avsluttet {0}': 'Wells completed {0}', 'operatør': 'operator', 'partner': 'partner', 'Andre selskaper': 'Other companies',
+  'Kilde: Sokkeldirektoratet (NLOD)': 'Source: Norwegian Offshore Directorate (NLOD)', ', data per {0}': ', data as of {0}',
+  // Bakgrunnskart
+  'Bakgrunnskart': 'Basemap', 'Tema': 'Theme', 'Lys': 'Light', 'Grå / nøytral': 'Grey / neutral', 'Mørk': 'Dark', 'Blå hav': 'Blue sea',
+  'Hav': 'Sea', 'Land': 'Land', 'Transparent bakgrunn (ingen havfarge)': 'Transparent background (no sea colour)',
+  'Dybdekurver (200, 1000, 2000, 3000 m)': 'Depth contours (200, 1000, 2000, 3000 m)', 'Landegrenser': 'Country borders',
+  'Byer og steder': 'Cities and places', 'Kvadranter (med nummer)': 'Quadrants (numbered)', 'Blokker': 'Blocks',
+  // Tittel og tekst
+  'Tittel, tegnforklaring og tekst': 'Title, legend and text', 'Tittel': 'Title', 'Undertittel (valgfritt)': 'Subtitle (optional)',
+  'Tegnforklaring': 'Legend', 'Øverst venstre': 'Top left', 'Øverst høyre': 'Top right', 'Nederst venstre': 'Bottom left', 'Nederst høyre': 'Bottom right',
+  'Målestokk': 'Scale bar', 'Nordpil': 'North arrow', 'Kildehenvisning': 'Source credit', 'Tekststørrelse etiketter': 'Label text size',
+  'Symbolstørrelse': 'Symbol size', 'Skjul overlappende etiketter': 'Hide overlapping labels', 'Nullstill flyttede/skjulte etiketter': 'Reset moved/hidden labels',
+  // Lagre og del
+  'Lagre og del': 'Save and share',
+  'Hele oppsettet ligger i lenken, så bokmerk eller del den. Maler lagres lokalt i denne nettleseren.': 'The whole setup is stored in the link, so bookmark or share it. Templates are saved locally in this browser.',
+  'Kopier lenke til dette kartet': 'Copy link to this map', 'Navn på mal': 'Template name', 'Lagre': 'Save', 'Tilbakestill alt': 'Reset everything', 'Slett': 'Delete',
+  // Verktøytips
+  'Status': 'Status', 'Type': 'Type', 'Funnår': 'Discovery year', 'Formål': 'Purpose', 'Resultat': 'Result', 'Medium': 'Medium',
+  'Dimensjon': 'Diameter', 'Fra – til': 'From – to', 'Tilhører': 'Belongs to', '+ {0} til': '+ {0} more',
+  // Meldinger
+  'Laster kartdata …': 'Loading map data …', 'Kunne ikke laste kartdata: {0}': 'Could not load map data: {0}',
+  'Kunne ikke lage PNG': 'Could not create PNG', 'Kunne ikke tegne SVG': 'Could not render SVG',
+  'Nettleseren støtter ikke kopiering av bilder – bruk PNG-knappen': 'This browser cannot copy images – use the PNG button',
+  'Kartet er kopiert – lim inn i PowerPoint med Ctrl+V': 'Map copied – paste into PowerPoint with Ctrl+V', 'Kopiering feilet: {0}': 'Copy failed: {0}',
+  'Lenken er kopiert': 'Link copied', 'Kunne ikke kopiere lenken': 'Could not copy the link', 'Gi malen et navn først': 'Give the template a name first',
+  'Malen «{0}» er lagret': 'Template “{0}” saved', 'Tilbakestille alle innstillinger?': 'Reset all settings?', 'Ingenting å zoome til': 'Nothing to zoom to',
+  'Kunne ikke lagre i nettleseren': 'Could not save in this browser', 'Lastet «{0}»': 'Loaded “{0}”', 'Slette malen «{0}»?': 'Delete the template “{0}”?',
+  'kart': 'map',
+};
+function t(str, ...args) {
+  let out = S.lang === 'en' ? (EN[str] ?? str) : str;
+  args.forEach((a, i) => { out = out.replace(`{${i}}`, a); });
+  return out;
+}
+const LOCALE = () => (S.lang === 'en' ? 'en-GB' : 'nb-NO');
+
+// Statisk tekst i HTML-en registreres én gang (med norsk original) og byttes ved språkskifte.
+const STATIC_TEXT = [];
+function collectStaticText() {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.parentElement.closest('svg, script, #tip, #toast')) continue;
+    const txt = n.nodeValue.trim();
+    if (txt && EN[txt]) STATIC_TEXT.push({ node: n, orig: n.nodeValue });
+  }
+  document.querySelectorAll('[title], [placeholder]').forEach(el => {
+    for (const attr of ['title', 'placeholder']) {
+      const v = el.getAttribute(attr);
+      if (v && EN[v]) STATIC_TEXT.push({ el, attr, orig: v });
+    }
+  });
+}
+function applyStaticText() {
+  for (const it of STATIC_TEXT) {
+    if (it.node) {
+      const o = it.orig, txt = o.trim();
+      it.node.nodeValue = o.replace(txt, t(txt));
+    } else it.el.setAttribute(it.attr, t(it.orig));
+  }
+  document.documentElement.lang = S.lang === 'en' ? 'en' : 'no';
+  document.title = S.lang === 'en' ? 'PPT Map – Norwegian continental shelf' : 'PPT-kart – norsk sokkel';
+}
+function storedLang() { try { return localStorage.getItem('pptkart.lang'); } catch { return null; } }
+
+// ════════════════════════════════════════════════════════════════════════════
 // Tilstand (lagres i URL-en)
 // ════════════════════════════════════════════════════════════════════════════
 const CURRENT_YEAR = new Date().getFullYear();
@@ -365,6 +482,7 @@ function defaultState() {
     labelSize: 16, symbolSize: 1.2, declutter: true,
     tilt: 0, bearing: 0, extrude: 10, extFields: true, extDsc: false, shadow: true, haze: true,
     offsets: {}, hidden: [],
+    lang: storedLang() === 'en' ? 'en' : 'no',
   };
 }
 let S = defaultState();
@@ -906,7 +1024,7 @@ function labelCandidate(key, it, [x, y], priority, anchor) {
     priority: priority + (it.other ? -5 : 0) + (it.cm && it.cm.match ? 3 : 0),
   };
 }
-function fmtShare(v) { return (Math.round(v * 100) / 100).toLocaleString('no', { maximumFractionDigits: 2 }) + ' %'; }
+function fmtShare(v) { return (Math.round(v * 100) / 100).toLocaleString(LOCALE(), { maximumFractionDigits: 2 }) + (S.lang === 'en' ? '%' : ' %'); }
 
 function placeLabels(cands, T, obstacles = []) {
   const hidden = new Set(S.hidden);
@@ -969,12 +1087,16 @@ function drawOverlay(T) {
   if (S.scale && !persp.tilted) drawScaleBar(g, T);
   if (S.north) drawNorth(g, T);
   if (S.source) {
-    const txt = `Kilde: Sokkeldirektoratet (NLOD)${META.updated ? ', data per ' + fmtDate(META.updated) : ''} · Natural Earth`;
+    const txt = `${t('Kilde: Sokkeldirektoratet (NLOD)')}${META.updated ? t(', data per {0}', fmtDate(META.updated)) : ''} · Natural Earth`;
     g.append('text').attr('x', w - 8).attr('y', h - 7).attr('text-anchor', 'end').attr('font-family', FONT).attr('font-size', 12)
       .attr('fill', ink).attr('fill-opacity', 0.65).text(txt);
   }
 }
-function fmtDate(iso) { const [y, mo, d] = iso.split('-'); return `${d}.${mo}.${y}`; }
+function fmtDate(iso) {
+  const [y, mo, d] = iso.split('-');
+  if (S.lang === 'en') return new Date(Date.UTC(+y, +mo - 1, +d)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  return `${d}.${mo}.${y}`;
+}
 
 function legendEntries() {
   const E = [];
@@ -992,38 +1114,38 @@ function legendEntries() {
         // Én oppføring per hydrokarbontype for alle HC-fargede lag samlet.
         shown.forEach(i => HC[i.p.hc] && hcSeen.add(i.p.hc));
         if (E.hcSlot == null) { E.hcSlot = E.length; E.push(null); }
-        if (key === 'discoveries' && shown.length) E.push({ sym: 'none', note: true, label: 'Lys fyll = funn' });
-        if (key === 'approved' && shown.length) E.push({ sym: 'none', note: true, label: 'Stiplet kant = under utbygging' });
+        if (key === 'discoveries' && shown.length) E.push({ sym: 'none', note: true, label: t('Lys fyll = funn') });
+        if (key === 'approved' && shown.length) E.push({ sym: 'none', note: true, label: t('Stiplet kant = under utbygging') });
       } else if (shown.length) {
-        E.push({ sym: 'poly', color: st.color, fo: st.fill, dash: st.dash || key === 'licences', label: L.legend });
+        E.push({ sym: 'poly', color: st.color, fo: st.fill, dash: st.dash || key === 'licences', label: t(L.legend) });
       }
     } else if (key === 'pipelines') {
       if (S.pipes.byMedium) {
-        for (const [m, v] of Object.entries(PIPE_MEDIUM)) if (items.some(i => i.p.medium === m)) E.push({ sym: 'line', color: v.color, label: `Rørledning – ${v.name.toLowerCase()}` });
-      } else E.push({ sym: 'line', color: st.color, label: 'Rørledning' });
+        for (const [m, v] of Object.entries(PIPE_MEDIUM)) if (items.some(i => i.p.medium === m)) E.push({ sym: 'line', color: v.color, label: `${t('Rørledning')} – ${m === 'Co2 injection' ? 'CO₂' : t(v.name).toLowerCase()}` });
+      } else E.push({ sym: 'line', color: st.color, label: t('Rørledning') });
     } else if (key === 'facilities') {
-      if (S.fac.surface && items.some(i => i.p.cls === 'surface')) E.push({ sym: 'square', color: st.color, label: 'Innretning (overflate)' });
-      if (S.fac.subsea && items.some(i => i.p.cls === 'subsea')) E.push({ sym: 'tri', color: lighten(st.color, 0.35), label: 'Havbunnsinnretning' });
-      if (S.fac.onshore && items.some(i => i.p.cls === 'onshore')) E.push({ sym: 'squareo', color: st.color, label: 'Landanlegg' });
+      if (S.fac.surface && items.some(i => i.p.cls === 'surface')) E.push({ sym: 'square', color: st.color, label: t('Innretning (overflate)') });
+      if (S.fac.subsea && items.some(i => i.p.cls === 'subsea')) E.push({ sym: 'tri', color: lighten(st.color, 0.35), label: t('Havbunnsinnretning') });
+      if (S.fac.onshore && items.some(i => i.p.cls === 'onshore')) E.push({ sym: 'squareo', color: st.color, label: t('Landanlegg') });
     } else if (key === 'wells') {
       const yr = S.wells.from === S.wells.to ? `${S.wells.from}` : `${S.wells.from}–${S.wells.to}`;
       if (S.wells.colorByContent) {
         for (const [c, v] of Object.entries(WELL_CLASSES)) if (items.some(i => wellClass(i.p.content) === c))
-          E.push({ sym: c === 'dry' || c === 'other' ? 'circleo' : 'circle', color: v.color, label: `Letebrønn – ${v.name.toLowerCase()}` });
-        E.push({ sym: 'none', label: `Brønner avsluttet ${yr}`, note: true });
-      } else E.push({ sym: 'circle', color: st.color, label: `Letebrønn (${yr})` });
+          E.push({ sym: c === 'dry' || c === 'other' ? 'circleo' : 'circle', color: v.color, label: `${t('Letebrønn')} – ${t(v.name).toLowerCase()}` });
+        E.push({ sym: 'none', label: t('Brønner avsluttet {0}', yr), note: true });
+      } else E.push({ sym: 'circle', color: st.color, label: `${t('Letebrønn')} (${yr})` });
     }
   }
   if (E.hcSlot != null) {
-    const hcE = HC_ORDER.filter(t => hcSeen.has(t)).map(t => ({ sym: 'poly', color: HC[t].color, fo: 0.85, label: HC[t].name }));
+    const hcE = HC_ORDER.filter(hc => hcSeen.has(hc)).map(hc => ({ sym: 'poly', color: HC[hc].color, fo: 0.85, label: t(HC[hc].name) }));
     E.splice(E.hcSlot, 1, ...hcE);
   }
   if (sel && S.splitRole) {
     const nm = S.companies.map(shortName).join(', ');
-    E.push({ sym: 'poly', color: '#6c757d', fo: 0.85, label: `${nm} – operatør` });
-    E.push({ sym: 'poly', color: lighten('#6c757d', 0.55), stroke: '#6c757d', fo: 0.85, label: `${nm} – partner` });
+    E.push({ sym: 'poly', color: '#6c757d', fo: 0.85, label: `${nm} – ${t('operatør')}` });
+    E.push({ sym: 'poly', color: lighten('#6c757d', 0.55), stroke: '#6c757d', fo: 0.85, label: `${nm} – ${t('partner')}` });
   }
-  if (sel && S.mode === 'highlight' && drewOther) E.push({ sym: 'poly', color: S.otherColor, fo: 0.5, label: 'Andre selskaper' });
+  if (sel && S.mode === 'highlight' && drewOther) E.push({ sym: 'poly', color: S.otherColor, fo: 0.5, label: t('Andre selskaper') });
   return E;
 }
 
@@ -1032,8 +1154,8 @@ function drawLegend(g, T, topY) {
   if (!E.length) return;
   const fs = 16, lh = 24, pad = 12, sw = 22;
   let heading = S.companies.length ? S.companies.map(shortName).join(', ') : '';
-  if (heading && S.role === 'op') heading += ' (operatør)';
-  if (heading && S.role === 'partner') heading += ' (partner)';
+  if (heading && S.role === 'op') heading += ` (${t('operatør')})`;
+  if (heading && S.role === 'partner') heading += ` (${t('partner')})`;
   const widths = E.map(e => textWidth(e.label, e.note ? fs * 0.9 : fs));
   if (heading) widths.push(textWidth(heading, fs, 'bold'));
   const bw = Math.max(...widths) + sw + pad * 2 + 8;
@@ -1164,19 +1286,19 @@ svg.on('mousemove', ev => {
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 function tipHtml(L, p) {
   const rows = [];
-  const add = (k, v) => v != null && v !== '' && rows.push(`<div><span class="m">${k}:</span> ${esc(v)}</div>`);
+  const add = (k, v) => v != null && v !== '' && rows.push(`<div><span class="m">${t(k)}:</span> ${esc(v)}</div>`);
   let title = p.name;
   if (L.key === 'licences') title = 'PL ' + p.name;
-  if (L.src === 'fields') { add('Status', FLD_STATUS[p.status]); add('Type', HC[p.hc]?.name); add('Funnår', p.year); }
-  if (L.key === 'discoveries') { add('Status', DSC_STATUS[p.status]); add('Type', HC[p.hc]?.name); add('Funnår', p.year); }
-  if (L.key === 'wells') { add('Formål', p.purpose === 'WILDCAT' ? 'Undersøkelse' : p.purpose === 'APPRAISAL' ? 'Avgrensning' : p.purpose); add('Resultat', WELL_CLASSES[wellClass(p.content)].name); add('År', p.year); add('Funn', p.dsc); }
-  if (L.key === 'pipelines') { add('Medium', PIPE_MEDIUM[p.medium]?.name || p.medium); add('Dimensjon', p.dim ? p.dim + '"' : null); add('Fra – til', p.from && p.to ? `${p.from} – ${p.to}` : null); }
+  if (L.src === 'fields') { add('Status', t(FLD_STATUS[p.status])); add('Type', HC[p.hc] && t(HC[p.hc].name)); add('Funnår', p.year); }
+  if (L.key === 'discoveries') { add('Status', t(DSC_STATUS[p.status])); add('Type', HC[p.hc] && t(HC[p.hc].name)); add('Funnår', p.year); }
+  if (L.key === 'wells') { add('Formål', p.purpose === 'WILDCAT' ? t('Undersøkelse') : p.purpose === 'APPRAISAL' ? t('Avgrensning') : p.purpose); add('Resultat', t(WELL_CLASSES[wellClass(p.content)].name)); add('År', p.year); add('Funn', p.dsc); }
+  if (L.key === 'pipelines') { add('Medium', PIPE_MEDIUM[p.medium] ? t(PIPE_MEDIUM[p.medium].name) : p.medium); add('Dimensjon', p.dim ? p.dim + '"' : null); add('Fra – til', p.from && p.to ? `${p.from} – ${p.to}` : null); }
   if (L.key === 'facilities') { add('Type', p.kind); add('Tilhører', p.field); }
   add('Operatør', p.op);
   let lic = '';
   if (p.lic && p.lic.length) {
     const sel = new Set(S.companies);
-    lic = '<div style="margin-top:4px">' + p.lic.slice(0, 8).map(l => `<div${sel.has(l[0]) ? ' style="color:#ffd43b"' : ''}>${esc(shortName(l[0]))} <span class="m">${fmtShare(l[1])}</span></div>`).join('') + (p.lic.length > 8 ? `<div class="m">+ ${p.lic.length - 8} til</div>` : '') + '</div>';
+    lic = '<div style="margin-top:4px">' + p.lic.slice(0, 8).map(l => `<div${sel.has(l[0]) ? ' style="color:#ffd43b"' : ''}>${esc(shortName(l[0]))} <span class="m">${fmtShare(l[1])}</span></div>`).join('') + (p.lic.length > 8 ? `<div class="m">${t('+ {0} til', p.lic.length - 8)}</div>` : '') + '</div>';
   }
   return `<b>${esc(title)}</b>${rows.join('')}${lic}`;
 }
@@ -1210,16 +1332,16 @@ function renderPng() {
     img.onload = () => {
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      canvas.toBlob(b => (b ? resolve(b) : reject(new Error('Kunne ikke lage PNG'))), 'image/png');
+      canvas.toBlob(b => (b ? resolve(b) : reject(new Error(t('Kunne ikke lage PNG')))), 'image/png');
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Kunne ikke tegne SVG')); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(t('Kunne ikke tegne SVG'))); };
     img.src = url;
   });
 }
 
 function fileBase() {
-  const slug = (S.titleText || 'kart').toLowerCase().replace(/[æ]/g, 'ae').replace(/[ø]/g, 'o').replace(/[å]/g, 'a')
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'kart';
+  const slug = (S.titleText || t('kart')).toLowerCase().replace(/[æ]/g, 'ae').replace(/[ø]/g, 'o').replace(/[å]/g, 'a')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || t('kart');
   const d = new Date(), z = n => String(n).padStart(2, '0');
   return `${slug}-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`;
 }
@@ -1242,12 +1364,12 @@ document.getElementById('btnSvg').onclick = () => {
   download(new Blob([exportSvgString()], { type: 'image/svg+xml;charset=utf-8' }), fileBase() + '.svg');
 };
 document.getElementById('btnCopy').onclick = async () => {
-  if (!navigator.clipboard || !window.ClipboardItem) { toast('Nettleseren støtter ikke kopiering av bilder – bruk PNG-knappen'); return; }
+  if (!navigator.clipboard || !window.ClipboardItem) { toast(t('Nettleseren støtter ikke kopiering av bilder – bruk PNG-knappen')); return; }
   try {
     // Promise sendes direkte til ClipboardItem slik at Safari godtar det.
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': renderPng() })]);
-    toast('Kartet er kopiert – lim inn i PowerPoint med Ctrl+V');
-  } catch (e) { toast('Kopiering feilet: ' + e.message); }
+    toast(t('Kartet er kopiert – lim inn i PowerPoint med Ctrl+V'));
+  } catch (e) { toast(t('Kopiering feilet: {0}', e.message)); }
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1257,7 +1379,7 @@ const $ = id => document.getElementById(id);
 function bindCheck(id, get, set) { const el = $(id); el.checked = get(); el.onchange = () => { set(el.checked); render(); }; }
 let rafId = 0;
 function scheduleRender() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(render); }
-function bindValue(id, get, set, ev = 'change') { const el = $(id); el.value = get(); el.addEventListener(ev, () => { set(el.value); ev === 'input' ? scheduleRender() : render(); }); }
+function bindValue(id, get, set, ev = 'change') { const el = $(id); el.value = get(); el['on' + ev] = () => { set(el.value); ev === 'input' ? scheduleRender() : render(); }; }
 
 function buildLayerList() {
   const box = $('layerList');
@@ -1267,9 +1389,9 @@ function buildLayerList() {
     const L = LAYER[key], st = S.layers[key];
     const row = document.createElement('div');
     row.className = 'lyr';
-    row.innerHTML = `<input type="checkbox" ${st.on ? 'checked' : ''} id="ly_${key}"><label class="name" for="ly_${key}">${L.name}</label>
-      <input type="color" value="${st.color}" title="Farge">
-      <label class="lbl" title="Vis etiketter"><input type="checkbox" ${st.labels ? 'checked' : ''}>Aa</label>`;
+    row.innerHTML = `<input type="checkbox" ${st.on ? 'checked' : ''} id="ly_${key}"><label class="name" for="ly_${key}">${t(L.name)}</label>
+      <input type="color" value="${st.color}" title="${t('Farge')}">
+      <label class="lbl" title="${t('Vis etiketter')}"><input type="checkbox" ${st.labels ? 'checked' : ''}>Aa</label>`;
     const [cb, col, lbl] = row.querySelectorAll('input');
     cb.onchange = () => { st.on = cb.checked; buildLayerList(); render(); };
     col.oninput = () => { st.color = col.value; render(); };
@@ -1279,33 +1401,33 @@ function buildLayerList() {
     const sub = document.createElement('div');
     sub.className = 'sub';
     if (key === 'producing') {
-      sub.innerHTML = `<label class="row"><input type="checkbox" id="o_hc" ${S.colorByHC ? 'checked' : ''}> Farge etter hydrokarbontype (felt og funn)</label>`;
+      sub.innerHTML = `<label class="row"><input type="checkbox" id="o_hc" ${S.colorByHC ? 'checked' : ''}> ${t('Farge etter hydrokarbontype (felt og funn)')}</label>`;
       sub.querySelector('#o_hc').onchange = e => { S.colorByHC = e.target.checked; render(); };
     }
     if (key === 'discoveries') {
-      sub.innerHTML = Object.entries(DSC_STATUS).map(([k, v]) => `<label class="row"><input type="checkbox" data-s="${esc(k)}" ${S.dscStatus.includes(k) ? 'checked' : ''}> ${v}</label>`).join('');
+      sub.innerHTML = Object.entries(DSC_STATUS).map(([k, v]) => `<label class="row"><input type="checkbox" data-s="${esc(k)}" ${S.dscStatus.includes(k) ? 'checked' : ''}> ${t(v)}</label>`).join('');
       sub.querySelectorAll('input').forEach(i => i.onchange = () => {
         S.dscStatus = [...sub.querySelectorAll('input:checked')].map(x => x.dataset.s); render();
       });
     }
     if (key === 'pipelines') {
-      sub.innerHTML = `<label class="row"><input type="checkbox" id="o_pm" ${S.pipes.byMedium ? 'checked' : ''}> Farge etter medium (gass/olje/kondensat)</label>
-        <label class="row"><input type="checkbox" id="o_pd" ${S.pipes.byDim ? 'checked' : ''}> Linjetykkelse etter dimensjon</label>`;
+      sub.innerHTML = `<label class="row"><input type="checkbox" id="o_pm" ${S.pipes.byMedium ? 'checked' : ''}> ${t('Farge etter medium (gass/olje/kondensat)')}</label>
+        <label class="row"><input type="checkbox" id="o_pd" ${S.pipes.byDim ? 'checked' : ''}> ${t('Linjetykkelse etter dimensjon')}</label>`;
       sub.querySelector('#o_pm').onchange = e => { S.pipes.byMedium = e.target.checked; render(); };
       sub.querySelector('#o_pd').onchange = e => { S.pipes.byDim = e.target.checked; render(); };
     }
     if (key === 'facilities') {
       sub.innerHTML = [['surface', 'Overflateinnretninger'], ['subsea', 'Havbunnsinnretninger'], ['onshore', 'Landanlegg']]
-        .map(([k, v]) => `<label class="row"><input type="checkbox" data-c="${k}" ${S.fac[k] ? 'checked' : ''}> ${v}</label>`).join('');
+        .map(([k, v]) => `<label class="row"><input type="checkbox" data-c="${k}" ${S.fac[k] ? 'checked' : ''}> ${t(v)}</label>`).join('');
       sub.querySelectorAll('input').forEach(i => i.onchange = () => { S.fac[i.dataset.c] = i.checked; render(); });
     }
     if (key === 'wells') {
       const w = S.wells;
-      sub.innerHTML = `<div class="row"><label><input type="checkbox" id="o_wc" ${w.wildcat ? 'checked' : ''}> Undersøkelse</label>
-          <label><input type="checkbox" id="o_wa" ${w.appraisal ? 'checked' : ''}> Avgrensning</label></div>
-        <div class="row">År <input type="number" id="o_wf" value="${w.from}" min="1966" max="${CURRENT_YEAR}"> – <input type="number" id="o_wt" value="${w.to}" min="1966" max="${CURRENT_YEAR}"></div>
-        <label class="row"><input type="checkbox" id="o_wcc" ${w.colorByContent ? 'checked' : ''}> Farge etter resultat</label>
-        ${Object.entries(WELL_CLASSES).map(([k, v]) => `<label class="row"><input type="checkbox" data-w="${k}" ${w.classes.includes(k) ? 'checked' : ''}> <span style="color:${v.color}">●</span> ${v.name}</label>`).join('')}`;
+      sub.innerHTML = `<div class="row"><label><input type="checkbox" id="o_wc" ${w.wildcat ? 'checked' : ''}> ${t('Undersøkelse')}</label>
+          <label><input type="checkbox" id="o_wa" ${w.appraisal ? 'checked' : ''}> ${t('Avgrensning')}</label></div>
+        <div class="row">${t('År')} <input type="number" id="o_wf" value="${w.from}" min="1966" max="${CURRENT_YEAR}"> – <input type="number" id="o_wt" value="${w.to}" min="1966" max="${CURRENT_YEAR}"></div>
+        <label class="row"><input type="checkbox" id="o_wcc" ${w.colorByContent ? 'checked' : ''}> ${t('Farge etter resultat')}</label>
+        ${Object.entries(WELL_CLASSES).map(([k, v]) => `<label class="row"><input type="checkbox" data-w="${k}" ${w.classes.includes(k) ? 'checked' : ''}> <span style="color:${v.color}">●</span> ${t(v.name)}</label>`).join('')}`;
       sub.querySelector('#o_wc').onchange = e => { w.wildcat = e.target.checked; render(); };
       sub.querySelector('#o_wa').onchange = e => { w.appraisal = e.target.checked; render(); };
       sub.querySelector('#o_wf').onchange = e => { w.from = +e.target.value || 1966; render(); };
@@ -1340,12 +1462,12 @@ function buildCompanyChips() {
   S.companies.forEach(n => {
     const c = document.createElement('span');
     c.className = 'chip';
-    c.innerHTML = `${esc(shortName(n))}<button title="Fjern">×</button>`;
+    c.innerHTML = `${esc(shortName(n))}<button title="${t('Fjern')}">×</button>`;
     c.querySelector('button').onclick = () => { S.companies = S.companies.filter(x => x !== n); buildCompanyUI(); render(); };
     box.appendChild(c);
   });
   if (S.companies.length) {
-    const b = document.createElement('button'); b.className = 'small'; b.textContent = 'Fjern alle';
+    const b = document.createElement('button'); b.className = 'small'; b.textContent = t('Fjern alle');
     b.onclick = () => { S.companies = []; buildCompanyUI(); render(); };
     box.appendChild(b);
   }
@@ -1448,30 +1570,15 @@ function initStaticControls() {
     S.view.scale *= kmPerPx() / before;
     setupProjection(); render();
   };
-  const vp = $('viewPresets');
-  VIEW_PRESETS.forEach(p => {
-    const b = document.createElement('button'); b.className = 'small'; b.textContent = p.name;
-    b.onclick = () => {
-      if (p.proj && S.proj === 'auto') { S.proj = p.proj; $('proj').value = p.proj; }
-      else if (!p.proj && S.proj === 'lcc') { S.proj = 'auto'; $('proj').value = 'auto'; }
-      fitBounds(p.bounds);
-    };
-    vp.appendChild(b);
-  });
+  buildPresetButtons();
   $('btnFit').onclick = fitToSelection;
-  const tp = $('tiltPresets');
-  [['2D', 0, 0], ['Lett skrå', 35, 0], ['Skrå', 50, 0], ['Dramatisk', 60, -20]].forEach(([name, t, b]) => {
-    const btn = document.createElement('button'); btn.className = 'small'; btn.textContent = name;
-    btn.onclick = () => {
-      S.tilt = t; S.bearing = b;
-      $('tilt').value = t; $('bearing').value = b; $('tiltVal').textContent = t + '°'; $('bearingVal').textContent = b + '°';
-      setupProjection(); render();
-    };
-    tp.appendChild(btn);
-  });
   $('zin').onclick = () => zoomBy(1.5);
   $('zout').onclick = () => zoomBy(1 / 1.5);
-
+  $('lang').onchange = () => {
+    S.lang = $('lang').value;
+    try { localStorage.setItem('pptkart.lang', S.lang); } catch {}
+    applyLanguage(); render();
+  };
   $('compSearch').oninput = buildCompanyUI;
   $('theme').onchange = () => {
     S.theme = $('theme').value;
@@ -1483,19 +1590,58 @@ function initStaticControls() {
 
   $('btnLink').onclick = async () => {
     history.replaceState(null, '', '#s=' + encodeState(S));
-    try { await navigator.clipboard.writeText(location.href); toast('Lenken er kopiert'); } catch { toast('Kunne ikke kopiere lenken'); }
+    try { await navigator.clipboard.writeText(location.href); toast(t('Lenken er kopiert')); } catch { toast(t('Kunne ikke kopiere lenken')); }
   };
   $('btnSavePreset').onclick = () => {
     const name = $('presetName').value.trim();
-    if (!name) { toast('Gi malen et navn først'); return; }
+    if (!name) { toast(t('Gi malen et navn først')); return; }
     const all = loadPresets(); all[name] = S; savePresets(all);
-    $('presetName').value = ''; buildPresetList(); toast(`Malen «${name}» er lagret`);
+    $('presetName').value = ''; buildPresetList(); toast(t('Malen «{0}» er lagret', name));
   };
   $('btnReset').onclick = () => {
-    if (!confirm('Tilbakestille alle innstillinger?')) return;
-    S = defaultState(); applyState();
+    if (!confirm(t('Tilbakestille alle innstillinger?'))) return;
+    const lang = S.lang;
+    S = defaultState(); S.lang = lang; applyState();
   };
   window.addEventListener('resize', layoutFrame);
+}
+
+function buildPresetButtons() {
+  const vp = $('viewPresets');
+  vp.innerHTML = '';
+  VIEW_PRESETS.forEach(p => {
+    const b = document.createElement('button'); b.className = 'small'; b.textContent = t(p.name);
+    b.onclick = () => {
+      if (p.proj && S.proj === 'auto') { S.proj = p.proj; $('proj').value = p.proj; }
+      else if (!p.proj && S.proj === 'lcc') { S.proj = 'auto'; $('proj').value = 'auto'; }
+      fitBounds(p.bounds);
+    };
+    vp.appendChild(b);
+  });
+  const tp = $('tiltPresets');
+  tp.innerHTML = '';
+  [['2D', 0, 0], ['Lett skrå', 35, 0], ['Skrå', 50, 0], ['Dramatisk', 60, -20]].forEach(([name, tilt, bearing]) => {
+    const btn = document.createElement('button'); btn.className = 'small'; btn.textContent = t(name);
+    btn.onclick = () => {
+      S.tilt = tilt; S.bearing = bearing;
+      $('tilt').value = tilt; $('bearing').value = bearing; $('tiltVal').textContent = tilt + '°'; $('bearingVal').textContent = bearing + '°';
+      setupProjection(); render();
+    };
+    tp.appendChild(btn);
+  });
+}
+
+function updateStatus() { $('status').textContent = META.updated ? t('Data fra Sodir per {0}', fmtDate(META.updated)) : ''; }
+
+// Oppdaterer all tekst i grensesnittet til gjeldende språk (kartet tegnes på nytt av kalleren).
+function applyLanguage() {
+  $('lang').value = S.lang;
+  applyStaticText();
+  buildPresetButtons();
+  buildLayerList();
+  buildCompanyUI();
+  buildPresetList();
+  updateStatus();
 }
 
 function fitToSelection() {
@@ -1506,7 +1652,7 @@ function fitToSelection() {
     if (!S.layers[L.key].on || (sel && !L.company)) continue;
     for (const it of layerItems(L)) if (!sel || (it.cm && it.cm.match)) feats.push(it.f);
   }
-  if (!feats.length) { toast('Ingenting å zoome til'); return; }
+  if (!feats.length) { toast(t('Ingenting å zoome til')); return; }
   const fc = { type: 'FeatureCollection', features: feats };
   if (S.proj === 'auto') S.cm = +d3.geoCentroid(fc)[0].toFixed(2);
   fitGeo(fc, 0.07);
@@ -1514,22 +1660,23 @@ function fitToSelection() {
 }
 
 function loadPresets() { try { return JSON.parse(localStorage.getItem('pptkart.maler') || '{}'); } catch { return {}; } }
-function savePresets(all) { try { localStorage.setItem('pptkart.maler', JSON.stringify(all)); } catch { toast('Kunne ikke lagre i nettleseren'); } }
+function savePresets(all) { try { localStorage.setItem('pptkart.maler', JSON.stringify(all)); } catch { toast(t('Kunne ikke lagre i nettleseren')); } }
 function buildPresetList() {
   const box = $('presetList'), all = loadPresets();
   box.innerHTML = '';
   Object.keys(all).sort((a, b) => a.localeCompare(b, 'no')).forEach(name => {
     const r = document.createElement('div'); r.className = 'row';
-    r.innerHTML = `<button class="grow small" style="text-align:left">${esc(name)}</button><button class="small" title="Slett">×</button>`;
+    r.innerHTML = `<button class="grow small" style="text-align:left">${esc(name)}</button><button class="small" title="${t('Slett')}">×</button>`;
     const [load, del] = r.querySelectorAll('button');
-    load.onclick = () => { S = mergeState(defaultState(), JSON.parse(JSON.stringify(all[name]))); applyState(); toast(`Lastet «${name}»`); };
-    del.onclick = () => { if (confirm(`Slette malen «${name}»?`)) { delete all[name]; savePresets(all); buildPresetList(); } };
+    load.onclick = () => { const lang0 = S.lang; S = mergeState(defaultState(), JSON.parse(JSON.stringify(all[name]))); S.lang = lang0; applyState(); toast(t('Lastet «{0}»', name)); };
+    del.onclick = () => { if (confirm(t('Slette malen «{0}»?', name))) { delete all[name]; savePresets(all); buildPresetList(); } };
     box.appendChild(r);
   });
 }
 
 function applyState() {
   syncAllControls();
+  applyLanguage();
   layoutFrame(); setupProjection(); render();
 }
 
@@ -1539,18 +1686,19 @@ function applyState() {
 (async function main() {
   const m = location.hash.match(/s=([^&]+)/);
   if (m) { try { S = mergeState(defaultState(), decodeState(m[1])); } catch (e) { console.warn('Ugyldig lenke', e); } }
+  collectStaticText();
   initStaticControls();
   syncAllControls();
-  buildPresetList();
+  applyLanguage();
   layoutFrame();
   try {
     await loadData();
   } catch (e) {
-    $('loading').textContent = 'Kunne ikke laste kartdata: ' + e.message;
+    $('loading').textContent = t('Kunne ikke laste kartdata: {0}', e.message);
     return;
   }
   $('loading').remove();
-  $('status').textContent = META.updated ? `Data fra Sodir per ${fmtDate(META.updated)}` : '';
+  updateStatus();
   buildCompanyUI();
   setupProjection();
   render();
