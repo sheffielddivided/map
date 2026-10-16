@@ -18,6 +18,7 @@ Lager egendefinerte kart over norsk sokkel til PowerPoint-presentasjoner.
   ved å høyreklikke og velge «Konverter til figur».
 - **Etiketter:** overlappende etiketter skjules automatisk. Dra en etikett for å flytte den, og
   dobbeltklikk for å skjule den.
+- **Språk:** norsk eller engelsk, både i grensesnittet og i kartet (tegnforklaring, kildehenvisning, verktøytips).
 - **Lagring:** hele oppsettet ligger i URL-en, så kart kan bokmerkes og deles. Navngitte maler
   lagres lokalt i nettleseren.
 
