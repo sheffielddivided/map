@@ -146,6 +146,21 @@
       </div>
     </details>
 
+    <details id="sec3d">
+      <summary>3D-effekt</summary>
+      <div class="sec">
+        <div class="presets" id="tiltPresets"></div>
+        <div class="row"><span class="grow">Vipping</span><input type="range" id="tilt" min="0" max="65" step="1" style="width:130px" /><span id="tiltVal" style="width:30px"></span></div>
+        <div class="row"><span class="grow">Rotasjon</span><input type="range" id="bearing" min="-180" max="180" step="1" style="width:130px" /><span id="bearingVal" style="width:30px"></span></div>
+        <div class="row"><span class="grow">Klosshøyde</span><input type="range" id="extrude" min="0" max="50" step="1" style="width:130px" /><span id="extrudeVal" style="width:30px"></span></div>
+        <label class="row"><input type="checkbox" id="extFields" /> Felt som klosser</label>
+        <label class="row"><input type="checkbox" id="extDsc" /> Funn som klosser</label>
+        <label class="row"><input type="checkbox" id="shadow" /> Skygge</label>
+        <label class="row"><input type="checkbox" id="haze" /> Dis mot horisonten</label>
+        <div class="hint">Klossene vises når kartet er vippet. Målestokken skjules i perspektiv fordi den ikke er gyldig over hele kartet.</div>
+      </div>
+    </details>
+
     <details open>
       <summary>Selskap</summary>
       <div class="sec">
@@ -348,6 +363,7 @@ function defaultState() {
     title: false, titleText: '', subtitleText: '',
     legend: true, legendPos: 'tr', scale: true, north: true, source: true,
     labelSize: 16, symbolSize: 1.2, declutter: true,
+    tilt: 0, bearing: 0, extrude: 10, extFields: true, extDsc: false, shadow: true, haze: true,
     offsets: {}, hidden: [],
   };
 }
@@ -470,14 +486,141 @@ function baseProjection(kind = S.proj) {
 let proj = null, path = null;
 const W = () => S.size[0], H = () => S.size[1];
 
+// ── 3D-effekt: kartplanet vippes bakover og roteres, med enkel sentralperspektiv-kamera.
+// Planet = projiserte 2D-koordinater; skjerm = det som tegnes. h = høyde over planet (logiske px).
+let persp = { on: false };
+function setupPerspective() {
+  const t = S.tilt * Math.PI / 180, b = S.bearing * Math.PI / 180;
+  persp = { on: S.tilt > 0 || S.bearing !== 0, tilted: S.tilt > 0, cx: W() / 2, cy: H() / 2,
+    ct: Math.cos(t), st: Math.sin(t), cb: Math.cos(b), sb: Math.sin(b), D: 2.2 * Math.max(W(), H()) };
+}
+// Plan -> roterte koordinater relativt til midtpunktet (skjermorientert, før vipping).
+function rot(x, y) {
+  const dx = x - persp.cx, dy = y - persp.cy;
+  return [dx * persp.cb - dy * persp.sb, dx * persp.sb + dy * persp.cb];
+}
+function toScreen(x, y, h = 0) {
+  if (!persp.on) return [x, y];
+  const [rx, ry] = rot(x, y);
+  const ys = ry * persp.ct - h * persp.st, z = -ry * persp.st - h * persp.ct;
+  const f = persp.D / (persp.D + z);
+  return [persp.cx + rx * f, persp.cy + ys * f];
+}
+function fromScreen(sx, sy) {
+  if (!persp.on) return [sx, sy];
+  const xp = sx - persp.cx, yp = sy - persp.cy;
+  const den = persp.D * persp.ct + yp * persp.st;
+  if (den <= 1e-6) return null;
+  const ry = yp * persp.D / den, rx = xp * (persp.D - ry * persp.st) / persp.D;
+  return [persp.cx + rx * persp.cb + ry * persp.sb, persp.cy - rx * persp.sb + ry * persp.cb];
+}
+// Lengde/bredde <-> skjerm.
+function P(lonlat, h = 0) { const q = proj(lonlat); return q && isFinite(q[0]) ? toScreen(q[0], q[1], h) : null; }
+function Pinv(xy) { const q = fromScreen(xy[0], xy[1]); return q ? proj.invert(q) : null; }
+
 function setupProjection() {
+  setupPerspective();
   proj = baseProjection().precision(0.2);
   if (!S.view) fitBounds(VIEW_PRESETS[1].bounds, false);
   proj.scale(S.view.scale).translate([0, 0]);
   const c = proj(S.view.center);
   proj.translate([W() / 2 - c[0], H() / 2 - c[1]]);
-  proj.clipExtent([[-60, -60], [W() + 60, H() + 60]]);
-  path = d3.geoPath(proj);
+  // Klipp i planet til området som faktisk er synlig i rammen (større enn rammen når kartet er vippet).
+  const pts = [];
+  for (let i = 0; i <= 8; i++) {
+    const x = W() * i / 8, y = H() * i / 8;
+    for (const q of [[x, 0], [x, H()], [0, y], [W(), y]]) { const r = fromScreen(q[0], q[1]); if (r) pts.push(r); }
+  }
+  const m = 60 + (persp.tilted ? S.extrude * 3 : 0);
+  proj.clipExtent([[d3.min(pts, q => q[0]) - m, d3.min(pts, q => q[1]) - m], [d3.max(pts, q => q[0]) + m, d3.max(pts, q => q[1]) + m]]);
+  const perspStream = sink => ({
+    point(x, y) { const q = toScreen(x, y); sink.point(q[0], q[1]); },
+    lineStart() { sink.lineStart(); }, lineEnd() { sink.lineEnd(); },
+    polygonStart() { sink.polygonStart(); }, polygonEnd() { sink.polygonEnd(); },
+    sphere() { if (sink.sphere) sink.sphere(); },
+  });
+  path = d3.geoPath({ stream: sink => proj.stream(perspStream(sink)) });
+}
+
+// Projiserte (og klippede) ringer i planet, gruppert per polygon.
+function planePolygons(f) {
+  const polys = [];
+  let poly = null, ring = null;
+  const sink = {
+    point(x, y) { ring.push([x, y]); },
+    lineStart() { ring = []; },
+    lineEnd() {
+      if (ring.length > 1) { const a = ring[0], b = ring[ring.length - 1]; if (a[0] === b[0] && a[1] === b[1]) ring.pop(); }
+      if (ring.length > 2) { if (!poly) polys.push(poly = []); poly.push(ring); }
+    },
+    polygonStart() { polys.push(poly = []); }, polygonEnd() { poly = null; }, sphere() {},
+  };
+  d3.geoStream(f, proj.stream(sink));
+  return polys.filter(p => p.length);
+}
+function ringArea(r) { let a = 0; for (let i = 0, n = r.length; i < n; i++) { const p = r[i], q = r[(i + 1) % n]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; }
+
+// Tegner felt/funn som klosser: skygge, synlige vegger (skyggelagt etter retning) og topp.
+function drawBlocks(g, blocks, T) {
+  const h = S.extrude;
+  // Kameraets fotavtrykk i planet: veggen er synlig hvis kameraet står på dens forside.
+  const camR = [0, persp.D * persp.st];
+  const cam = [persp.cx + camR[0] * persp.cb + camR[1] * persp.sb, persp.cy - camR[0] * persp.sb + camR[1] * persp.cb];
+  const light = [-0.6, 0.8];   // fra venstre og forfra (skjermorientert)
+  for (const b of blocks) {
+    b.polys = planePolygons(b.f);
+    const all = b.polys.flat(2);
+    b.depth = all.length ? d3.mean(b.polys.flat(), q => rot(q[0], q[1])[1]) : 0;
+  }
+  const visible = blocks.filter(b => b.polys.length).sort((a, c) => a.depth - c.depth);
+  const ringPath = (r, hh) => 'M' + r.map(q => toScreen(q[0], q[1], hh).map(v => v.toFixed(1)).join(',')).join('L') + 'Z';
+
+  if (S.shadow) {
+    // Skygge kastet mot høyre og bakover, i skjermretning.
+    const off = [h * 0.9, -h * 0.35];
+    const dx = off[0] * persp.cb + off[1] * persp.sb, dy = -off[0] * persp.sb + off[1] * persp.cb;
+    const sg = g.append('g').attr('fill', '#000').attr('fill-opacity', T === THEMES.dark ? 0.35 : 0.16);
+    for (const b of visible) {
+      const d = b.polys.map(p => p.map(r => ringPath(r.map(q => [q[0] + dx, q[1] + dy]), 0)).join('')).join('');
+      sg.append('path').attr('d', d).attr('fill-rule', 'evenodd');
+    }
+  }
+  for (const b of visible) {
+    const bg = g.append('g');
+    const walls = [];
+    for (const poly of b.polys) {
+      const ext = poly.reduce((m, r) => (Math.abs(ringArea(r)) > Math.abs(ringArea(m)) ? r : m), poly[0]);
+      const sgn = Math.sign(ringArea(ext)) || 1;
+      for (const r of poly) {
+        for (let i = 0, n = r.length; i < n; i++) {
+          const a = r[i], c = r[(i + 1) % n];
+          const nx = sgn * (c[1] - a[1]), ny = -sgn * (c[0] - a[0]);
+          const mx = (a[0] + c[0]) / 2, my = (a[1] + c[1]) / 2;
+          if (nx * (cam[0] - mx) + ny * (cam[1] - my) <= 0) continue;
+          // Skyggelegging etter veggens retning i skjermorientering.
+          const nr = [nx * persp.cb - ny * persp.sb, nx * persp.sb + ny * persp.cb];
+          const len = Math.hypot(nr[0], nr[1]) || 1;
+          const dot = (nr[0] * light[0] + nr[1] * light[1]) / len;
+          const shade = Math.min(3, Math.floor((1 - dot) * 2));
+          walls.push({ a, c, shade, depth: rot(mx, my)[1] });
+        }
+      }
+    }
+    walls.sort((p, q) => p.depth - q.depth);
+    // Slå sammen påfølgende vegger med samme skygge til én path (færre elementer i SVG/PowerPoint).
+    let run = null;
+    const flush = () => { if (run) bg.append('path').attr('d', run.d).attr('fill', b.wall[run.shade]).attr('stroke', b.wall[run.shade]).attr('stroke-width', 0.4).attr('stroke-linejoin', 'round'); run = null; };
+    for (const wl of walls) {
+      const p0 = toScreen(wl.a[0], wl.a[1], 0), p1 = toScreen(wl.c[0], wl.c[1], 0), p2 = toScreen(wl.c[0], wl.c[1], h), p3 = toScreen(wl.a[0], wl.a[1], h);
+      const d = `M${p0[0].toFixed(1)},${p0[1].toFixed(1)}L${p1[0].toFixed(1)},${p1[1].toFixed(1)}L${p2[0].toFixed(1)},${p2[1].toFixed(1)}L${p3[0].toFixed(1)},${p3[1].toFixed(1)}Z`;
+      if (run && run.shade === wl.shade) run.d += d; else { flush(); run = { shade: wl.shade, d }; }
+    }
+    flush();
+    const top = b.polys.map(p => p.map(r => ringPath(r, h)).join('')).join('');
+    const el = bg.append('path').attr('d', top).attr('fill-rule', 'evenodd').attr('fill', b.fill).attr('stroke', b.stroke)
+      .attr('stroke-width', 0.8).attr('stroke-linejoin', 'round').attr('data-k', b.fk);
+    if (b.dash) el.attr('stroke-dasharray', '3 2');
+  }
 }
 
 function boundsToGeo(b) {
@@ -601,12 +744,29 @@ function render() {
   }
   if (S.quads) g.append('path').attr('d', path(D.quadrants)).attr('fill', 'none').attr('stroke', T.grid).attr('stroke-width', 0.8).attr('stroke-opacity', 0.8);
 
+  if (persp.tilted && S.haze && !S.transparent) {
+    // Dis mot horisonten over bakgrunnskartet (ikke over feltene) gir dybdefølelse.
+    // Vanlig lineær gradient – støttes av PowerPoint.
+    const gid = 'hazegrad';
+    const lgd = defs.append('linearGradient').attr('id', gid).attr('x1', 0).attr('y1', 0).attr('x2', 0).attr('y2', 1);
+    lgd.append('stop').attr('offset', 0).attr('stop-color', S.sea).attr('stop-opacity', Math.min(0.75, 0.2 + S.tilt / 90));
+    lgd.append('stop').attr('offset', 0.5).attr('stop-color', S.sea).attr('stop-opacity', 0);
+    g.append('rect').attr('width', w).attr('height', h).attr('fill', `url(#${gid})`).attr('pointer-events', 'none');
+  }
+
   const labels = [];   // kandidater for etiketter
   const L_ORDER = ['licences', 'discoveries', 'shutdown', 'approved', 'producing', 'pipelines', 'facilities', 'wells'];
   const labelPriority = { producing: 10, approved: 9, facilities: 8, shutdown: 6, discoveries: 5, licences: 3, wells: 2 };
 
+  // Klosser (3D) samles opp og tegnes samlet bakfra og frem, etter rørledninger og før punkter.
+  let blocks = [];
+  const extruded = key => persp.tilted && S.extrude > 0 &&
+    ((S.extFields && (key === 'producing' || key === 'approved' || key === 'shutdown')) || (S.extDsc && key === 'discoveries'));
+  const flushBlocks = () => { if (blocks.length) drawBlocks(g.append('g').attr('data-layer', 'blocks'), blocks, T); blocks = []; };
+
   for (const key of L_ORDER) {
     const L = LAYER[key], st = S.layers[key];
+    if (L.kind === 'point') flushBlocks();   // rørledninger ligger på havbunnen, under klossene
     const items = layerItems(L);
     if (!items.length) continue;
     const lg = g.append('g').attr('data-layer', key);
@@ -620,11 +780,19 @@ function render() {
         let fill = it.color, stroke = d3.color(it.color).darker(0.7).formatHex(), fo = st.fill, so = 1, sw = key === 'licences' ? 0.9 : 0.8;
         if (it.partner) { fill = lighten(it.color, 0.55); stroke = it.color; }
         if (it.other) { drewOther = true; fill = S.otherColor; stroke = d3.color(S.otherColor).darker(0.6).formatHex(); fo = Math.min(st.fill, 0.5); so = 0.7; }
-        const el = lg.append('path').attr('d', d).attr('fill', fill).attr('fill-opacity', fo)
+        const ext = extruded(key);
+        const el = ext ? null : lg.append('path').attr('d', d).attr('fill', fill).attr('fill-opacity', fo)
           .attr('stroke', stroke).attr('stroke-opacity', so).attr('stroke-width', sw).attr('stroke-linejoin', 'round').attr('data-k', fk);
-        if (st.dash || key === 'licences' || (key === 'approved' && S.colorByHC)) el.attr('stroke-dasharray', key === 'licences' ? '4 2' : '3 2');
+        const dash = st.dash || key === 'licences' || (key === 'approved' && S.colorByHC);
+        if (ext) {
+          // Opake klosser; veggene er mørkere toner av toppfargen.
+          const top = it.other ? fill : (fo < 0.99 ? d3.interpolateRgb(S.sea, fill)(Math.max(fo, 0.75)) : fill);
+          const wall = [0.25, 0.55, 0.85, 1.15].map(v => d3.color(top).darker(v).formatHex());
+          blocks.push({ f: it.f, fk, fill: top, stroke, wall, dash });
+        } else if (dash) el.attr('stroke-dasharray', key === 'licences' ? '4 2' : '3 2');
         if (st.labels && !(it.other && S.labelsOnlySel)) {
-          const c = polyLabelPoint(it.f);
+          let c = polyLabelPoint(it.f);
+          if (c && ext) { const q = fromScreen(c[0], c[1]); c = q ? toScreen(q[0], q[1], S.extrude) : c; }
           if (c) labels.push(labelCandidate(key, it, c, labelPriority[key], 'center'));
         }
       }
@@ -640,7 +808,7 @@ function render() {
       }
     } else {
       for (const it of items) {
-        const xy = it.f.geometry.coordinates.length === 2 ? proj(it.f.geometry.coordinates) : null;
+        const xy = it.f.geometry.coordinates.length === 2 ? P(it.f.geometry.coordinates) : null;
         if (!xy || !isFinite(xy[0]) || xy[0] < -20 || xy[1] < -20 || xy[0] > w + 20 || xy[1] > h + 20) continue;
         const fk = `${key}:${it.p.id}`;
         featIndex.set(fk, { L, p: it.p });
@@ -651,10 +819,13 @@ function render() {
     }
   }
 
+  flushBlocks();
+
   if (S.cities) {
     const cg = g.append('g');
     for (const [name, lon, lat] of CITIES) {
-      const xy = proj([lon, lat]);
+      const xy = P([lon, lat]);
+      if (!xy) continue;
       if (!xy || xy[0] < 0 || xy[1] < 0 || xy[0] > w || xy[1] > h) continue;
       cg.append('circle').attr('cx', xy[0]).attr('cy', xy[1]).attr('r', 2.6 * k).attr('fill', T.ink).attr('stroke', T.halo).attr('stroke-width', 0.8);
       labels.push({ key: `city:${name}`, text: name, x: xy[0], y: xy[1], anchor: 'right', size: S.labelSize * 0.92, weight: 'normal', italic: true, color: T.ink, priority: 7 });
@@ -794,7 +965,8 @@ function drawOverlay(T) {
   }
   if (S.legend) drawLegend(g, T, titleBottom);
 
-  if (S.scale) drawScaleBar(g, T);
+  // Målestokken varierer i perspektiv, så den vises bare når kartet ikke er vippet.
+  if (S.scale && !persp.tilted) drawScaleBar(g, T);
   if (S.north) drawNorth(g, T);
   if (S.source) {
     const txt = `Kilde: Sokkeldirektoratet (NLOD)${META.updated ? ', data per ' + fmtDate(META.updated) : ''} · Natural Earth`;
@@ -909,9 +1081,9 @@ function drawScaleBar(g, T) {
 
 function drawNorth(g, T) {
   // Retningen mot nord i kartets midtpunkt (varierer med projeksjonen).
-  const c = proj.invert([W() / 2, H() / 2]);
+  const c = Pinv([W() / 2, H() / 2]);
   if (!c) return;
-  const p0 = proj(c), p1 = proj([c[0], Math.min(c[1] + 0.2, 89.9)]);
+  const p0 = P(c), p1 = P([c[0], Math.min(c[1] + 0.2, 89.9)]);
   const ang = Math.atan2(p1[0] - p0[0], -(p1[1] - p0[1])) * 180 / Math.PI;
   const s = 15;
   const pos = S.legend && S.legendPos === 'br' ? [W() - 34, 40] : [W() - 34, H() - 62];
@@ -941,7 +1113,7 @@ function initZoom() {
       const t = ev.transform;
       if (t.k === 1 && t.x === 0 && t.y === 0) return;
       // Bak inn transformasjonen i projeksjonen og tegn kartet skarpt på nytt.
-      const center = proj.invert([(W() / 2 - t.x) / t.k, (H() / 2 - t.y) / t.k]);
+      const center = Pinv([(W() / 2 - t.x) / t.k, (H() / 2 - t.y) / t.k]);
       S.view = { center: center.map(v => +v.toFixed(5)), scale: S.view.scale * t.k };
       resetting = true; svg.call(zoomBehavior.transform, d3.zoomIdentity); resetting = false;
       setupProjection(); render();
@@ -1083,7 +1255,9 @@ document.getElementById('btnCopy').onclick = async () => {
 // ════════════════════════════════════════════════════════════════════════════
 const $ = id => document.getElementById(id);
 function bindCheck(id, get, set) { const el = $(id); el.checked = get(); el.onchange = () => { set(el.checked); render(); }; }
-function bindValue(id, get, set, ev = 'change') { const el = $(id); el.value = get(); el.addEventListener(ev, () => { set(el.value); render(); }); }
+let rafId = 0;
+function scheduleRender() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(render); }
+function bindValue(id, get, set, ev = 'change') { const el = $(id); el.value = get(); el.addEventListener(ev, () => { set(el.value); ev === 'input' ? scheduleRender() : render(); }); }
 
 function buildLayerList() {
   const box = $('layerList');
@@ -1237,6 +1411,15 @@ function syncAllControls() {
   bindCheck('declutter', () => S.declutter, v => S.declutter = v);
   bindValue('labelSize', () => S.labelSize, v => { S.labelSize = +v; $('labelSizeVal').textContent = v; }, 'input');
   bindValue('symbolSize', () => S.symbolSize, v => { S.symbolSize = +v; $('symbolSizeVal').textContent = (+v).toFixed(1); }, 'input');
+  const deg = v => `${v}°`;
+  bindValue('tilt', () => S.tilt, v => { S.tilt = +v; $('tiltVal').textContent = deg(v); setupProjection(); }, 'input');
+  bindValue('bearing', () => S.bearing, v => { S.bearing = +v; $('bearingVal').textContent = deg(v); setupProjection(); }, 'input');
+  bindValue('extrude', () => S.extrude, v => { S.extrude = +v; $('extrudeVal').textContent = v; setupProjection(); }, 'input');
+  $('tiltVal').textContent = deg(S.tilt); $('bearingVal').textContent = deg(S.bearing); $('extrudeVal').textContent = S.extrude;
+  bindCheck('extFields', () => S.extFields, v => S.extFields = v);
+  bindCheck('extDsc', () => S.extDsc, v => S.extDsc = v);
+  bindCheck('shadow', () => S.shadow, v => S.shadow = v);
+  bindCheck('haze', () => S.haze, v => S.haze = v);
   $('labelSizeVal').textContent = S.labelSize;
   $('symbolSizeVal').textContent = (+S.symbolSize).toFixed(1);
   buildLayerList();
@@ -1276,6 +1459,16 @@ function initStaticControls() {
     vp.appendChild(b);
   });
   $('btnFit').onclick = fitToSelection;
+  const tp = $('tiltPresets');
+  [['2D', 0, 0], ['Lett skrå', 35, 0], ['Skrå', 50, 0], ['Dramatisk', 60, -20]].forEach(([name, t, b]) => {
+    const btn = document.createElement('button'); btn.className = 'small'; btn.textContent = name;
+    btn.onclick = () => {
+      S.tilt = t; S.bearing = b;
+      $('tilt').value = t; $('bearing').value = b; $('tiltVal').textContent = t + '°'; $('bearingVal').textContent = b + '°';
+      setupProjection(); render();
+    };
+    tp.appendChild(btn);
+  });
   $('zin').onclick = () => zoomBy(1.5);
   $('zout').onclick = () => zoomBy(1 / 1.5);
 
