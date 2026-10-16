@@ -1,0 +1,42 @@
+name: Oppdater kartdata
+
+on:
+  schedule:
+    # 04:30 UTC hver dag. De fleste kjøringene gir ingen endringer og dermed ingen commit.
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: map-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # fetch_data.py bruker kun standardbiblioteket.
+      - name: Hent data fra Sodir
+        run: python fetch_data.py
+
+      - name: Commit hvis dataene er endret
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "Ingen endringer - hopper over commit."
+          else
+            git commit -m "Oppdater kartdata ($(date -u +%Y-%m-%d))"
+            git push
+          fi

@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PPT-kart – norsk sokkel</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<style>
+  :root {
+    --bg: #eef0f3; --panel: #ffffff; --ink: #1c2430; --muted: #687385; --line: #dde1e7;
+    --accent: #1f5fae; --accent-ink: #ffffff; --hover: #f3f5f8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: var(--ink); background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+
+  header { display: flex; align-items: center; gap: 12px; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0 12px 0 0; font-weight: 650; }
+  header .grow { flex: 1; }
+  header .group { display: flex; align-items: center; gap: 6px; }
+  .status { color: var(--muted); font-size: 12px; }
+
+  button, select, input[type=text], input[type=number], input[type=search] {
+    font: inherit; color: inherit; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 5px 8px;
+  }
+  button { cursor: pointer; }
+  button:hover { background: var(--hover); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  button.small { padding: 2px 7px; font-size: 12px; }
+  input[type=color] { width: 26px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; flex: none; }
+  input[type=number] { width: 70px; }
+
+  main { flex: 1; display: flex; min-height: 0; }
+  aside { width: 340px; flex: none; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); padding: 4px 0 40px; }
+  details { border-bottom: 1px solid var(--line); }
+  summary { padding: 9px 14px; font-weight: 650; cursor: pointer; user-select: none; list-style: none; display: flex; justify-content: space-between; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "▸"; color: var(--muted); }
+  details[open] > summary::after { content: "▾"; }
+  .sec { padding: 0 14px 12px; display: flex; flex-direction: column; gap: 7px; }
+  .row { display: flex; align-items: center; gap: 7px; }
+  .row label.grow, .row .grow { flex: 1; min-width: 0; }
+  .row select.grow { width: 100%; }
+  .sub { margin-left: 24px; display: flex; flex-direction: column; gap: 5px; padding: 2px 0 4px; color: var(--muted); }
+  .sub .row { gap: 5px; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .lyr { display: flex; align-items: center; gap: 7px; }
+  .lyr .name { flex: 1; }
+  .lyr .lbl { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 2px; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; flex: 1; padding: 4px 6px; font-size: 12px; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--accent); color: var(--accent-ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { background: #e7eef8; color: #1a467f; border-radius: 12px; padding: 2px 4px 2px 9px; font-size: 12px; display: flex; align-items: center; gap: 3px; }
+  .chip button { border: 0; background: none; padding: 0 4px; line-height: 1; color: inherit; }
+  .complist { max-height: 180px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
+  .complist label { display: flex; gap: 6px; padding: 3px 8px; align-items: center; cursor: pointer; }
+  .complist label:hover { background: var(--hover); }
+  .complist .cnt { margin-left: auto; color: var(--muted); font-size: 11px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 5px; }
+
+  #stage { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 18px; position: relative; }
+  #frame { position: relative; box-shadow: 0 2px 14px rgba(20,30,50,.18); background-color: #fff;
+    background-image: linear-gradient(45deg,#e4e6ea 25%,transparent 25%),linear-gradient(-45deg,#e4e6ea 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e4e6ea 75%),linear-gradient(-45deg,transparent 75%,#e4e6ea 75%);
+    background-size: 16px 16px; background-position: 0 0,0 8px,8px -8px,-8px 0; }
+  #map { display: block; width: 100%; height: 100%; cursor: grab; }
+  #map:active { cursor: grabbing; }
+  #map .lab { cursor: move; }
+  #zoomctl { position: absolute; right: 26px; top: 26px; display: flex; flex-direction: column; gap: 4px; z-index: 2; }
+  #zoomctl button { width: 30px; height: 30px; padding: 0; font-size: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  #tip { position: fixed; pointer-events: none; background: rgba(25,32,44,.94); color: #fff; padding: 7px 9px; border-radius: 6px; font-size: 12px; max-width: 300px; display: none; z-index: 10; }
+  #tip b { font-size: 13px; }
+  #tip .m { color: #b8c3d4; }
+  #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 14px; }
+  #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1c2430; color: #fff; padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
+  #toast.show { opacity: 1; }
+
+  @media (max-width: 800px) {
+    body { overflow-y: auto; overflow-x: hidden; height: auto; }
+    main { flex-direction: column; flex: none; }
+    #stage { order: -1; height: 56vh; flex: none; padding: 8px; }
+    aside { width: 100%; border-right: 0; overflow: visible; }
+    header .group { flex-wrap: wrap; }
+    #zoomctl { right: 14px; top: 14px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>PPT-kart</h1>
+  <div class="group">
+    <label for="format">Format</label>
+    <select id="format">
+      <option value="1600x900">16:9 helside</option>
+      <option value="800x900">16:9 halvside (8:9)</option>
+      <option value="1200x900">4:3</option>
+      <option value="900x900">Kvadrat</option>
+      <option value="675x900">Stående 3:4</option>
+      <option value="custom">Egendefinert …</option>
+    </select>
+    <span id="customsize" style="display:none" class="group">
+      <input type="number" id="cw" min="200" max="4000" step="10" /> × <input type="number" id="ch" min="200" max="4000" step="10" />
+    </span>
+  </div>
+  <div class="grow"></div>
+  <span class="status" id="status"></span>
+  <div class="group">
+    <label for="res">Oppløsning</label>
+    <select id="res">
+      <option value="1920">Full HD (1920 px)</option>
+      <option value="3840" selected>4K (3840 px)</option>
+      <option value="7680">8K (7680 px)</option>
+    </select>
+    <button id="btnCopy" class="primary" title="Kopier som PNG til utklippstavlen (lim inn i PowerPoint med Ctrl+V)">Kopier</button>
+    <button id="btnPng" title="Last ned PNG">PNG</button>
+    <button id="btnSvg" title="Last ned SVG – kan settes inn i PowerPoint og konverteres til figur for redigering">SVG</button>
+  </div>
+</header>
+
+<main>
+  <aside id="panel">
+    <details open>
+      <summary>Utsnitt</summary>
+      <div class="sec">
+        <div class="presets" id="viewPresets"></div>
+        <div class="row">
+          <button id="btnFit" class="grow" title="Zoom til valgt selskap, eller til alt som er synlig">Zoom til utvalg</button>
+        </div>
+        <div class="row">
+          <label for="proj">Projeksjon</label>
+          <select id="proj" class="grow">
+            <option value="auto">Transvers Mercator, nord opp (anbefalt)</option>
+            <option value="utm31">UTM sone 31 (3° Ø)</option>
+            <option value="utm32">UTM sone 32 (9° Ø)</option>
+            <option value="utm33">UTM sone 33 (15° Ø)</option>
+            <option value="utm34">UTM sone 34 (21° Ø)</option>
+            <option value="utm35">UTM sone 35 (27° Ø)</option>
+            <option value="lcc">Lambert konform (hele sokkelen)</option>
+            <option value="merc">Web Mercator</option>
+          </select>
+        </div>
+        <div class="hint">Dra for å panorere, scroll for å zoome. Etiketter kan dras til ny plass – dobbeltklikk skjuler en etikett.</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Selskap</summary>
+      <div class="sec">
+        <input type="search" id="compSearch" placeholder="Søk etter selskap …" />
+        <div class="complist" id="compList"></div>
+        <div class="chips" id="compChips"></div>
+        <div class="row"><span>Rolle</span>
+          <div class="seg grow" id="segRole">
+            <button data-v="any">Operatør eller partner</button><button data-v="op">Operatør</button><button data-v="partner">Partner</button>
+          </div>
+        </div>
+        <div class="row"><span>Visning</span>
+          <div class="seg grow" id="segMode">
+            <button data-v="highlight">Fremhev</button><button data-v="only">Vis kun valgte</button>
+          </div>
+        </div>
+        <label class="row"><input type="checkbox" id="splitRole" /> Skill operatør (mørk) og partner (lys)</label>
+        <label class="row"><input type="checkbox" id="labelsOnlySel" /> Etiketter kun for valgte</label>
+        <label class="row"><input type="checkbox" id="labelShare" /> Vis eierandel i etiketten</label>
+        <div class="row"><span class="grow">Farge for andre selskaper</span><input type="color" id="otherColor" /></div>
+        <div class="hint">Gjelder felt, funn og lisenser.</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Kartlag</summary>
+      <div class="sec" id="layerList"></div>
+    </details>
+
+    <details>
+      <summary>Bakgrunnskart</summary>
+      <div class="sec">
+        <div class="row"><span>Tema</span>
+          <select id="theme" class="grow">
+            <option value="light">Lys</option>
+            <option value="grey">Grå / nøytral</option>
+            <option value="dark">Mørk</option>
+            <option value="blue">Blå hav</option>
+          </select>
+        </div>
+        <div class="row"><span class="grow">Hav</span><input type="color" id="seaColor" /></div>
+        <div class="row"><span class="grow">Land</span><input type="color" id="landColor" /></div>
+        <label class="row"><input type="checkbox" id="transparent" /> Transparent bakgrunn (ingen havfarge)</label>
+        <label class="row"><input type="checkbox" id="showDepth" /> Dybdekurver (200, 1000, 2000, 3000 m)</label>
+        <label class="row"><input type="checkbox" id="showBorders" /> Landegrenser</label>
+        <label class="row"><input type="checkbox" id="showCities" /> Byer og steder</label>
+        <label class="row"><input type="checkbox" id="showQuads" /> Kvadranter (med nummer)</label>
+        <label class="row"><input type="checkbox" id="showBlocks" /> Blokker</label>
+      </div>
+    </details>
+
+    <details>
+      <summary>Tittel, tegnforklaring og tekst</summary>
+      <div class="sec">
+        <label class="row"><input type="checkbox" id="showTitle" /> Tittel</label>
+        <input type="text" id="titleText" placeholder="Tittel" />
+        <input type="text" id="subtitleText" placeholder="Undertittel (valgfritt)" />
+        <label class="row"><input type="checkbox" id="showLegend" /> Tegnforklaring
+          <select id="legendPos" style="margin-left:auto">
+            <option value="tl">Øverst venstre</option><option value="tr">Øverst høyre</option>
+            <option value="bl">Nederst venstre</option><option value="br">Nederst høyre</option>
+          </select>
+        </label>
+        <label class="row"><input type="checkbox" id="showScale" /> Målestokk</label>
+        <label class="row"><input type="checkbox" id="showNorth" /> Nordpil</label>
+        <label class="row"><input type="checkbox" id="showSource" /> Kildehenvisning</label>
+        <div class="row"><span class="grow">Tekststørrelse etiketter</span><input type="range" id="labelSize" min="8" max="28" step="1" style="width:110px" /><span id="labelSizeVal" style="width:22px"></span></div>
+        <div class="row"><span class="grow">Symbolstørrelse</span><input type="range" id="symbolSize" min="0.5" max="2.5" step="0.1" style="width:110px" /><span id="symbolSizeVal" style="width:22px"></span></div>
+        <label class="row"><input type="checkbox" id="declutter" /> Skjul overlappende etiketter</label>
+        <div class="row"><button id="btnResetLabels" class="grow">Nullstill flyttede/skjulte etiketter</button></div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Lagre og del</summary>
+      <div class="sec">
+        <div class="hint">Hele oppsettet ligger i lenken, så bokmerk eller del den. Maler lagres lokalt i denne nettleseren.</div>
+        <div class="row"><button id="btnLink" class="grow">Kopier lenke til dette kartet</button></div>
+        <div class="row"><input type="text" id="presetName" class="grow" placeholder="Navn på mal" /><button id="btnSavePreset">Lagre</button></div>
+        <div id="presetList" class="sec" style="padding:0"></div>
+        <div class="row"><button id="btnReset" class="grow">Tilbakestill alt</button></div>
+      </div>
+    </details>
+  </aside>
+
+  <section id="stage">
+    <div id="frame">
+      <svg id="map" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div id="loading">Laster kartdata …</div>
+    </div>
+    <div id="zoomctl"><button id="zin" title="Zoom inn">+</button><button id="zout" title="Zoom ut">−</button></div>
+  </section>
+</main>
+<div id="tip"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+// ════════════════════════════════════════════════════════════════════════════
+// Konstanter og oppslag
+// ════════════════════════════════════════════════════════════════════════════
+const FONT = 'Arial, Helvetica, sans-serif';
+const DATA_FILES = ['fields', 'discoveries', 'licences', 'wells', 'pipelines', 'facilities', 'quadrants'];
+
+const THEMES = {
+  light: { sea: '#e8f0f6', land: '#f4f2ee', coast: '#b9c2cb', depth: '#d6e3ee', border: '#a9b0b8', ink: '#2b3440', halo: '#ffffff', grid: '#8a9bb0', box: '#ffffff', other: '#c3c8cf' },
+  grey:  { sea: '#ffffff', land: '#e9e9e9', coast: '#bdbdbd', depth: '#f1f3f5', border: '#a6a6a6', ink: '#2d2d2d', halo: '#ffffff', grid: '#9a9a9a', box: '#ffffff', other: '#c9c9c9' },
+  dark:  { sea: '#10202f', land: '#25384b', coast: '#3d5368', depth: '#0c1a27', border: '#56708a', ink: '#e8eef5', halo: '#10202f', grid: '#4b6580', box: '#16293b', other: '#53687e' },
+  blue:  { sea: '#cfe2f1', land: '#f7f6f2', coast: '#9fb6c9', depth: '#bcd4e8', border: '#9aa6b1', ink: '#1f2a37', halo: '#ffffff', grid: '#7f97ad', box: '#ffffff', other: '#aeb9c4' },
+};
+
+const HC = {
+  'OIL': { name: 'Olje', color: '#2f9e44' },
+  'OIL/GAS': { name: 'Olje/gass', color: '#a9a31e' },
+  'OIL/CONDENSATE': { name: 'Olje/kondensat', color: '#5c940d' },
+  'GAS/CONDENSATE': { name: 'Gass/kondensat', color: '#e8590c' },
+  'GAS': { name: 'Gass', color: '#d6336c' },
+};
+const HC_ORDER = ['OIL', 'OIL/CONDENSATE', 'OIL/GAS', 'GAS/CONDENSATE', 'GAS'];
+
+const DSC_STATUS = {
+  'Production in clarification phase': 'Utvinning i avklaringsfase',
+  'Production likely but unclarified': 'Utvinning sannsynlig, men uavklart',
+  'Production not evaluated': 'Utvinning ikke evaluert',
+  'Production is unlikely': 'Utvinning lite sannsynlig',
+};
+const FLD_STATUS = { 'Producing': 'I produksjon', 'Shut down': 'Nedstengt', 'Approved for production': 'Godkjent for utbygging (PUD)' };
+
+// Brønninnhold gruppert i symbolklasser.
+const WELL_CLASSES = {
+  oil:    { name: 'Olje', color: '#2f9e44', match: ['OIL', 'OIL/CONDENSATE'] },
+  oilgas: { name: 'Olje og gass', color: '#a9a31e', match: ['OIL/GAS', 'OIL/GAS/CONDENSATE'] },
+  gas:    { name: 'Gass', color: '#d6336c', match: ['GAS', 'GAS/CONDENSATE', 'WATER/GAS'] },
+  shows:  { name: 'Spor av hydrokarboner', color: '#f08c00', match: ['SHOWS', 'OIL SHOWS', 'GAS SHOWS', 'OIL/GAS SHOWS'] },
+  dry:    { name: 'Tørr', color: '#868e96', match: ['DRY', 'WATER'] },
+  other:  { name: 'Annet / ukjent', color: '#adb5bd', match: [] },
+};
+function wellClass(content) {
+  for (const [k, c] of Object.entries(WELL_CLASSES)) if (c.match.includes(content)) return k;
+  return 'other';
+}
+const PIPE_MEDIUM = { 'Gas': { name: 'Gass', color: '#d6336c' }, 'Oil': { name: 'Olje', color: '#2f9e44' }, 'Condensate': { name: 'Kondensat', color: '#e8590c' }, 'Co2 injection': { name: 'CO₂', color: '#7048e8' } };
+
+const CITIES = [
+  ['Oslo', 10.75, 59.91], ['Stavanger', 5.73, 58.97], ['Bergen', 5.32, 60.39], ['Florø', 5.03, 61.60],
+  ['Kristiansund', 7.73, 63.11], ['Trondheim', 10.40, 63.43], ['Sandnessjøen', 12.63, 66.02], ['Bodø', 14.40, 67.28],
+  ['Harstad', 16.54, 68.80], ['Tromsø', 18.96, 69.65], ['Hammerfest', 23.68, 70.66], ['Kirkenes', 30.05, 69.73],
+  ['Longyearbyen', 15.63, 78.22], ['Aberdeen', -2.10, 57.15], ['Lerwick', -1.15, 60.15], ['Esbjerg', 8.45, 55.47],
+  ['Kristiansand', 7.99, 58.15], ['Haugesund', 5.27, 59.41], ['Ålesund', 6.15, 62.47], ['Murmansk', 33.08, 68.97],
+];
+
+const VIEW_PRESETS = [
+  { name: 'Hele sokkelen', bounds: [[1.5, 56], [36, 74.5]], proj: 'lcc' },
+  { name: 'Nordsjøen', bounds: [[1.5, 56.2], [7.5, 62]] },
+  { name: 'Nordlige Nordsjø', bounds: [[1.8, 59.3], [5.5, 62]] },
+  { name: 'Norskehavet', bounds: [[4.5, 62], [14, 67.5]] },
+  { name: 'Barentshavet', bounds: [[16, 70], [37, 74.5]] },
+];
+
+// Lagdefinisjoner. "company" = lag som påvirkes av selskapsfilteret.
+const LAYERS = [
+  { key: 'licences', name: 'Lisenser (aktive)', legend: 'Lisens', kind: 'poly', src: 'licences', company: true,
+    def: { on: false, color: '#5c7cfa', labels: false, fill: 0.10 } },
+  { key: 'discoveries', name: 'Funn', legend: 'Funn', kind: 'poly', src: 'discoveries', company: true, hc: true,
+    def: { on: true, color: '#f59f00', labels: false, fill: 0.55 } },
+  { key: 'shutdown', name: 'Nedstengte felt', legend: 'Nedstengt felt', kind: 'poly', src: 'fields', company: true,
+    filter: p => p.status === 'Shut down', def: { on: false, color: '#9aa1a9', labels: false, fill: 0.45, dash: true } },
+  { key: 'approved', name: 'Felt godkjent for utbygging', legend: 'Felt under utbygging', kind: 'poly', src: 'fields', company: true, hc: true,
+    filter: p => p.status === 'Approved for production', def: { on: true, color: '#4c6ef5', labels: true, fill: 0.8 } },
+  { key: 'producing', name: 'Felt i produksjon', legend: 'Felt i produksjon', kind: 'poly', src: 'fields', company: true, hc: true,
+    filter: p => p.status === 'Producing', def: { on: true, color: '#1c7c54', labels: true, fill: 0.85 } },
+  { key: 'pipelines', name: 'Rørledninger (transport)', legend: 'Rørledning', kind: 'line', src: 'pipelines',
+    def: { on: true, color: '#7b8794', labels: false } },
+  { key: 'facilities', name: 'Innretninger', legend: 'Innretning', kind: 'point', src: 'facilities',
+    def: { on: false, color: '#343a40', labels: false } },
+  { key: 'wells', name: 'Letebrønner', legend: 'Letebrønn', kind: 'point', src: 'wells',
+    def: { on: false, color: '#343a40', labels: false } },
+];
+const LAYER = Object.fromEntries(LAYERS.map(l => [l.key, l]));
+
+// ════════════════════════════════════════════════════════════════════════════
+// Tilstand (lagres i URL-en)
+// ════════════════════════════════════════════════════════════════════════════
+const CURRENT_YEAR = new Date().getFullYear();
+function defaultState() {
+  return {
+    v: 1,
+    size: [1600, 900],
+    proj: 'auto', cm: 4.5,
+    view: null,                       // { center: [lon, lat], scale }
+    layers: Object.fromEntries(LAYERS.map(l => [l.key, { ...l.def }])),
+    colorByHC: false,
+    dscStatus: ['Production in clarification phase', 'Production likely but unclarified', 'Production not evaluated'],
+    wells: { wildcat: true, appraisal: true, from: CURRENT_YEAR - 10, to: CURRENT_YEAR, classes: Object.keys(WELL_CLASSES), colorByContent: true },
+    pipes: { byMedium: false, byDim: true },
+    fac: { surface: true, subsea: false, onshore: true },
+    companies: [], role: 'any', mode: 'highlight', splitRole: false, labelsOnlySel: true, labelShare: false, otherColor: '#c3c8cf',
+    theme: 'light', sea: THEMES.light.sea, land: THEMES.light.land, transparent: false,
+    depth: true, borders: true, cities: true, quads: false, blocks: false,
+    title: false, titleText: '', subtitleText: '',
+    legend: true, legendPos: 'tr', scale: true, north: true, source: true,
+    labelSize: 16, symbolSize: 1.2, declutter: true,
+    offsets: {}, hidden: [],
+  };
+}
+let S = defaultState();
+
+function mergeState(base, saved) {
+  // Behold nye nøkler fra standardtilstanden når en eldre lenke lastes.
+  for (const k of Object.keys(saved)) {
+    if (base[k] && typeof base[k] === 'object' && !Array.isArray(base[k]) && saved[k] && typeof saved[k] === 'object' && !Array.isArray(saved[k])) {
+      base[k] = mergeState(base[k], saved[k]);
+    } else base[k] = saved[k];
+  }
+  return base;
+}
+function encodeState(st) {
+  const bytes = new TextEncoder().encode(JSON.stringify(st));
+  let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function decodeState(str) {
+  const bin = atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
+}
+let urlTimer = null;
+function saveToUrl() {
+  clearTimeout(urlTimer);
+  urlTimer = setTimeout(() => { history.replaceState(null, '', '#s=' + encodeState(S)); }, 300);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Data
+// ════════════════════════════════════════════════════════════════════════════
+const D = {};            // GeoJSON per kilde
+let BASE = null;         // bakgrunnskart
+let META = {};
+let COMPANIES = [];      // [{name, n}]
+
+// d3 forventer at ytre ringer går med klokka; GeoJSON (RFC 7946) har motsatt.
+// Snu polygoner som ellers ville dekket hele kloden.
+function rewind(geom) {
+  if (!geom) return geom;
+  const fix = rings => (d3.geoArea({ type: 'Polygon', coordinates: rings }) > 2 * Math.PI ? rings.map(r => r.slice().reverse()) : rings);
+  if (geom.type === 'Polygon') geom.coordinates = fix(geom.coordinates);
+  else if (geom.type === 'MultiPolygon') geom.coordinates = geom.coordinates.map(fix);
+  return geom;
+}
+
+async function loadJSON(path) {
+  const r = await fetch(path, { cache: 'no-cache' });
+  if (!r.ok) throw new Error(`${path}: ${r.status}`);
+  return r.json();
+}
+
+async function loadData() {
+  const [base, meta, ...rest] = await Promise.all([
+    loadJSON('data/basemap.json'), loadJSON('data/meta.json').catch(() => ({})),
+    ...DATA_FILES.map(f => loadJSON(`data/${f}.json`)),
+  ]);
+  META = meta;
+  DATA_FILES.forEach((f, i) => {
+    rest[i].features.forEach(ft => rewind(ft.geometry));
+    D[f] = rest[i];
+  });
+  const o = base.objects;
+  BASE = {
+    land: topojson.feature(base, o.land),
+    borders: topojson.feature(base, o.borders),
+    depth: ['d200', 'd1000', 'd2000', 'd3000'].map(k => topojson.feature(base, o[k])),
+  };
+  const counts = new Map();
+  for (const src of ['fields', 'discoveries', 'licences']) {
+    for (const f of D[src].features) {
+      const names = new Set([f.properties.op, ...f.properties.lic.map(l => l[0])].filter(Boolean));
+      names.forEach(n => counts.set(n, (counts.get(n) || 0) + 1));
+    }
+  }
+  COMPANIES = [...counts].map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'no'));
+}
+
+let blocksPromise = null;
+function ensureBlocks() {
+  if (D.blocks) return Promise.resolve();
+  if (!blocksPromise) blocksPromise = loadJSON('data/blocks.json').then(j => { j.features.forEach(f => rewind(f.geometry)); D.blocks = j; render(); });
+  return blocksPromise;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Selskap
+// ════════════════════════════════════════════════════════════════════════════
+function shortName(n) {
+  if (!n) return '';
+  return n.replace(/\s+(ASA|AS|AB|A\/S|Ltd\.?|Limited|plc)$/i, '')
+          .replace(/\s+(Norge|Norway|Skandinavia|Energy Norway)$/i, '')
+          .replace(/\s+Energy$/i, '').trim();
+}
+// Returnerer null hvis ingen selskaper er valgt; ellers {match, op, share}.
+function companyMatch(p) {
+  if (!S.companies.length) return null;
+  const sel = new Set(S.companies);
+  const isOp = sel.has(p.op);
+  const share = p.lic.filter(l => sel.has(l[0])).reduce((s, l) => s + l[1], 0);
+  const isLic = share > 0 || p.lic.some(l => sel.has(l[0]));
+  let match;
+  if (S.role === 'op') match = isOp;
+  else if (S.role === 'partner') match = isLic && !isOp;
+  else match = isOp || isLic;
+  return { match, op: isOp, share };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Projeksjon og visning
+// ════════════════════════════════════════════════════════════════════════════
+const UTM = { utm31: 3, utm32: 9, utm33: 15, utm34: 21, utm35: 27 };
+function baseProjection(kind = S.proj) {
+  if (kind === 'lcc') return d3.geoConicConformal().parallels([62, 72]).rotate([-14, 0]);
+  if (kind === 'merc') return d3.geoMercator();
+  const cm = UTM[kind] ?? S.cm;
+  return d3.geoTransverseMercator().rotate([-cm, 0]);
+}
+let proj = null, path = null;
+const W = () => S.size[0], H = () => S.size[1];
+
+function setupProjection() {
+  proj = baseProjection().precision(0.2);
+  if (!S.view) fitBounds(VIEW_PRESETS[1].bounds, false);
+  proj.scale(S.view.scale).translate([0, 0]);
+  const c = proj(S.view.center);
+  proj.translate([W() / 2 - c[0], H() / 2 - c[1]]);
+  proj.clipExtent([[-60, -60], [W() + 60, H() + 60]]);
+  path = d3.geoPath(proj);
+}
+
+function boundsToGeo(b) {
+  // Rektangel i lengde/bredde som linje med mellompunkter, så tilpasningen tar hensyn til krumning.
+  const [[x0, y0], [x1, y1]] = b, pts = [];
+  for (let i = 0; i <= 10; i++) { const x = x0 + (x1 - x0) * i / 10; pts.push([x, y0], [x, y1]); }
+  for (let i = 0; i <= 10; i++) { const y = y0 + (y1 - y0) * i / 10; pts.push([x0, y], [x1, y]); }
+  return { type: 'MultiPoint', coordinates: pts };
+}
+function fitGeo(geo, pad = 0.04) {
+  const p = baseProjection().precision(0.2);
+  const m = Math.min(W(), H()) * pad;
+  p.fitExtent([[m, m], [W() - m, H() - m]], geo);
+  const center = p.invert([W() / 2, H() / 2]);
+  S.view = { center: center.map(v => +v.toFixed(5)), scale: p.scale() };
+}
+function fitBounds(b, rerender = true) {
+  if (S.proj === 'auto') S.cm = +((b[0][0] + b[1][0]) / 2).toFixed(2);
+  fitGeo(boundsToGeo(b));
+  if (rerender) { setupProjection(); render(); }
+}
+// Målestokk i kartets midtpunkt.
+function kmPerPx() {
+  const cx = W() / 2, cy = H() / 2;
+  const a = proj.invert([cx - 50, cy]), b = proj.invert([cx + 50, cy]);
+  return a && b ? d3.geoDistance(a, b) * 6371.0088 / 100 : 1;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rendering
+// ════════════════════════════════════════════════════════════════════════════
+const svg = d3.select('#map');
+let gMap, gLabels, gOverlay, gRoot;
+const featIndex = new Map();   // nøkkel -> {layer, props}
+let drewOther = false;          // om noe er tegnet i «andre selskaper»-farge
+const measureCtx = document.createElement('canvas').getContext('2d');
+
+function theme() { return THEMES[S.theme] || THEMES.light; }
+
+function lighten(hex, t) {
+  const c = d3.color(hex); if (!c) return hex;
+  const w = d3.rgb(255, 255, 255);
+  return d3.rgb(c.r + (w.r - c.r) * t, c.g + (w.g - c.g) * t, c.b + (w.b - c.b) * t).formatHex();
+}
+
+function textWidth(txt, size, weight = 'normal') {
+  measureCtx.font = `${weight} ${size}px ${FONT}`;
+  return measureCtx.measureText(txt).width;
+}
+
+// Hvilke features som vises for et lag, med farge og etikett.
+function layerItems(L) {
+  const st = S.layers[L.key];
+  if (!st.on || !D[L.src]) return [];
+  let feats = D[L.src].features;
+  if (L.filter) feats = feats.filter(f => L.filter(f.properties));
+  if (L.key === 'discoveries') feats = feats.filter(f => S.dscStatus.includes(f.properties.status));
+  if (L.key === 'wells') {
+    const w = S.wells;
+    feats = feats.filter(f => {
+      const p = f.properties;
+      const purpose = (p.purpose === 'WILDCAT' && w.wildcat) || (p.purpose === 'APPRAISAL' && w.appraisal);
+      return purpose && p.year >= w.from && p.year <= w.to && w.classes.includes(wellClass(p.content));
+    });
+  }
+  if (L.key === 'facilities') feats = feats.filter(f => S.fac[f.properties.cls]);
+
+  const out = [];
+  for (const f of feats) {
+    const p = f.properties;
+    let color = st.color;
+    if (L.hc && S.colorByHC && HC[p.hc]) color = HC[p.hc].color;
+    if (L.key === 'wells' && S.wells.colorByContent) color = WELL_CLASSES[wellClass(p.content)].color;
+    if (L.key === 'pipelines' && S.pipes.byMedium && PIPE_MEDIUM[p.medium]) color = PIPE_MEDIUM[p.medium].color;
+    let cm = null, other = false, partner = false;
+    if (L.company) {
+      cm = companyMatch(p);
+      if (cm && !cm.match) {
+        if (S.mode === 'only') continue;
+        other = true;
+      }
+      if (cm && cm.match && S.splitRole && !cm.op) partner = true;
+    }
+    out.push({ f, p, color, other, partner, cm });
+  }
+  // Andre selskaper tegnes under de valgte.
+  out.sort((a, b) => (b.other - a.other));
+  return out;
+}
+
+function render() {
+  if (!BASE) return;
+  const T = theme();
+  const w = W(), h = H(), k = S.symbolSize;
+  svg.attr('viewBox', `0 0 ${w} ${h}`).attr('width', null).attr('height', null);
+  svg.selectAll('*').remove();
+  featIndex.clear();
+  drewOther = false;
+
+  const defs = svg.append('defs');
+  defs.append('clipPath').attr('id', 'frameclip').append('rect').attr('width', w).attr('height', h);
+  gRoot = svg.append('g').attr('clip-path', 'url(#frameclip)');
+  if (!S.transparent) gRoot.append('rect').attr('width', w).attr('height', h).attr('fill', S.sea);
+
+  gMap = gRoot.append('g').attr('id', 'gmap');
+  const g = gMap;
+
+  // Bakgrunn
+  if (S.depth) {
+    BASE.depth.forEach((fc, i) => {
+      g.append('path').attr('d', path(fc)).attr('fill', d3.interpolateRgb(S.sea, T.depth)((i + 1) / 4 * 0.9 + 0.1))
+        .attr('fill-opacity', S.transparent ? 0.6 : 1).attr('stroke', 'none');
+    });
+  }
+  g.append('path').attr('d', path(BASE.land)).attr('fill', S.land).attr('stroke', T.coast).attr('stroke-width', 0.6).attr('stroke-linejoin', 'round');
+  if (S.borders) g.append('path').attr('d', path(BASE.borders)).attr('fill', 'none').attr('stroke', T.border).attr('stroke-width', 0.8).attr('stroke-dasharray', '3 2');
+
+  if (S.blocks) {
+    if (D.blocks) g.append('path').attr('d', path(D.blocks)).attr('fill', 'none').attr('stroke', T.grid).attr('stroke-width', 0.35).attr('stroke-opacity', 0.6);
+    else ensureBlocks();
+  }
+  if (S.quads) g.append('path').attr('d', path(D.quadrants)).attr('fill', 'none').attr('stroke', T.grid).attr('stroke-width', 0.8).attr('stroke-opacity', 0.8);
+
+  const labels = [];   // kandidater for etiketter
+  const L_ORDER = ['licences', 'discoveries', 'shutdown', 'approved', 'producing', 'pipelines', 'facilities', 'wells'];
+  const labelPriority = { producing: 10, approved: 9, facilities: 8, shutdown: 6, discoveries: 5, licences: 3, wells: 2 };
+
+  for (const key of L_ORDER) {
+    const L = LAYER[key], st = S.layers[key];
+    const items = layerItems(L);
+    if (!items.length) continue;
+    const lg = g.append('g').attr('data-layer', key);
+
+    if (L.kind === 'poly') {
+      for (const it of items) {
+        const d = path(it.f);
+        if (!d) continue;
+        const fk = `${key}:${it.p.id}`;
+        featIndex.set(fk, { L, p: it.p });
+        let fill = it.color, stroke = d3.color(it.color).darker(0.7).formatHex(), fo = st.fill, so = 1, sw = key === 'licences' ? 0.9 : 0.8;
+        if (it.partner) { fill = lighten(it.color, 0.55); stroke = it.color; }
+        if (it.other) { drewOther = true; fill = S.otherColor; stroke = d3.color(S.otherColor).darker(0.6).formatHex(); fo = Math.min(st.fill, 0.5); so = 0.7; }
+        const el = lg.append('path').attr('d', d).attr('fill', fill).attr('fill-opacity', fo)
+          .attr('stroke', stroke).attr('stroke-opacity', so).attr('stroke-width', sw).attr('stroke-linejoin', 'round').attr('data-k', fk);
+        if (st.dash || key === 'licences' || (key === 'approved' && S.colorByHC)) el.attr('stroke-dasharray', key === 'licences' ? '4 2' : '3 2');
+        if (st.labels && !(it.other && S.labelsOnlySel)) {
+          const c = polyLabelPoint(it.f);
+          if (c) labels.push(labelCandidate(key, it, c, labelPriority[key], 'center'));
+        }
+      }
+    } else if (L.kind === 'line') {
+      for (const it of items) {
+        const d = path(it.f);
+        if (!d) continue;
+        const fk = `${key}:${it.p.id}`;
+        featIndex.set(fk, { L, p: it.p });
+        const sw = S.pipes.byDim && it.p.dim ? Math.max(0.8, Math.min(3.2, it.p.dim / 14)) * k : 1.4 * k;
+        lg.append('path').attr('d', d).attr('fill', 'none').attr('stroke', it.color).attr('stroke-width', sw)
+          .attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round').attr('data-k', fk);
+      }
+    } else {
+      for (const it of items) {
+        const xy = it.f.geometry.coordinates.length === 2 ? proj(it.f.geometry.coordinates) : null;
+        if (!xy || !isFinite(xy[0]) || xy[0] < -20 || xy[1] < -20 || xy[0] > w + 20 || xy[1] > h + 20) continue;
+        const fk = `${key}:${it.p.id}`;
+        featIndex.set(fk, { L, p: it.p });
+        drawPointSymbol(lg, key, it, xy, k, T).attr('data-k', fk);
+        const wantLabel = st.labels && (key !== 'facilities' || it.p.cls !== 'subsea');
+        if (wantLabel) labels.push(labelCandidate(key, it, xy, labelPriority[key], 'right'));
+      }
+    }
+  }
+
+  if (S.cities) {
+    const cg = g.append('g');
+    for (const [name, lon, lat] of CITIES) {
+      const xy = proj([lon, lat]);
+      if (!xy || xy[0] < 0 || xy[1] < 0 || xy[0] > w || xy[1] > h) continue;
+      cg.append('circle').attr('cx', xy[0]).attr('cy', xy[1]).attr('r', 2.6 * k).attr('fill', T.ink).attr('stroke', T.halo).attr('stroke-width', 0.8);
+      labels.push({ key: `city:${name}`, text: name, x: xy[0], y: xy[1], anchor: 'right', size: S.labelSize * 0.92, weight: 'normal', italic: true, color: T.ink, priority: 7 });
+    }
+  }
+
+  if (S.quads) {
+    for (const f of D.quadrants.features) {
+      const c = path.centroid(f);
+      if (!isFinite(c[0]) || c[0] < 0 || c[1] < 0 || c[0] > w || c[1] > h) continue;
+      labels.push({ key: `quad:${f.properties.name}`, text: f.properties.name, x: c[0], y: c[1], anchor: 'center', size: S.labelSize * 1.15, weight: 'bold', color: T.grid, priority: 1, faint: true });
+    }
+  }
+
+  gLabels = gRoot.append('g').attr('id', 'glabels');
+  gOverlay = svg.append('g').attr('id', 'goverlay');
+  drawOverlay(T);
+  // Tittel, tegnforklaring, målestokk osv. er hindringer for etikettene.
+  const obstacles = [];
+  gOverlay.selectChildren().each(function () {
+    const b = this.getBBox(), t = this.transform && this.transform.baseVal.consolidate();
+    if (!b.width) return;
+    // Rotert nordpil: bruk et omsluttende kvadrat rundt transformasjonens origo.
+    const m = t ? t.matrix : { e: 0, f: 0, a: 1, d: 1 };
+    if (t && (Math.abs(m.b) > 1e-6 || Math.abs(m.c) > 1e-6)) {
+      const r = Math.hypot(Math.max(Math.abs(b.x), Math.abs(b.x + b.width)), Math.max(Math.abs(b.y), Math.abs(b.y + b.height)));
+      obstacles.push({ x0: m.e - r, x1: m.e + r, y0: m.f - r, y1: m.f + r });
+    } else obstacles.push({ x0: b.x + m.e - 3, x1: b.x + b.width + m.e + 3, y0: b.y + m.f - 3, y1: b.y + b.height + m.f + 3 });
+  });
+  placeLabels(labels, T, obstacles);
+  attachInteractions();
+  saveToUrl();
+}
+
+function drawPointSymbol(g, key, it, [x, y], k, T) {
+  const halo = T.halo;
+  if (key === 'wells') {
+    const r = 3.2 * k, cls = wellClass(it.p.content);
+    if (cls === 'dry' || cls === 'other') {
+      return g.append('circle').attr('cx', x).attr('cy', y).attr('r', r).attr('fill', halo).attr('stroke', it.color).attr('stroke-width', 1.4 * k);
+    }
+    return g.append('circle').attr('cx', x).attr('cy', y).attr('r', r).attr('fill', it.color).attr('stroke', halo).attr('stroke-width', 0.8 * k);
+  }
+  // Innretninger
+  const cls = it.p.cls;
+  if (cls === 'subsea') {
+    const s = 3 * k;
+    return g.append('path').attr('d', `M${x},${y - s}L${x + s},${y + s * 0.8}L${x - s},${y + s * 0.8}Z`).attr('fill', lighten(it.color, 0.35)).attr('stroke', halo).attr('stroke-width', 0.6 * k);
+  }
+  const s = (cls === 'onshore' ? 5 : 4) * k;
+  return g.append('rect').attr('x', x - s / 2).attr('y', y - s / 2).attr('width', s).attr('height', s)
+    .attr('fill', cls === 'onshore' ? halo : it.color).attr('stroke', cls === 'onshore' ? it.color : halo).attr('stroke-width', (cls === 'onshore' ? 1.6 : 0.8) * k);
+}
+
+// Etikettpunkt for polygon: tyngdepunktet til den største delen av polygonet.
+function polyLabelPoint(f) {
+  let geom = f.geometry;
+  if (geom.type === 'MultiPolygon') {
+    let best = null, ba = -1;
+    for (const c of geom.coordinates) { const g = { type: 'Polygon', coordinates: c }; const a = path.area(g); if (a > ba) { ba = a; best = g; } }
+    geom = best;
+  }
+  const c = path.centroid(geom);
+  if (!isFinite(c[0]) || c[0] < 0 || c[1] < 0 || c[0] > W() || c[1] > H()) return null;
+  return c;
+}
+
+function labelCandidate(key, it, [x, y], priority, anchor) {
+  const p = it.p, T = theme();
+  let text = p.name;
+  if (key === 'licences') text = 'PL ' + p.name;
+  if (S.labelShare && it.cm && it.cm.match && it.cm.share > 0) text += ` (${fmtShare(it.cm.share)})`;
+  const isField = key === 'producing' || key === 'approved';
+  return {
+    key: `${key}:${p.id}`, text, x, y, anchor,
+    size: S.labelSize * (isField ? 1 : key === 'wells' ? 0.82 : 0.9),
+    weight: isField ? 'bold' : 'normal', color: T.ink,
+    priority: priority + (it.other ? -5 : 0) + (it.cm && it.cm.match ? 3 : 0),
+  };
+}
+function fmtShare(v) { return (Math.round(v * 100) / 100).toLocaleString('no', { maximumFractionDigits: 2 }) + ' %'; }
+
+function placeLabels(cands, T, obstacles = []) {
+  const hidden = new Set(S.hidden);
+  const placed = [];
+  const boxes = [...obstacles];
+  const overlaps = b => boxes.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
+  // Flyttede etiketter først, deretter etter prioritet.
+  cands.forEach(c => { c.moved = !!S.offsets[c.key]; });
+  cands.sort((a, b) => (b.moved - a.moved) || (b.priority - a.priority));
+  for (const c of cands) {
+    if (hidden.has(c.key)) continue;
+    const tw = textWidth(c.text, c.size, c.weight);
+    const off = S.offsets[c.key] || [0, 0];
+    let tx, ty, ta;
+    if (c.anchor === 'right') { tx = c.x + 5 * S.symbolSize + 1; ty = c.y; ta = 'start'; }
+    else { tx = c.x; ty = c.y; ta = 'middle'; }
+    tx += off[0]; ty += off[1];
+    const x0 = ta === 'start' ? tx : tx - tw / 2;
+    const b = { x0: x0 - 2, x1: x0 + tw + 2, y0: ty - c.size * 0.6, y1: ty + c.size * 0.6 };
+    if (!c.moved && (b.x0 < 0 || b.x1 > W() || b.y0 < 0 || b.y1 > H())) continue;
+    if (!c.moved && (c.faint ? obstacles.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0) : (S.declutter ? overlaps(b) : false))) continue;
+    if (!S.declutter && !c.moved && !c.faint && obstacles.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0)) continue;
+    if (!c.faint) boxes.push(b);
+    placed.push({ ...c, tx, ty, ta, tw });
+  }
+  for (const c of placed) {
+    const grp = gLabels.append('g').attr('class', 'lab').attr('data-lk', c.key).datum(c);
+    const moved = S.offsets[c.key];
+    if (moved && Math.hypot(moved[0], moved[1]) > 14) {
+      // Ledelinje fra objektet til den flyttede etiketten.
+      const ex = c.ta === 'start' ? c.tx - 2 : c.tx, ey = c.ty;
+      grp.append('line').attr('x1', c.x).attr('y1', c.y).attr('x2', ex).attr('y2', ey).attr('stroke', c.color).attr('stroke-width', 0.7).attr('stroke-opacity', 0.8);
+    }
+    const attrs = t => t.attr('x', c.tx).attr('y', c.ty).attr('text-anchor', c.ta).attr('dy', (c.size * 0.35).toFixed(1))
+      .attr('font-family', FONT).attr('font-size', c.size.toFixed(1)).attr('font-weight', c.weight)
+      .attr('font-style', c.italic ? 'italic' : null).text(c.text);
+    if (!c.faint) {
+      // Glorie som eget tekstelement (i stedet for paint-order) slik at PowerPoint tolker SVG-en riktig.
+      attrs(grp.append('text')).attr('fill', 'none').attr('stroke', T.halo).attr('stroke-width', Math.max(2.4, c.size * 0.24)).attr('stroke-linejoin', 'round').attr('stroke-opacity', 0.9);
+    }
+    attrs(grp.append('text')).attr('fill', c.color).attr('fill-opacity', c.faint ? 0.55 : 1);
+  }
+}
+
+// ── Overlay: tittel, tegnforklaring, målestokk, nordpil, kilde ─────────────
+function drawOverlay(T) {
+  const w = W(), h = H(), g = gOverlay, m = 22;
+  const ink = T.ink, box = T.box;
+  let titleBottom = m;
+  if (S.title && (S.titleText || S.subtitleText)) {
+    const ts = Math.round(H() / 900 * 34);
+    let y = m + ts * 0.8;
+    if (S.titleText) { g.append('text').attr('x', m).attr('y', y).attr('font-family', FONT).attr('font-size', ts).attr('font-weight', 'bold').attr('fill', ink).text(S.titleText); y += ts * 0.95; }
+    if (S.subtitleText) { g.append('text').attr('x', m).attr('y', y).attr('font-family', FONT).attr('font-size', ts * 0.55).attr('fill', ink).attr('fill-opacity', 0.8).text(S.subtitleText); y += ts * 0.6; }
+    titleBottom = y + 6;
+  }
+  if (S.legend) drawLegend(g, T, titleBottom);
+
+  if (S.scale) drawScaleBar(g, T);
+  if (S.north) drawNorth(g, T);
+  if (S.source) {
+    const txt = `Kilde: Sokkeldirektoratet (NLOD)${META.updated ? ', data per ' + fmtDate(META.updated) : ''} · Natural Earth`;
+    g.append('text').attr('x', w - 8).attr('y', h - 7).attr('text-anchor', 'end').attr('font-family', FONT).attr('font-size', 12)
+      .attr('fill', ink).attr('fill-opacity', 0.65).text(txt);
+  }
+}
+function fmtDate(iso) { const [y, mo, d] = iso.split('-'); return `${d}.${mo}.${y}`; }
+
+function legendEntries() {
+  const E = [];
+  const sel = S.companies.length > 0;
+  const hcSeen = new Set();
+  for (const key of ['producing', 'approved', 'shutdown', 'discoveries', 'licences', 'pipelines', 'facilities', 'wells']) {
+    const L = LAYER[key], st = S.layers[key];
+    if (!st.on) continue;
+    // Bare det som faktisk er tegnet innenfor rammen.
+    const items = layerItems(L).filter(i => featIndex.has(`${key}:${i.p.id}`));
+    if (!items.length) continue;
+    const shown = items.filter(i => !i.other);
+    if (L.kind === 'poly') {
+      if (L.hc && S.colorByHC) {
+        // Én oppføring per hydrokarbontype for alle HC-fargede lag samlet.
+        shown.forEach(i => HC[i.p.hc] && hcSeen.add(i.p.hc));
+        if (E.hcSlot == null) { E.hcSlot = E.length; E.push(null); }
+        if (key === 'discoveries' && shown.length) E.push({ sym: 'none', note: true, label: 'Lys fyll = funn' });
+        if (key === 'approved' && shown.length) E.push({ sym: 'none', note: true, label: 'Stiplet kant = under utbygging' });
+      } else if (shown.length) {
+        E.push({ sym: 'poly', color: st.color, fo: st.fill, dash: st.dash || key === 'licences', label: L.legend });
+      }
+    } else if (key === 'pipelines') {
+      if (S.pipes.byMedium) {
+        for (const [m, v] of Object.entries(PIPE_MEDIUM)) if (items.some(i => i.p.medium === m)) E.push({ sym: 'line', color: v.color, label: `Rørledning – ${v.name.toLowerCase()}` });
+      } else E.push({ sym: 'line', color: st.color, label: 'Rørledning' });
+    } else if (key === 'facilities') {
+      if (S.fac.surface && items.some(i => i.p.cls === 'surface')) E.push({ sym: 'square', color: st.color, label: 'Innretning (overflate)' });
+      if (S.fac.subsea && items.some(i => i.p.cls === 'subsea')) E.push({ sym: 'tri', color: lighten(st.color, 0.35), label: 'Havbunnsinnretning' });
+      if (S.fac.onshore && items.some(i => i.p.cls === 'onshore')) E.push({ sym: 'squareo', color: st.color, label: 'Landanlegg' });
+    } else if (key === 'wells') {
+      const yr = S.wells.from === S.wells.to ? `${S.wells.from}` : `${S.wells.from}–${S.wells.to}`;
+      if (S.wells.colorByContent) {
+        for (const [c, v] of Object.entries(WELL_CLASSES)) if (items.some(i => wellClass(i.p.content) === c))
+          E.push({ sym: c === 'dry' || c === 'other' ? 'circleo' : 'circle', color: v.color, label: `Letebrønn – ${v.name.toLowerCase()}` });
+        E.push({ sym: 'none', label: `Brønner avsluttet ${yr}`, note: true });
+      } else E.push({ sym: 'circle', color: st.color, label: `Letebrønn (${yr})` });
+    }
+  }
+  if (E.hcSlot != null) {
+    const hcE = HC_ORDER.filter(t => hcSeen.has(t)).map(t => ({ sym: 'poly', color: HC[t].color, fo: 0.85, label: HC[t].name }));
+    E.splice(E.hcSlot, 1, ...hcE);
+  }
+  if (sel && S.splitRole) {
+    const nm = S.companies.map(shortName).join(', ');
+    E.push({ sym: 'poly', color: '#6c757d', fo: 0.85, label: `${nm} – operatør` });
+    E.push({ sym: 'poly', color: lighten('#6c757d', 0.55), stroke: '#6c757d', fo: 0.85, label: `${nm} – partner` });
+  }
+  if (sel && S.mode === 'highlight' && drewOther) E.push({ sym: 'poly', color: S.otherColor, fo: 0.5, label: 'Andre selskaper' });
+  return E;
+}
+
+function drawLegend(g, T, topY) {
+  const E = legendEntries();
+  if (!E.length) return;
+  const fs = 16, lh = 24, pad = 12, sw = 22;
+  let heading = S.companies.length ? S.companies.map(shortName).join(', ') : '';
+  if (heading && S.role === 'op') heading += ' (operatør)';
+  if (heading && S.role === 'partner') heading += ' (partner)';
+  const widths = E.map(e => textWidth(e.label, e.note ? fs * 0.9 : fs));
+  if (heading) widths.push(textWidth(heading, fs, 'bold'));
+  const bw = Math.max(...widths) + sw + pad * 2 + 8;
+  const bh = E.length * lh + pad * 2 + (heading ? lh + 2 : 0) - 4;
+  const m = 18;
+  const pos = S.legendPos;
+  let x = pos.includes('l') ? m : W() - bw - m;
+  let y = pos.includes('t') ? (pos === 'tl' ? Math.max(m, topY) : m) : H() - bh - m - (S.source ? 14 : 0);
+  if (pos === 'bl' && S.scale) y -= 44;
+  const lg = g.append('g').attr('transform', `translate(${x},${y})`).attr('class', 'legend');
+  lg.append('rect').attr('width', bw).attr('height', bh).attr('rx', 4).attr('fill', T.box).attr('fill-opacity', 0.9).attr('stroke', T.coast).attr('stroke-width', 0.6);
+  let cy = pad + lh / 2 - 2;
+  if (heading) { lg.append('text').attr('x', pad).attr('y', cy).attr('dy', fs * 0.35).attr('font-family', FONT).attr('font-size', fs).attr('font-weight', 'bold').attr('fill', T.ink).text(heading); cy += lh + 2; }
+  for (const e of E) {
+    const sx = pad, sy = cy;
+    const halo = T.halo;
+    if (e.sym === 'poly') lg.append('rect').attr('x', sx).attr('y', sy - 7).attr('width', sw).attr('height', 14).attr('rx', 2).attr('fill', e.color).attr('fill-opacity', Math.max(e.fo ?? 0.8, 0.35))
+      .attr('stroke', e.stroke || d3.color(e.color).darker(0.7).formatHex()).attr('stroke-width', 0.8).attr('stroke-dasharray', e.dash ? '3 2' : null);
+    else if (e.sym === 'line') lg.append('line').attr('x1', sx).attr('x2', sx + sw).attr('y1', sy).attr('y2', sy).attr('stroke', e.color).attr('stroke-width', 2.4).attr('stroke-linecap', 'round');
+    else if (e.sym === 'circle') lg.append('circle').attr('cx', sx + sw / 2).attr('cy', sy).attr('r', 5).attr('fill', e.color).attr('stroke', halo).attr('stroke-width', 0.8);
+    else if (e.sym === 'circleo') lg.append('circle').attr('cx', sx + sw / 2).attr('cy', sy).attr('r', 5).attr('fill', halo).attr('stroke', e.color).attr('stroke-width', 1.5);
+    else if (e.sym === 'square') lg.append('rect').attr('x', sx + sw / 2 - 4).attr('y', sy - 4).attr('width', 8).attr('height', 8).attr('fill', e.color);
+    else if (e.sym === 'squareo') lg.append('rect').attr('x', sx + sw / 2 - 4.5).attr('y', sy - 4.5).attr('width', 9).attr('height', 9).attr('fill', halo).attr('stroke', e.color).attr('stroke-width', 1.6);
+    else if (e.sym === 'tri') lg.append('path').attr('d', `M${sx + sw / 2},${sy - 4.5}L${sx + sw / 2 + 4.5},${sy + 3.6}L${sx + sw / 2 - 4.5},${sy + 3.6}Z`).attr('fill', e.color);
+    lg.append('text').attr('x', e.note ? sx : sx + sw + 8).attr('y', sy).attr('dy', (e.note ? fs * 0.9 : fs) * 0.35).attr('font-family', FONT)
+      .attr('font-size', e.note ? fs * 0.9 : fs).attr('font-style', e.note ? 'italic' : null).attr('fill', T.ink).attr('fill-opacity', e.note ? 0.75 : 1).text(e.label);
+    cy += lh;
+  }
+}
+
+function drawScaleBar(g, T) {
+  const kpp = kmPerPx();
+  const target = 160 * kpp;
+  const nice = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000];
+  const km = nice.reduce((best, n) => (Math.abs(n - target) < Math.abs(best - target) ? n : best), nice[0]);
+  const len = km / kpp;
+  const x = 26, y = H() - 34;
+  const sg = g.append('g').attr('transform', `translate(${x},${y})`);
+  sg.append('rect').attr('x', -8).attr('y', -22).attr('width', len + 16 + textWidth(' km', 13) + 4).attr('height', 36).attr('rx', 3).attr('fill', T.box).attr('fill-opacity', 0.75);
+  for (let i = 0; i < 4; i++) sg.append('rect').attr('x', len * i / 4).attr('y', 0).attr('width', len / 4).attr('height', 5)
+    .attr('fill', i % 2 ? T.box : T.ink).attr('stroke', T.ink).attr('stroke-width', 0.8);
+  [[0, '0'], [len / 2, `${km / 2}`], [len, `${km} km`]].forEach(([tx, t], i) => sg.append('text').attr('x', tx).attr('y', -5)
+    .attr('text-anchor', i === 2 ? 'start' : 'middle').attr('dx', i === 2 ? -6 : 0).attr('font-family', FONT).attr('font-size', 13).attr('fill', T.ink).text(t));
+}
+
+function drawNorth(g, T) {
+  // Retningen mot nord i kartets midtpunkt (varierer med projeksjonen).
+  const c = proj.invert([W() / 2, H() / 2]);
+  if (!c) return;
+  const p0 = proj(c), p1 = proj([c[0], Math.min(c[1] + 0.2, 89.9)]);
+  const ang = Math.atan2(p1[0] - p0[0], -(p1[1] - p0[1])) * 180 / Math.PI;
+  const s = 15;
+  const pos = S.legend && S.legendPos === 'br' ? [W() - 34, 40] : [W() - 34, H() - 62];
+  const ng = g.append('g').attr('transform', `translate(${pos[0]},${pos[1]}) rotate(${ang.toFixed(2)})`);
+  ng.append('path').attr('d', `M0,${-s}L${s * 0.45},${s * 0.55}L0,${s * 0.25}Z`).attr('fill', T.ink);
+  ng.append('path').attr('d', `M0,${-s}L${-s * 0.45},${s * 0.55}L0,${s * 0.25}Z`).attr('fill', T.box).attr('stroke', T.ink).attr('stroke-width', 0.8);
+  ng.append('text').attr('x', 0).attr('y', -s - 6).attr('text-anchor', 'middle').attr('font-family', FONT).attr('font-size', 12).attr('font-weight', 'bold').attr('fill', T.ink).text('N');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Interaksjon: zoom, etiketter, verktøytips
+// ════════════════════════════════════════════════════════════════════════════
+let zoomBehavior = null, resetting = false;
+function initZoom() {
+  zoomBehavior = d3.zoom().scaleExtent([1 / 64, 64])
+    .filter(ev => !ev.target.closest('.lab') && (!ev.ctrlKey || ev.type === 'wheel') && !ev.button)
+    .on('zoom', ev => {
+      if (resetting) return;
+      const t = ev.transform;
+      gMap.attr('transform', t);
+      gLabels.attr('transform', t);
+      gOverlay.attr('opacity', 0.35);
+      hideTip();
+    })
+    .on('end', ev => {
+      if (resetting) return;
+      const t = ev.transform;
+      if (t.k === 1 && t.x === 0 && t.y === 0) return;
+      // Bak inn transformasjonen i projeksjonen og tegn kartet skarpt på nytt.
+      const center = proj.invert([(W() / 2 - t.x) / t.k, (H() / 2 - t.y) / t.k]);
+      S.view = { center: center.map(v => +v.toFixed(5)), scale: S.view.scale * t.k };
+      resetting = true; svg.call(zoomBehavior.transform, d3.zoomIdentity); resetting = false;
+      setupProjection(); render();
+    });
+  svg.call(zoomBehavior).on('dblclick.zoom', null);
+}
+function zoomBy(f) {
+  S.view.scale *= f; setupProjection(); render();
+}
+
+function attachInteractions() {
+  gLabels.selectAll('.lab').call(d3.drag()
+    .on('start', function () { d3.select(this).raise(); })
+    .on('drag', function (ev) {
+      const c = d3.select(this).datum();
+      c._dx = (c._dx || 0) + ev.dx; c._dy = (c._dy || 0) + ev.dy;
+      d3.select(this).attr('transform', `translate(${c._dx},${c._dy})`);
+    })
+    .on('end', function () {
+      const c = d3.select(this).datum();
+      if (!c._dx && !c._dy) return;
+      const o = S.offsets[c.key] || [0, 0];
+      S.offsets[c.key] = [Math.round(o[0] + c._dx), Math.round(o[1] + c._dy)];
+      render();
+    }))
+    .on('dblclick', function (ev) {
+      ev.stopPropagation();
+      const c = d3.select(this).datum();
+      if (!S.hidden.includes(c.key)) S.hidden.push(c.key);
+      render();
+    });
+}
+
+const tip = document.getElementById('tip');
+function hideTip() { tip.style.display = 'none'; }
+svg.on('mousemove', ev => {
+  const el = ev.target.closest && ev.target.closest('[data-k]');
+  if (!el || ev.buttons) return hideTip();
+  const info = featIndex.get(el.getAttribute('data-k'));
+  if (!info) return hideTip();
+  tip.innerHTML = tipHtml(info.L, info.p);
+  tip.style.display = 'block';
+  const x = Math.min(ev.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
+  const y = Math.min(ev.clientY + 14, window.innerHeight - tip.offsetHeight - 8);
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}).on('mouseleave', hideTip);
+
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function tipHtml(L, p) {
+  const rows = [];
+  const add = (k, v) => v != null && v !== '' && rows.push(`<div><span class="m">${k}:</span> ${esc(v)}</div>`);
+  let title = p.name;
+  if (L.key === 'licences') title = 'PL ' + p.name;
+  if (L.src === 'fields') { add('Status', FLD_STATUS[p.status]); add('Type', HC[p.hc]?.name); add('Funnår', p.year); }
+  if (L.key === 'discoveries') { add('Status', DSC_STATUS[p.status]); add('Type', HC[p.hc]?.name); add('Funnår', p.year); }
+  if (L.key === 'wells') { add('Formål', p.purpose === 'WILDCAT' ? 'Undersøkelse' : p.purpose === 'APPRAISAL' ? 'Avgrensning' : p.purpose); add('Resultat', WELL_CLASSES[wellClass(p.content)].name); add('År', p.year); add('Funn', p.dsc); }
+  if (L.key === 'pipelines') { add('Medium', PIPE_MEDIUM[p.medium]?.name || p.medium); add('Dimensjon', p.dim ? p.dim + '"' : null); add('Fra – til', p.from && p.to ? `${p.from} – ${p.to}` : null); }
+  if (L.key === 'facilities') { add('Type', p.kind); add('Tilhører', p.field); }
+  add('Operatør', p.op);
+  let lic = '';
+  if (p.lic && p.lic.length) {
+    const sel = new Set(S.companies);
+    lic = '<div style="margin-top:4px">' + p.lic.slice(0, 8).map(l => `<div${sel.has(l[0]) ? ' style="color:#ffd43b"' : ''}>${esc(shortName(l[0]))} <span class="m">${fmtShare(l[1])}</span></div>`).join('') + (p.lic.length > 8 ? `<div class="m">+ ${p.lic.length - 8} til</div>` : '') + '</div>';
+  }
+  return `<b>${esc(title)}</b>${rows.join('')}${lic}`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Eksport
+// ════════════════════════════════════════════════════════════════════════════
+function exportSvgString() {
+  const node = document.getElementById('map').cloneNode(true);
+  node.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  node.setAttribute('width', W());
+  node.setAttribute('height', H());
+  node.removeAttribute('id'); node.removeAttribute('style');
+  node.querySelectorAll('[data-k],[data-lk],[data-layer],[class]').forEach(el => {
+    el.removeAttribute('data-k'); el.removeAttribute('data-lk'); el.removeAttribute('data-layer'); el.removeAttribute('class');
+  });
+  node.querySelectorAll('[transform]').forEach(el => { if (el.id === 'gmap' || el.id === 'glabels') el.removeAttribute('transform'); });
+  node.querySelectorAll('#goverlay').forEach(el => el.removeAttribute('opacity'));
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(node);
+}
+
+function renderPng() {
+  return new Promise((resolve, reject) => {
+    const px = +document.getElementById('res').value;
+    const scale = px / W();
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(W() * scale); canvas.height = Math.round(H() * scale);
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    const url = URL.createObjectURL(new Blob([exportSvgString()], { type: 'image/svg+xml;charset=utf-8' }));
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(b => (b ? resolve(b) : reject(new Error('Kunne ikke lage PNG'))), 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Kunne ikke tegne SVG')); };
+    img.src = url;
+  });
+}
+
+function fileBase() {
+  const slug = (S.titleText || 'kart').toLowerCase().replace(/[æ]/g, 'ae').replace(/[ø]/g, 'o').replace(/[å]/g, 'a')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'kart';
+  const d = new Date(), z = n => String(n).padStart(2, '0');
+  return `${slug}-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`;
+}
+function download(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+document.getElementById('btnPng').onclick = async () => {
+  try { download(await renderPng(), fileBase() + '.png'); } catch (e) { toast(e.message); }
+};
+document.getElementById('btnSvg').onclick = () => {
+  download(new Blob([exportSvgString()], { type: 'image/svg+xml;charset=utf-8' }), fileBase() + '.svg');
+};
+document.getElementById('btnCopy').onclick = async () => {
+  if (!navigator.clipboard || !window.ClipboardItem) { toast('Nettleseren støtter ikke kopiering av bilder – bruk PNG-knappen'); return; }
+  try {
+    // Promise sendes direkte til ClipboardItem slik at Safari godtar det.
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': renderPng() })]);
+    toast('Kartet er kopiert – lim inn i PowerPoint med Ctrl+V');
+  } catch (e) { toast('Kopiering feilet: ' + e.message); }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// Kontrollpanel
+// ════════════════════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+function bindCheck(id, get, set) { const el = $(id); el.checked = get(); el.onchange = () => { set(el.checked); render(); }; }
+function bindValue(id, get, set, ev = 'change') { const el = $(id); el.value = get(); el.addEventListener(ev, () => { set(el.value); render(); }); }
+
+function buildLayerList() {
+  const box = $('layerList');
+  box.innerHTML = '';
+  const order = ['producing', 'approved', 'shutdown', 'discoveries', 'licences', 'pipelines', 'facilities', 'wells'];
+  for (const key of order) {
+    const L = LAYER[key], st = S.layers[key];
+    const row = document.createElement('div');
+    row.className = 'lyr';
+    row.innerHTML = `<input type="checkbox" ${st.on ? 'checked' : ''} id="ly_${key}"><label class="name" for="ly_${key}">${L.name}</label>
+      <input type="color" value="${st.color}" title="Farge">
+      <label class="lbl" title="Vis etiketter"><input type="checkbox" ${st.labels ? 'checked' : ''}>Aa</label>`;
+    const [cb, col, lbl] = row.querySelectorAll('input');
+    cb.onchange = () => { st.on = cb.checked; buildLayerList(); render(); };
+    col.oninput = () => { st.color = col.value; render(); };
+    lbl.onchange = () => { st.labels = lbl.checked; render(); };
+    box.appendChild(row);
+    if (!st.on) continue;
+    const sub = document.createElement('div');
+    sub.className = 'sub';
+    if (key === 'producing') {
+      sub.innerHTML = `<label class="row"><input type="checkbox" id="o_hc" ${S.colorByHC ? 'checked' : ''}> Farge etter hydrokarbontype (felt og funn)</label>`;
+      sub.querySelector('#o_hc').onchange = e => { S.colorByHC = e.target.checked; render(); };
+    }
+    if (key === 'discoveries') {
+      sub.innerHTML = Object.entries(DSC_STATUS).map(([k, v]) => `<label class="row"><input type="checkbox" data-s="${esc(k)}" ${S.dscStatus.includes(k) ? 'checked' : ''}> ${v}</label>`).join('');
+      sub.querySelectorAll('input').forEach(i => i.onchange = () => {
+        S.dscStatus = [...sub.querySelectorAll('input:checked')].map(x => x.dataset.s); render();
+      });
+    }
+    if (key === 'pipelines') {
+      sub.innerHTML = `<label class="row"><input type="checkbox" id="o_pm" ${S.pipes.byMedium ? 'checked' : ''}> Farge etter medium (gass/olje/kondensat)</label>
+        <label class="row"><input type="checkbox" id="o_pd" ${S.pipes.byDim ? 'checked' : ''}> Linjetykkelse etter dimensjon</label>`;
+      sub.querySelector('#o_pm').onchange = e => { S.pipes.byMedium = e.target.checked; render(); };
+      sub.querySelector('#o_pd').onchange = e => { S.pipes.byDim = e.target.checked; render(); };
+    }
+    if (key === 'facilities') {
+      sub.innerHTML = [['surface', 'Overflateinnretninger'], ['subsea', 'Havbunnsinnretninger'], ['onshore', 'Landanlegg']]
+        .map(([k, v]) => `<label class="row"><input type="checkbox" data-c="${k}" ${S.fac[k] ? 'checked' : ''}> ${v}</label>`).join('');
+      sub.querySelectorAll('input').forEach(i => i.onchange = () => { S.fac[i.dataset.c] = i.checked; render(); });
+    }
+    if (key === 'wells') {
+      const w = S.wells;
+      sub.innerHTML = `<div class="row"><label><input type="checkbox" id="o_wc" ${w.wildcat ? 'checked' : ''}> Undersøkelse</label>
+          <label><input type="checkbox" id="o_wa" ${w.appraisal ? 'checked' : ''}> Avgrensning</label></div>
+        <div class="row">År <input type="number" id="o_wf" value="${w.from}" min="1966" max="${CURRENT_YEAR}"> – <input type="number" id="o_wt" value="${w.to}" min="1966" max="${CURRENT_YEAR}"></div>
+        <label class="row"><input type="checkbox" id="o_wcc" ${w.colorByContent ? 'checked' : ''}> Farge etter resultat</label>
+        ${Object.entries(WELL_CLASSES).map(([k, v]) => `<label class="row"><input type="checkbox" data-w="${k}" ${w.classes.includes(k) ? 'checked' : ''}> <span style="color:${v.color}">●</span> ${v.name}</label>`).join('')}`;
+      sub.querySelector('#o_wc').onchange = e => { w.wildcat = e.target.checked; render(); };
+      sub.querySelector('#o_wa').onchange = e => { w.appraisal = e.target.checked; render(); };
+      sub.querySelector('#o_wf').onchange = e => { w.from = +e.target.value || 1966; render(); };
+      sub.querySelector('#o_wt').onchange = e => { w.to = +e.target.value || CURRENT_YEAR; render(); };
+      sub.querySelector('#o_wcc').onchange = e => { w.colorByContent = e.target.checked; render(); };
+      sub.querySelectorAll('[data-w]').forEach(i => i.onchange = () => {
+        w.classes = [...sub.querySelectorAll('[data-w]:checked')].map(x => x.dataset.w); render();
+      });
+    }
+    if (sub.innerHTML) box.appendChild(sub);
+  }
+}
+
+function buildCompanyUI() {
+  const list = $('compList'), q = $('compSearch').value.trim().toLowerCase();
+  list.innerHTML = '';
+  const sel = new Set(S.companies);
+  COMPANIES.filter(c => !q || c.name.toLowerCase().includes(q)).forEach(c => {
+    const l = document.createElement('label');
+    l.innerHTML = `<input type="checkbox" ${sel.has(c.name) ? 'checked' : ''}><span>${esc(c.name)}</span><span class="cnt">${c.n}</span>`;
+    l.querySelector('input').onchange = e => {
+      if (e.target.checked) S.companies.push(c.name); else S.companies = S.companies.filter(n => n !== c.name);
+      buildCompanyChips(); render();
+    };
+    list.appendChild(l);
+  });
+  buildCompanyChips();
+}
+function buildCompanyChips() {
+  const box = $('compChips');
+  box.innerHTML = '';
+  S.companies.forEach(n => {
+    const c = document.createElement('span');
+    c.className = 'chip';
+    c.innerHTML = `${esc(shortName(n))}<button title="Fjern">×</button>`;
+    c.querySelector('button').onclick = () => { S.companies = S.companies.filter(x => x !== n); buildCompanyUI(); render(); };
+    box.appendChild(c);
+  });
+  if (S.companies.length) {
+    const b = document.createElement('button'); b.className = 'small'; b.textContent = 'Fjern alle';
+    b.onclick = () => { S.companies = []; buildCompanyUI(); render(); };
+    box.appendChild(b);
+  }
+}
+function bindSeg(id, get, set) {
+  const el = $(id);
+  const sync = () => el.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === get()));
+  el.querySelectorAll('button').forEach(b => b.onclick = () => { set(b.dataset.v); sync(); render(); });
+  sync();
+}
+
+function layoutFrame() {
+  const stage = $('stage'), frame = $('frame');
+  const pad = window.innerWidth <= 800 ? 16 : 36;
+  const aw = stage.clientWidth - pad, ah = stage.clientHeight - pad;
+  const s = Math.min(aw / W(), ah / H());
+  frame.style.width = Math.floor(W() * s) + 'px';
+  frame.style.height = Math.floor(H() * s) + 'px';
+}
+
+function setSize(w, h) {
+  const oldH = H();
+  S.size = [w, h];
+  // Behold utsnittets høyde i kart-enheter når formatet endres.
+  if (S.view) S.view.scale *= h / oldH;
+  layoutFrame(); setupProjection(); render();
+}
+
+function syncFormatUI() {
+  const v = S.size.join('x');
+  const opt = [...$('format').options].find(o => o.value === v);
+  $('format').value = opt ? v : 'custom';
+  $('customsize').style.display = opt ? 'none' : '';
+  $('cw').value = S.size[0]; $('ch').value = S.size[1];
+}
+
+function syncAllControls() {
+  syncFormatUI();
+  $('proj').value = S.proj;
+  bindCheck('splitRole', () => S.splitRole, v => S.splitRole = v);
+  bindCheck('labelsOnlySel', () => S.labelsOnlySel, v => S.labelsOnlySel = v);
+  bindCheck('labelShare', () => S.labelShare, v => S.labelShare = v);
+  bindValue('otherColor', () => S.otherColor, v => S.otherColor = v, 'input');
+  bindSeg('segRole', () => S.role, v => S.role = v);
+  bindSeg('segMode', () => S.mode, v => S.mode = v);
+  $('theme').value = S.theme;
+  bindValue('seaColor', () => S.sea, v => S.sea = v, 'input');
+  bindValue('landColor', () => S.land, v => S.land = v, 'input');
+  bindCheck('transparent', () => S.transparent, v => S.transparent = v);
+  bindCheck('showDepth', () => S.depth, v => S.depth = v);
+  bindCheck('showBorders', () => S.borders, v => S.borders = v);
+  bindCheck('showCities', () => S.cities, v => S.cities = v);
+  bindCheck('showQuads', () => S.quads, v => S.quads = v);
+  bindCheck('showBlocks', () => S.blocks, v => S.blocks = v);
+  bindCheck('showTitle', () => S.title, v => S.title = v);
+  bindValue('titleText', () => S.titleText, v => { S.titleText = v; if (v) { S.title = true; $('showTitle').checked = true; } }, 'input');
+  bindValue('subtitleText', () => S.subtitleText, v => { S.subtitleText = v; if (v) { S.title = true; $('showTitle').checked = true; } }, 'input');
+  bindCheck('showLegend', () => S.legend, v => S.legend = v);
+  bindValue('legendPos', () => S.legendPos, v => S.legendPos = v);
+  bindCheck('showScale', () => S.scale, v => S.scale = v);
+  bindCheck('showNorth', () => S.north, v => S.north = v);
+  bindCheck('showSource', () => S.source, v => S.source = v);
+  bindCheck('declutter', () => S.declutter, v => S.declutter = v);
+  bindValue('labelSize', () => S.labelSize, v => { S.labelSize = +v; $('labelSizeVal').textContent = v; }, 'input');
+  bindValue('symbolSize', () => S.symbolSize, v => { S.symbolSize = +v; $('symbolSizeVal').textContent = (+v).toFixed(1); }, 'input');
+  $('labelSizeVal').textContent = S.labelSize;
+  $('symbolSizeVal').textContent = (+S.symbolSize).toFixed(1);
+  buildLayerList();
+  buildCompanyUI();
+}
+
+function initStaticControls() {
+  $('format').onchange = () => {
+    const v = $('format').value;
+    if (v === 'custom') { $('customsize').style.display = ''; return; }
+    $('customsize').style.display = 'none';
+    const [w, h] = v.split('x').map(Number); setSize(w, h);
+  };
+  const custom = () => {
+    const w = Math.max(200, Math.min(4000, +$('cw').value || 1600)), h = Math.max(200, Math.min(4000, +$('ch').value || 900));
+    setSize(w, h);
+  };
+  $('cw').onchange = custom; $('ch').onchange = custom;
+
+  $('proj').onchange = () => {
+    // Behold midtpunkt og målestokk (km per piksel i midten) når projeksjonen byttes.
+    const before = kmPerPx();
+    S.proj = $('proj').value;
+    if (S.proj === 'auto') S.cm = +S.view.center[0].toFixed(2);
+    setupProjection();
+    S.view.scale *= kmPerPx() / before;
+    setupProjection(); render();
+  };
+  const vp = $('viewPresets');
+  VIEW_PRESETS.forEach(p => {
+    const b = document.createElement('button'); b.className = 'small'; b.textContent = p.name;
+    b.onclick = () => {
+      if (p.proj && S.proj === 'auto') { S.proj = p.proj; $('proj').value = p.proj; }
+      else if (!p.proj && S.proj === 'lcc') { S.proj = 'auto'; $('proj').value = 'auto'; }
+      fitBounds(p.bounds);
+    };
+    vp.appendChild(b);
+  });
+  $('btnFit').onclick = fitToSelection;
+  $('zin').onclick = () => zoomBy(1.5);
+  $('zout').onclick = () => zoomBy(1 / 1.5);
+
+  $('compSearch').oninput = buildCompanyUI;
+  $('theme').onchange = () => {
+    S.theme = $('theme').value;
+    const T = THEMES[S.theme];
+    S.sea = T.sea; S.land = T.land; S.otherColor = T.other;
+    $('seaColor').value = S.sea; $('landColor').value = S.land; $('otherColor').value = S.otherColor; render();
+  };
+  $('btnResetLabels').onclick = () => { S.offsets = {}; S.hidden = []; render(); };
+
+  $('btnLink').onclick = async () => {
+    history.replaceState(null, '', '#s=' + encodeState(S));
+    try { await navigator.clipboard.writeText(location.href); toast('Lenken er kopiert'); } catch { toast('Kunne ikke kopiere lenken'); }
+  };
+  $('btnSavePreset').onclick = () => {
+    const name = $('presetName').value.trim();
+    if (!name) { toast('Gi malen et navn først'); return; }
+    const all = loadPresets(); all[name] = S; savePresets(all);
+    $('presetName').value = ''; buildPresetList(); toast(`Malen «${name}» er lagret`);
+  };
+  $('btnReset').onclick = () => {
+    if (!confirm('Tilbakestille alle innstillinger?')) return;
+    S = defaultState(); applyState();
+  };
+  window.addEventListener('resize', layoutFrame);
+}
+
+function fitToSelection() {
+  // Med valgt selskap: zoom til selskapets felt/funn/lisenser. Ellers: alt som er synlig.
+  const sel = S.companies.length > 0;
+  const feats = [];
+  for (const L of LAYERS) {
+    if (!S.layers[L.key].on || (sel && !L.company)) continue;
+    for (const it of layerItems(L)) if (!sel || (it.cm && it.cm.match)) feats.push(it.f);
+  }
+  if (!feats.length) { toast('Ingenting å zoome til'); return; }
+  const fc = { type: 'FeatureCollection', features: feats };
+  if (S.proj === 'auto') S.cm = +d3.geoCentroid(fc)[0].toFixed(2);
+  fitGeo(fc, 0.07);
+  setupProjection(); render();
+}
+
+function loadPresets() { try { return JSON.parse(localStorage.getItem('pptkart.maler') || '{}'); } catch { return {}; } }
+function savePresets(all) { try { localStorage.setItem('pptkart.maler', JSON.stringify(all)); } catch { toast('Kunne ikke lagre i nettleseren'); } }
+function buildPresetList() {
+  const box = $('presetList'), all = loadPresets();
+  box.innerHTML = '';
+  Object.keys(all).sort((a, b) => a.localeCompare(b, 'no')).forEach(name => {
+    const r = document.createElement('div'); r.className = 'row';
+    r.innerHTML = `<button class="grow small" style="text-align:left">${esc(name)}</button><button class="small" title="Slett">×</button>`;
+    const [load, del] = r.querySelectorAll('button');
+    load.onclick = () => { S = mergeState(defaultState(), JSON.parse(JSON.stringify(all[name]))); applyState(); toast(`Lastet «${name}»`); };
+    del.onclick = () => { if (confirm(`Slette malen «${name}»?`)) { delete all[name]; savePresets(all); buildPresetList(); } };
+    box.appendChild(r);
+  });
+}
+
+function applyState() {
+  syncAllControls();
+  layoutFrame(); setupProjection(); render();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Oppstart
+// ════════════════════════════════════════════════════════════════════════════
+(async function main() {
+  const m = location.hash.match(/s=([^&]+)/);
+  if (m) { try { S = mergeState(defaultState(), decodeState(m[1])); } catch (e) { console.warn('Ugyldig lenke', e); } }
+  initStaticControls();
+  syncAllControls();
+  buildPresetList();
+  layoutFrame();
+  try {
+    await loadData();
+  } catch (e) {
+    $('loading').textContent = 'Kunne ikke laste kartdata: ' + e.message;
+    return;
+  }
+  $('loading').remove();
+  $('status').textContent = META.updated ? `Data fra Sodir per ${fmtDate(META.updated)}` : '';
+  buildCompanyUI();
+  setupProjection();
+  render();
+  initZoom();
+})();
+</script>
+</body>
+</html>
