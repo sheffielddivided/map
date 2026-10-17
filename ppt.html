@@ -220,9 +220,16 @@
         <div class="row"><span class="grow">Land</span><input type="color" id="landColor" /></div>
         <label class="row"><input type="checkbox" id="transparent" /> Transparent bakgrunn (ingen havfarge)</label>
         <label class="row"><input type="checkbox" id="showDepth" /> Dybdekurver (200, 1000, 2000, 3000 m)</label>
-        <label class="row"><input type="checkbox" id="showBorders" /> Landegrenser</label>
+        <label class="row"><input type="checkbox" id="showBorders" /> Landegrenser
+          <select id="borderMode" style="margin-left:auto">
+            <option value="all">Alle land</option><option value="some">Utvalgte land</option>
+          </select>
+        </label>
+        <div class="sub" id="borderList"></div>
         <label class="row"><input type="checkbox" id="showCities" /> Byer og steder</label>
-        <label class="row"><input type="checkbox" id="showQuads" /> Kvadranter (med nummer)</label>
+        <label class="row"><input type="checkbox" id="showQuads" /> Kvadranter
+          <label class="lbl" style="margin-left:auto" title="Vis kvadrantnummer"><input type="checkbox" id="showQuadLabels" /> Nummer</label>
+        </label>
         <label class="row"><input type="checkbox" id="showBlocks" /> Blokker</label>
       </div>
     </details>
@@ -282,6 +289,13 @@ const DATA_FILES = ['fields', 'discoveries', 'licences', 'pipelines', 'facilitie
 // Store lag som lastes først når de slås på.
 const LAZY_FILES = ['wells', 'blocks'];
 const SECTORS = { no: 'Norge', uk: 'Storbritannia', dk: 'Danmark' };
+// Land med landegrenser innenfor bakgrunnskartet (ISO 3166-1 alfa-3, som i Natural Earth).
+const COUNTRIES = {
+  NOR: 'Norge', SWE: 'Sverige', FIN: 'Finland', RUS: 'Russland', DNK: 'Danmark', DEU: 'Tyskland', NLD: 'Nederland',
+  BEL: 'Belgia', LUX: 'Luxembourg', FRA: 'Frankrike', GBR: 'Storbritannia', IRL: 'Irland', POL: 'Polen', EST: 'Estland',
+  LVA: 'Latvia', LTU: 'Litauen', BLR: 'Belarus', UKR: 'Ukraina', CZE: 'Tsjekkia', SVK: 'Slovakia', AUT: 'Østerrike',
+  HUN: 'Ungarn', ROU: 'Romania', MDA: 'Moldova', KAZ: 'Kasakhstan',
+};
 
 const THEMES = {
   light: { sea: '#e8f0f6', land: '#f4f2ee', coast: '#b9c2cb', depth: '#d6e3ee', border: '#a9b0b8', ink: '#2b3440', halo: '#ffffff', grid: '#8a9bb0', box: '#ffffff', other: '#c3c8cf' },
@@ -418,7 +432,7 @@ const EN = {
   'Bakgrunnskart': 'Basemap', 'Tema': 'Theme', 'Lys': 'Light', 'Grå / nøytral': 'Grey / neutral', 'Mørk': 'Dark', 'Blå hav': 'Blue sea',
   'Hav': 'Sea', 'Land': 'Land', 'Transparent bakgrunn (ingen havfarge)': 'Transparent background (no sea colour)',
   'Dybdekurver (200, 1000, 2000, 3000 m)': 'Depth contours (200, 1000, 2000, 3000 m)', 'Landegrenser': 'Country borders',
-  'Byer og steder': 'Cities and places', 'Kvadranter (med nummer)': 'Quadrants (numbered)', 'Blokker': 'Blocks',
+  'Byer og steder': 'Cities and places', 'Kvadranter': 'Quadrants', 'Nummer': 'Numbers', 'Vis kvadrantnummer': 'Show quadrant numbers', 'Blokker': 'Blocks',
   // Tittel og tekst
   'Tittel, tegnforklaring og tekst': 'Title, legend and text', 'Tittel': 'Title', 'Undertittel (valgfritt)': 'Subtitle (optional)',
   'Tegnforklaring': 'Legend', 'Øverst venstre': 'Top left', 'Øverst høyre': 'Top right', 'Nederst venstre': 'Bottom left', 'Nederst høyre': 'Bottom right',
@@ -439,6 +453,11 @@ const EN = {
   'Lenken er kopiert': 'Link copied', 'Kunne ikke kopiere lenken': 'Could not copy the link', 'Gi malen et navn først': 'Give the template a name first',
   'Malen «{0}» er lagret': 'Template “{0}” saved', 'Tilbakestille alle innstillinger?': 'Reset all settings?', 'Ingenting å zoome til': 'Nothing to zoom to',
   'Kunne ikke lagre i nettleseren': 'Could not save in this browser',
+  'Alle land': 'All countries', 'Utvalgte land': 'Selected countries', 'Sverige': 'Sweden', 'Finland': 'Finland',
+  'Russland': 'Russia', 'Tyskland': 'Germany', 'Nederland': 'Netherlands', 'Belgia': 'Belgium', 'Luxembourg': 'Luxembourg',
+  'Frankrike': 'France', 'Irland': 'Ireland', 'Polen': 'Poland', 'Estland': 'Estonia', 'Latvia': 'Latvia', 'Litauen': 'Lithuania',
+  'Belarus': 'Belarus', 'Ukraina': 'Ukraine', 'Tsjekkia': 'Czechia', 'Slovakia': 'Slovakia', 'Østerrike': 'Austria',
+  'Ungarn': 'Hungary', 'Romania': 'Romania', 'Moldova': 'Moldova', 'Kasakhstan': 'Kazakhstan',
   'Sektorer': 'Sectors', 'Norge': 'Norway', 'Storbritannia': 'United Kingdom', 'Danmark': 'Denmark', 'Sektorgrenser': 'Sector boundaries',
   'Danske data har ikke funn, felt mangler hydrokarbontype, og brønnene går til 2019.': 'Danish data has no discoveries, fields lack hydrocarbon type, and wells end in 2019.',
   'Hele Nordsjøen': 'Entire North Sea', 'Sentrale Nordsjø': 'Central North Sea', 'Vest for Shetland': 'West of Shetland',
@@ -500,7 +519,7 @@ function defaultState() {
     fac: { surface: true, subsea: false, onshore: true },
     companies: [], role: 'any', mode: 'highlight', splitRole: false, labelsOnlySel: true, labelShare: false, otherColor: '#c3c8cf',
     theme: 'light', sea: THEMES.light.sea, land: THEMES.light.land, transparent: false,
-    depth: true, borders: true, cities: true, quads: false, blocks: false,
+    depth: true, borders: true, borderMode: 'all', borderCountries: ['NOR'], cities: true, quads: false, quadLabels: true, blocks: false,
     title: false, titleText: '', subtitleText: '',
     legend: true, legendPos: 'tr', scale: true, north: true, source: true,
     labelSize: 16, symbolSize: 1.2, declutter: true,
@@ -606,6 +625,23 @@ function ensureLazy(name) {
   return lazyPromises[name];
 }
 const inSector = f => S.sectors[f.properties.cc || 'no'] !== false;
+// Med «Utvalgte land» vises bare grenselinjer der minst ett av landene på hver side er valgt.
+function bordersToDraw() {
+  if (S.borderMode !== 'some') return BASE.borders;
+  const sel = new Set(S.borderCountries);
+  return { type: 'FeatureCollection', features: BASE.borders.features.filter(f => sel.has(f.properties.l) || sel.has(f.properties.r)) };
+}
+function buildBorderList() {
+  const box = $('borderList');
+  box.style.display = S.borders && S.borderMode === 'some' ? '' : 'none';
+  if (box.style.display === 'none') return;
+  const present = BASE ? new Set(BASE.borders.features.flatMap(f => [f.properties.l, f.properties.r])) : new Set(Object.keys(COUNTRIES));
+  const codes = Object.keys(COUNTRIES).filter(c => present.has(c)).sort((a, b) => t(COUNTRIES[a]).localeCompare(t(COUNTRIES[b]), LOCALE()));
+  box.innerHTML = codes.map(c => `<label class="row"><input type="checkbox" data-c="${c}" ${S.borderCountries.includes(c) ? 'checked' : ''}> ${t(COUNTRIES[c])}</label>`).join('');
+  box.querySelectorAll('input').forEach(i => i.onchange = () => {
+    S.borderCountries = [...box.querySelectorAll('input:checked')].map(x => x.dataset.c); render();
+  });
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // Selskap
@@ -894,7 +930,7 @@ function render() {
     });
   }
   g.append('path').attr('d', path(BASE.land)).attr('fill', S.land).attr('stroke', T.coast).attr('stroke-width', 0.6).attr('stroke-linejoin', 'round');
-  if (S.borders) g.append('path').attr('d', path(BASE.borders)).attr('fill', 'none').attr('stroke', T.border).attr('stroke-width', 0.8).attr('stroke-dasharray', '3 2');
+  if (S.borders) g.append('path').attr('d', path(bordersToDraw())).attr('fill', 'none').attr('stroke', T.border).attr('stroke-width', 0.8).attr('stroke-dasharray', '3 2');
 
   if (S.blocks) {
     if (D.blocks) g.append('path').attr('d', path({ type: 'FeatureCollection', features: D.blocks.features.filter(inSector) }))
@@ -1009,7 +1045,7 @@ function render() {
     }
   }
 
-  if (S.quads) {
+  if (S.quads && S.quadLabels) {
     for (const f of D.quadrants.features.filter(inSector)) {
       const c = path.centroid(f);
       if (!isFinite(c[0]) || c[0] < 0 || c[1] < 0 || c[0] > w || c[1] > h) continue;
@@ -1584,9 +1620,12 @@ function syncAllControls() {
   bindValue('landColor', () => S.land, v => S.land = v, 'input');
   bindCheck('transparent', () => S.transparent, v => S.transparent = v);
   bindCheck('showDepth', () => S.depth, v => S.depth = v);
-  bindCheck('showBorders', () => S.borders, v => S.borders = v);
+  bindCheck('showBorders', () => S.borders, v => { S.borders = v; buildBorderList(); });
+  bindValue('borderMode', () => S.borderMode, v => { S.borderMode = v; buildBorderList(); });
+  buildBorderList();
   bindCheck('showCities', () => S.cities, v => S.cities = v);
   bindCheck('showQuads', () => S.quads, v => S.quads = v);
+  bindCheck('showQuadLabels', () => S.quadLabels, v => S.quadLabels = v);
   bindCheck('showBlocks', () => S.blocks, v => S.blocks = v);
   bindCheck('showTitle', () => S.title, v => S.title = v);
   bindValue('titleText', () => S.titleText, v => { S.titleText = v; if (v) { S.title = true; $('showTitle').checked = true; } }, 'input');
@@ -1708,6 +1747,7 @@ function applyLanguage() {
   $('lang').value = S.lang;
   applyStaticText();
   buildPresetButtons();
+  buildBorderList();
   buildLayerList();
   buildCompanyUI();
   buildPresetList();
@@ -1769,6 +1809,7 @@ function applyState() {
   }
   $('loading').remove();
   updateStatus();
+  buildBorderList();
   buildCompanyUI();
   setupProjection();
   render();
