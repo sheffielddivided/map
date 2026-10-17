@@ -275,7 +275,9 @@
             <option value="scandinavia">Skandinavia</option><option value="europe">Nord-Europa</option></select></div>
           <div class="row">Markering <select id="insetMarker" class="grow">
             <option value="rect">Utsnittets omriss</option><option value="circle">Sirkel</option></select></div>
-          <div class="row"><span class="grow">Størrelse</span><input type="range" id="insetSize" min="14" max="45" step="1" style="width:110px" /><span id="insetSizeVal" style="width:30px"></span></div>
+          <div class="row">Bredde <select id="insetWidth" class="grow">
+            <option value="size">Egen størrelse</option><option value="legend">Samme som tegnforklaringen</option></select></div>
+          <div class="row" id="insetSizeRow"><span class="grow">Størrelse</span><input type="range" id="insetSize" min="14" max="45" step="1" style="width:110px" /><span id="insetSizeVal" style="width:30px"></span></div>
           <div class="row">Land <input type="color" id="insetLand" /> Markering <input type="color" id="insetMarkerColor" />
             <button class="small" id="insetReset" title="Tilbake til standardfarger">↺</button></div>
           <label class="row"><input type="checkbox" id="insetLabels" /> Landnavn i miniatyrkartet</label>
@@ -495,7 +497,7 @@ const EN = {
   'Belarus': 'Belarus', 'Ukraina': 'Ukraine', 'Tsjekkia': 'Czechia', 'Slovakia': 'Slovakia', 'Østerrike': 'Austria',
   'Ungarn': 'Hungary', 'Romania': 'Romania', 'Moldova': 'Moldova', 'Kasakhstan': 'Kazakhstan',
   'Stiplet linje': 'Dashed line', 'Stil': 'Style', 'Omriss (stiplet)': 'Outline (dashed)', 'Helfarge uten omriss': 'Solid fill, no outline', 'Dekkevne': 'Opacity', 'Plassering langs linjen': 'Position along the line', 'Landnavn langs grensen': 'Country names along the boundary', 'Miniatyrkart': 'Inset map',
-  'Område': 'Area', 'Automatisk rundt utsnittet': 'Automatic around the view', 'Skandinavia': 'Scandinavia', 'Nord-Europa': 'Northern Europe',
+  'Område': 'Area', 'Bredde': 'Width', 'Egen størrelse': 'Own size', 'Samme som tegnforklaringen': 'Same as the legend', 'Automatisk rundt utsnittet': 'Automatic around the view', 'Skandinavia': 'Scandinavia', 'Nord-Europa': 'Northern Europe',
   'Markering': 'Marker', 'Utsnittets omriss': 'Outline of the view', 'Sirkel': 'Circle', 'Størrelse': 'Size',
   'Tilbake til standardfarger': 'Back to default colours', 'Landnavn i miniatyrkartet': 'Country names in the inset map',
   'Sektorer': 'Sectors', 'Norge': 'Norway', 'Storbritannia': 'United Kingdom', 'Danmark': 'Denmark', 'Sektorgrenser': 'Sector boundaries',
@@ -556,7 +558,7 @@ function defaultState() {
     dscStatus: ['Production in clarification phase', 'Production likely but unclarified', 'Production not evaluated', 'Undeveloped'],
     sectors: { no: true, uk: true, dk: true }, sectorLines: true,
     sectorColor: null, sectorWidth: 1.4, sectorDash: true, sectorLabels: false, sectorLabelPos: 50,
-    inset: false, insetPos: 'bl', insetArea: 'auto', insetMarker: 'rect', insetSize: 24, insetLand: null, insetMarkerColor: '#e8590c', insetLabels: true,
+    inset: false, insetPos: 'bl', insetArea: 'auto', insetMarker: 'rect', insetSize: 24, insetWidth: 'size', insetLand: null, insetMarkerColor: '#e8590c', insetLabels: true,
     wells: { wildcat: true, appraisal: true, from: CURRENT_YEAR - 10, to: CURRENT_YEAR, classes: Object.keys(WELL_CLASSES), colorByContent: true },
     pipes: { byMedium: false, byDim: true },
     fac: { surface: true, subsea: false, onshore: true },
@@ -1333,7 +1335,8 @@ function frameRing() {
 function layoutInset() {
   insetBox = null;
   if (!S.inset) return;
-  const w = Math.round(Math.max(150, Math.min(W(), H()) * S.insetSize / 100 * 1.25)), m = 22;
+  const LM = S.insetWidth === 'legend' && S.legend ? legendMetrics() : null;
+  const w = LM ? Math.round(LM.bw) : Math.round(Math.max(150, Math.min(W(), H()) * S.insetSize / 100 * 1.25));
   const ring = frameRing();
   if (!ring) return;
   let bounds = INSET_AREAS[S.insetArea];
@@ -1353,7 +1356,7 @@ function layoutInset() {
 }
 function placeInset(topY) {
   if (!insetBox) return;
-  const m = 22, pos = S.insetPos;
+  const m = BOX_MARGIN, pos = S.insetPos;
   insetBox.x = pos.includes('l') ? m : W() - insetBox.w - m;
   insetBox.y = pos.includes('t') ? (pos === 'tl' ? Math.max(m, topY) : m) : H() - insetBox.h - m - (S.source ? 14 : 0);
 }
@@ -1361,10 +1364,10 @@ function drawInset(g, T) {
   if (!insetBox) return;
   const { x, y, w, h, ip, ring } = insetBox;
   const id = 'insetclip';
-  svg.select('defs').append('clipPath').attr('id', id).append('rect').attr('width', w).attr('height', h);
+  svg.select('defs').append('clipPath').attr('id', id).append('rect').attr('width', w).attr('height', h).attr('rx', 4);
   const landCol = S.insetLand || (S.theme === 'dark' ? '#8fb3e8' : '#1f3b73');
   const ig = g.append('g').attr('transform', `translate(${x},${y})`).attr('class', 'inset');
-  ig.append('rect').attr('width', w).attr('height', h).attr('fill', S.theme === 'dark' ? T.box : '#ffffff');
+  boxFrame(ig, w, h, T).attr('fill', S.theme === 'dark' ? T.box : '#ffffff').attr('stroke', 'none');
   const cg = ig.append('g').attr('clip-path', `url(#${id})`);
   const ipath = d3.geoPath(ip.clipExtent([[-5, -5], [w + 5, h + 5]]));
   cg.append('path').attr('d', ipath(landToDraw())).attr('fill', landCol).attr('stroke', 'none');
@@ -1413,7 +1416,7 @@ function drawInset(g, T) {
         .attr('stroke', mc).attr('stroke-width', 2).attr('stroke-linejoin', 'round');
     }
   }
-  ig.append('rect').attr('width', w).attr('height', h).attr('fill', 'none').attr('stroke', T.ink).attr('stroke-width', 1.5);
+  boxFrame(ig, w, h, T).attr('fill', 'none');
 }
 
 // ── Overlay: tittel, tegnforklaring, målestokk, nordpil, kilde ─────────────
@@ -1504,9 +1507,10 @@ function legendEntries() {
   return E;
 }
 
-function drawLegend(g, T, topY) {
+// Innhold og mål for tegnforklaringen (brukes også når miniatyrkartet skal ha samme bredde).
+function legendMetrics() {
   const E = legendEntries();
-  if (!E.length) return;
+  if (!E.length) return null;
   const fs = 16, lh = 24, pad = 12, sw = 22;
   let heading = S.companies.length ? S.companies.map(shortName).join(', ') : '';
   if (heading && S.role === 'op') heading += ` (${t('operatør')})`;
@@ -1515,7 +1519,19 @@ function drawLegend(g, T, topY) {
   if (heading) widths.push(textWidth(heading, fs, 'bold'));
   const bw = Math.max(...widths) + sw + pad * 2 + 8;
   const bh = E.length * lh + pad * 2 + (heading ? lh + 2 : 0) - 4;
-  const m = 18;
+  return { E, fs, lh, pad, sw, heading, bw, bh };
+}
+const BOX_MARGIN = 18;   // avstand fra kanten for tegnforklaring og miniatyrkart
+function boxFrame(sel, w, h, T) {
+  // Felles ramme for tegnforklaring og miniatyrkart.
+  return sel.append('rect').attr('width', w).attr('height', h).attr('rx', 4).attr('stroke', T.coast).attr('stroke-width', 0.6);
+}
+
+function drawLegend(g, T, topY) {
+  const LM = legendMetrics();
+  if (!LM) return;
+  const { E, fs, lh, pad, sw, heading, bw, bh } = LM;
+  const m = BOX_MARGIN;
   const pos = S.legendPos;
   let x = pos.includes('l') ? m : W() - bw - m;
   let y = pos.includes('t') ? (pos === 'tl' ? Math.max(m, topY) : m) : H() - bh - m - (S.source ? 14 : 0);
@@ -1523,7 +1539,7 @@ function drawLegend(g, T, topY) {
   // Samme hjørne som miniatyrkartet: stable tegnforklaringen innenfor (mot midten av kartet).
   if (insetBox && S.insetPos === pos) y = pos.includes('t') ? insetBox.y + insetBox.h + 12 : insetBox.y - bh - 12;
   const lg = g.append('g').attr('transform', `translate(${x},${y})`).attr('class', 'legend');
-  lg.append('rect').attr('width', bw).attr('height', bh).attr('rx', 4).attr('fill', T.box).attr('fill-opacity', 0.9).attr('stroke', T.coast).attr('stroke-width', 0.6);
+  boxFrame(lg, bw, bh, T).attr('fill', T.box).attr('fill-opacity', 0.9);
   let cy = pad + lh / 2 - 2;
   if (heading) { lg.append('text').attr('x', pad).attr('y', cy).attr('dy', fs * 0.35).attr('font-family', FONT).attr('font-size', fs).attr('font-weight', 'bold').attr('fill', T.ink).text(heading); cy += lh + 2; }
   for (const e of E) {
@@ -1944,6 +1960,8 @@ function syncAllControls() {
   bindValue('insetArea', () => S.insetArea, v => S.insetArea = v);
   bindValue('insetMarker', () => S.insetMarker, v => S.insetMarker = v);
   bindValue('insetSize', () => S.insetSize, v => { S.insetSize = +v; $('insetSizeVal').textContent = v + ' %'; }, 'input');
+  bindValue('insetWidth', () => S.insetWidth, v => { S.insetWidth = v; $('insetSizeRow').style.display = v === 'legend' ? 'none' : ''; });
+  $('insetSizeRow').style.display = S.insetWidth === 'legend' ? 'none' : '';
   $('insetSizeVal').textContent = S.insetSize + ' %';
   bindCheck('insetLabels', () => S.insetLabels, v => S.insetLabels = v);
   {
