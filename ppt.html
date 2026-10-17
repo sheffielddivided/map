@@ -227,7 +227,9 @@
         </label>
         <div class="sub" id="borderList"></div>
         <label class="row"><input type="checkbox" id="showCities" /> Byer og steder</label>
-        <label class="row"><input type="checkbox" id="showQuads" /> Kvadranter (med nummer)</label>
+        <label class="row"><input type="checkbox" id="showQuads" /> Kvadranter
+          <label class="lbl" style="margin-left:auto" title="Vis kvadrantnummer"><input type="checkbox" id="showQuadLabels" /> Nummer</label>
+        </label>
         <label class="row"><input type="checkbox" id="showBlocks" /> Blokker</label>
       </div>
     </details>
@@ -430,7 +432,7 @@ const EN = {
   'Bakgrunnskart': 'Basemap', 'Tema': 'Theme', 'Lys': 'Light', 'Grå / nøytral': 'Grey / neutral', 'Mørk': 'Dark', 'Blå hav': 'Blue sea',
   'Hav': 'Sea', 'Land': 'Land', 'Transparent bakgrunn (ingen havfarge)': 'Transparent background (no sea colour)',
   'Dybdekurver (200, 1000, 2000, 3000 m)': 'Depth contours (200, 1000, 2000, 3000 m)', 'Landegrenser': 'Country borders',
-  'Byer og steder': 'Cities and places', 'Kvadranter (med nummer)': 'Quadrants (numbered)', 'Blokker': 'Blocks',
+  'Byer og steder': 'Cities and places', 'Kvadranter': 'Quadrants', 'Nummer': 'Numbers', 'Vis kvadrantnummer': 'Show quadrant numbers', 'Blokker': 'Blocks',
   // Tittel og tekst
   'Tittel, tegnforklaring og tekst': 'Title, legend and text', 'Tittel': 'Title', 'Undertittel (valgfritt)': 'Subtitle (optional)',
   'Tegnforklaring': 'Legend', 'Øverst venstre': 'Top left', 'Øverst høyre': 'Top right', 'Nederst venstre': 'Bottom left', 'Nederst høyre': 'Bottom right',
@@ -517,7 +519,7 @@ function defaultState() {
     fac: { surface: true, subsea: false, onshore: true },
     companies: [], role: 'any', mode: 'highlight', splitRole: false, labelsOnlySel: true, labelShare: false, otherColor: '#c3c8cf',
     theme: 'light', sea: THEMES.light.sea, land: THEMES.light.land, transparent: false,
-    depth: true, borders: true, borderMode: 'all', borderCountries: ['NOR'], cities: true, quads: false, blocks: false,
+    depth: true, borders: true, borderMode: 'all', borderCountries: ['NOR'], cities: true, quads: false, quadLabels: true, blocks: false,
     title: false, titleText: '', subtitleText: '',
     legend: true, legendPos: 'tr', scale: true, north: true, source: true,
     labelSize: 16, symbolSize: 1.2, declutter: true,
@@ -1043,7 +1045,7 @@ function render() {
     }
   }
 
-  if (S.quads) {
+  if (S.quads && S.quadLabels) {
     for (const f of D.quadrants.features.filter(inSector)) {
       const c = path.centroid(f);
       if (!isFinite(c[0]) || c[0] < 0 || c[1] < 0 || c[0] > w || c[1] > h) continue;
@@ -1623,6 +1625,7 @@ function syncAllControls() {
   buildBorderList();
   bindCheck('showCities', () => S.cities, v => S.cities = v);
   bindCheck('showQuads', () => S.quads, v => S.quads = v);
+  bindCheck('showQuadLabels', () => S.quadLabels, v => S.quadLabels = v);
   bindCheck('showBlocks', () => S.blocks, v => S.blocks = v);
   bindCheck('showTitle', () => S.title, v => S.title = v);
   bindValue('titleText', () => S.titleText, v => { S.titleText = v; if (v) { S.title = true; $('showTitle').checked = true; } }, 'input');
