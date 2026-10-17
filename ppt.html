@@ -494,7 +494,7 @@ const EN = {
   'Frankrike': 'France', 'Irland': 'Ireland', 'Polen': 'Poland', 'Estland': 'Estonia', 'Latvia': 'Latvia', 'Litauen': 'Lithuania',
   'Belarus': 'Belarus', 'Ukraina': 'Ukraine', 'Tsjekkia': 'Czechia', 'Slovakia': 'Slovakia', 'Østerrike': 'Austria',
   'Ungarn': 'Hungary', 'Romania': 'Romania', 'Moldova': 'Moldova', 'Kasakhstan': 'Kazakhstan',
-  'Stiplet linje': 'Dashed line', 'Plassering langs linjen': 'Position along the line', 'Landnavn langs grensen': 'Country names along the boundary', 'Miniatyrkart': 'Inset map',
+  'Stiplet linje': 'Dashed line', 'Stil': 'Style', 'Omriss (stiplet)': 'Outline (dashed)', 'Helfarge uten omriss': 'Solid fill, no outline', 'Dekkevne': 'Opacity', 'Plassering langs linjen': 'Position along the line', 'Landnavn langs grensen': 'Country names along the boundary', 'Miniatyrkart': 'Inset map',
   'Område': 'Area', 'Automatisk rundt utsnittet': 'Automatic around the view', 'Skandinavia': 'Scandinavia', 'Nord-Europa': 'Northern Europe',
   'Markering': 'Marker', 'Utsnittets omriss': 'Outline of the view', 'Sirkel': 'Circle', 'Størrelse': 'Size',
   'Tilbake til standardfarger': 'Back to default colours', 'Landnavn i miniatyrkartet': 'Country names in the inset map',
@@ -552,6 +552,7 @@ function defaultState() {
     view: null,                       // { center: [lon, lat], scale }
     layers: Object.fromEntries(LAYERS.map(l => [l.key, { ...l.def }])),
     colorByHC: false,
+    licStyle: 'outline', licOpacity: 1,
     dscStatus: ['Production in clarification phase', 'Production likely but unclarified', 'Production not evaluated', 'Undeveloped'],
     sectors: { no: true, uk: true, dk: true }, sectorLines: true,
     sectorColor: null, sectorWidth: 1.4, sectorDash: true, sectorLabels: false, sectorLabelPos: 50,
@@ -1056,10 +1057,15 @@ function render() {
         let fill = it.color, stroke = d3.color(it.color).darker(0.7).formatHex(), fo = st.fill, so = 1, sw = key === 'licences' ? 0.9 : 0.8;
         if (it.partner) { fill = lighten(it.color, 0.55); stroke = it.color; }
         if (it.other) { drewOther = true; fill = S.otherColor; stroke = d3.color(S.otherColor).darker(0.6).formatHex(); fo = Math.min(st.fill, 0.5); so = 0.7; }
+        const solidLic = key === 'licences' && S.licStyle === 'solid';
+        if (solidLic) {
+          // Helfarge uten omriss. Kanten tegnes i fyllfargen for å skjule hårfine sprekker mellom nabolisenser.
+          fo = S.licOpacity; stroke = fill; so = S.licOpacity; sw = 0.6;
+        }
         const ext = extruded(key);
         const el = ext ? null : lg.append('path').attr('d', d).attr('fill', fill).attr('fill-opacity', fo)
           .attr('stroke', stroke).attr('stroke-opacity', so).attr('stroke-width', sw).attr('stroke-linejoin', 'round').attr('data-k', fk);
-        const dash = st.dash || key === 'licences' || (key === 'approved' && S.colorByHC);
+        const dash = st.dash || (key === 'licences' && !solidLic) || (key === 'approved' && S.colorByHC);
         if (ext) {
           // Opake klosser; veggene er mørkere toner av toppfargen.
           const top = it.other ? fill : (fo < 0.99 ? d3.interpolateRgb(S.sea, fill)(Math.max(fo, 0.75)) : fill);
@@ -1464,7 +1470,8 @@ function legendEntries() {
         if (key === 'discoveries' && shown.length) E.push({ sym: 'none', note: true, label: t('Lys fyll = funn') });
         if (key === 'approved' && shown.length) E.push({ sym: 'none', note: true, label: t('Stiplet kant = under utbygging') });
       } else if (shown.length) {
-        E.push({ sym: 'poly', color: st.color, fo: st.fill, dash: st.dash || key === 'licences', label: t(L.legend) });
+        if (key === 'licences' && S.licStyle === 'solid') E.push({ sym: 'poly', color: st.color, fo: S.licOpacity, stroke: st.color, label: t(L.legend) });
+        else E.push({ sym: 'poly', color: st.color, fo: st.fill, dash: st.dash || key === 'licences', label: t(L.legend) });
       }
     } else if (key === 'pipelines') {
       if (S.pipes.byMedium) {
@@ -1493,6 +1500,7 @@ function legendEntries() {
     E.push({ sym: 'poly', color: lighten('#6c757d', 0.55), stroke: '#6c757d', fo: 0.85, label: `${nm} – ${t('partner')}` });
   }
   if (sel && S.mode === 'highlight' && drewOther) E.push({ sym: 'poly', color: S.otherColor, fo: 0.5, label: t('Andre selskaper') });
+  E.forEach(e => { if (e.fo != null && e.stroke && e.stroke === e.color) e.fo = Math.max(e.fo, 0.35); });
   return E;
 }
 
@@ -1766,6 +1774,15 @@ function buildLayerList() {
       sub.querySelectorAll('input').forEach(i => i.onchange = () => {
         S.dscStatus = [...sub.querySelectorAll('input:checked')].map(x => x.dataset.s); render();
       });
+    }
+    if (key === 'licences') {
+      sub.innerHTML = `<div class="row">${t('Stil')} <select id="o_ls" class="grow">
+          <option value="outline">${t('Omriss (stiplet)')}</option><option value="solid">${t('Helfarge uten omriss')}</option></select></div>
+        <div class="row" ${S.licStyle === 'solid' ? '' : 'style="display:none"'}><span class="grow">${t('Dekkevne')}</span>
+          <input type="range" id="o_lo" min="0.1" max="1" step="0.05" value="${S.licOpacity}" style="width:110px"><span id="o_lov" style="width:36px">${Math.round(S.licOpacity * 100)} %</span></div>`;
+      sub.querySelector('#o_ls').value = S.licStyle;
+      sub.querySelector('#o_ls').onchange = e => { S.licStyle = e.target.value; buildLayerList(); render(); };
+      sub.querySelector('#o_lo').oninput = e => { S.licOpacity = +e.target.value; sub.querySelector('#o_lov').textContent = Math.round(S.licOpacity * 100) + ' %'; scheduleRender(); };
     }
     if (key === 'pipelines') {
       sub.innerHTML = `<label class="row"><input type="checkbox" id="o_pm" ${S.pipes.byMedium ? 'checked' : ''}> ${t('Farge etter medium (gass/olje/kondensat)')}</label>
