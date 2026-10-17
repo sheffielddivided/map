@@ -220,12 +220,13 @@
         <div class="row"><span class="grow">Land</span><input type="color" id="landColor" /></div>
         <label class="row"><input type="checkbox" id="transparent" /> Transparent bakgrunn (ingen havfarge)</label>
         <label class="row"><input type="checkbox" id="showDepth" /> Dybdekurver (200, 1000, 2000, 3000 m)</label>
-        <label class="row"><input type="checkbox" id="showBorders" /> Landegrenser
-          <select id="borderMode" style="margin-left:auto">
-            <option value="all">Alle land</option><option value="some">Utvalgte land</option>
+        <div class="row"><span>Landvalg</span>
+          <select id="landMode" class="grow">
+            <option value="all">Vis alle land</option><option value="some">Vis kun utvalgte land</option>
           </select>
-        </label>
-        <div class="sub" id="borderList"></div>
+        </div>
+        <div class="sub" id="landList"></div>
+        <label class="row"><input type="checkbox" id="showBorders" /> Landegrenser</label>
         <label class="row"><input type="checkbox" id="showCities" /> Byer og steder</label>
         <label class="row"><input type="checkbox" id="showQuads" /> Kvadranter
           <label class="lbl" style="margin-left:auto" title="Vis kvadrantnummer"><input type="checkbox" id="showQuadLabels" /> Nummer</label>
@@ -294,8 +295,11 @@ const COUNTRIES = {
   NOR: 'Norge', SWE: 'Sverige', FIN: 'Finland', RUS: 'Russland', DNK: 'Danmark', DEU: 'Tyskland', NLD: 'Nederland',
   BEL: 'Belgia', LUX: 'Luxembourg', FRA: 'Frankrike', GBR: 'Storbritannia', IRL: 'Irland', POL: 'Polen', EST: 'Estland',
   LVA: 'Latvia', LTU: 'Litauen', BLR: 'Belarus', UKR: 'Ukraina', CZE: 'Tsjekkia', SVK: 'Slovakia', AUT: 'Østerrike',
-  HUN: 'Ungarn', ROU: 'Romania', MDA: 'Moldova', KAZ: 'Kasakhstan',
+  HUN: 'Ungarn', ROU: 'Romania', MDA: 'Moldova', KAZ: 'Kasakhstan', FRO: 'Færøyene', GRL: 'Grønland', ISL: 'Island',
 };
+// Små selvstyrte områder følger landet de hører til i landvalget.
+const COUNTRY_PARENT = { ALD: 'FIN', GGY: 'GBR', JEY: 'GBR', IMN: 'GBR' };
+const countryOf = c => COUNTRY_PARENT[c] || c;
 
 const THEMES = {
   light: { sea: '#e8f0f6', land: '#f4f2ee', coast: '#b9c2cb', depth: '#d6e3ee', border: '#a9b0b8', ink: '#2b3440', halo: '#ffffff', grid: '#8a9bb0', box: '#ffffff', other: '#c3c8cf' },
@@ -338,11 +342,11 @@ function wellClass(content) {
 const PIPE_MEDIUM = { 'Gas': { name: 'Gass', color: '#d6336c' }, 'Oil': { name: 'Olje', color: '#2f9e44' }, 'Condensate': { name: 'Kondensat', color: '#e8590c' }, 'Co2 injection': { name: 'CO₂', color: '#7048e8' }, 'Mixed': { name: 'Flerfase', color: '#9c36b5' } };
 
 const CITIES = [
-  ['Oslo', 10.75, 59.91], ['Stavanger', 5.73, 58.97], ['Bergen', 5.32, 60.39], ['Florø', 5.03, 61.60],
-  ['Kristiansund', 7.73, 63.11], ['Trondheim', 10.40, 63.43], ['Sandnessjøen', 12.63, 66.02], ['Bodø', 14.40, 67.28],
-  ['Harstad', 16.54, 68.80], ['Tromsø', 18.96, 69.65], ['Hammerfest', 23.68, 70.66], ['Kirkenes', 30.05, 69.73],
-  ['Longyearbyen', 15.63, 78.22], ['Aberdeen', -2.10, 57.15], ['Lerwick', -1.15, 60.15], ['Esbjerg', 8.45, 55.47],
-  ['Kristiansand', 7.99, 58.15], ['Haugesund', 5.27, 59.41], ['Ålesund', 6.15, 62.47], ['Murmansk', 33.08, 68.97],
+  ['Oslo', 10.75, 59.91, 'NOR'], ['Stavanger', 5.73, 58.97, 'NOR'], ['Bergen', 5.32, 60.39, 'NOR'], ['Florø', 5.03, 61.60, 'NOR'],
+  ['Kristiansund', 7.73, 63.11, 'NOR'], ['Trondheim', 10.40, 63.43, 'NOR'], ['Sandnessjøen', 12.63, 66.02, 'NOR'], ['Bodø', 14.40, 67.28, 'NOR'],
+  ['Harstad', 16.54, 68.80, 'NOR'], ['Tromsø', 18.96, 69.65, 'NOR'], ['Hammerfest', 23.68, 70.66, 'NOR'], ['Kirkenes', 30.05, 69.73, 'NOR'],
+  ['Longyearbyen', 15.63, 78.22, 'NOR'], ['Aberdeen', -2.10, 57.15, 'GBR'], ['Lerwick', -1.15, 60.15, 'GBR'], ['Esbjerg', 8.45, 55.47, 'DNK'],
+  ['Kristiansand', 7.99, 58.15, 'NOR'], ['Haugesund', 5.27, 59.41, 'NOR'], ['Ålesund', 6.15, 62.47, 'NOR'], ['Murmansk', 33.08, 68.97, 'RUS'],
 ];
 
 const VIEW_PRESETS = [
@@ -453,7 +457,8 @@ const EN = {
   'Lenken er kopiert': 'Link copied', 'Kunne ikke kopiere lenken': 'Could not copy the link', 'Gi malen et navn først': 'Give the template a name first',
   'Malen «{0}» er lagret': 'Template “{0}” saved', 'Tilbakestille alle innstillinger?': 'Reset all settings?', 'Ingenting å zoome til': 'Nothing to zoom to',
   'Kunne ikke lagre i nettleseren': 'Could not save in this browser',
-  'Alle land': 'All countries', 'Utvalgte land': 'Selected countries', 'Sverige': 'Sweden', 'Finland': 'Finland',
+  'Landvalg': 'Countries', 'Vis alle land': 'Show all countries', 'Vis kun utvalgte land': 'Show selected countries only',
+  'Færøyene': 'Faroe Islands', 'Grønland': 'Greenland', 'Island': 'Iceland', 'Sverige': 'Sweden', 'Finland': 'Finland',
   'Russland': 'Russia', 'Tyskland': 'Germany', 'Nederland': 'Netherlands', 'Belgia': 'Belgium', 'Luxembourg': 'Luxembourg',
   'Frankrike': 'France', 'Irland': 'Ireland', 'Polen': 'Poland', 'Estland': 'Estonia', 'Latvia': 'Latvia', 'Litauen': 'Lithuania',
   'Belarus': 'Belarus', 'Ukraina': 'Ukraine', 'Tsjekkia': 'Czechia', 'Slovakia': 'Slovakia', 'Østerrike': 'Austria',
@@ -519,7 +524,7 @@ function defaultState() {
     fac: { surface: true, subsea: false, onshore: true },
     companies: [], role: 'any', mode: 'highlight', splitRole: false, labelsOnlySel: true, labelShare: false, otherColor: '#c3c8cf',
     theme: 'light', sea: THEMES.light.sea, land: THEMES.light.land, transparent: false,
-    depth: true, borders: true, borderMode: 'all', borderCountries: ['NOR'], cities: true, quads: false, quadLabels: true, blocks: false,
+    depth: true, borders: true, landMode: 'all', landCountries: ['NOR'], cities: true, quads: false, quadLabels: true, blocks: false,
     title: false, titleText: '', subtitleText: '',
     legend: true, legendPos: 'tr', scale: true, north: true, source: true,
     labelSize: 16, symbolSize: 1.2, declutter: true,
@@ -590,6 +595,7 @@ async function loadData() {
   });
   const o = base.objects;
   BASE = {
+    topo: base,
     land: topojson.feature(base, o.land),
     borders: topojson.feature(base, o.borders),
     sectors: o.sectors ? topojson.feature(base, o.sectors) : null,
@@ -625,21 +631,34 @@ function ensureLazy(name) {
   return lazyPromises[name];
 }
 const inSector = f => S.sectors[f.properties.cc || 'no'] !== false;
-// Med «Utvalgte land» vises bare grenselinjer der minst ett av landene på hver side er valgt.
-function bordersToDraw() {
-  if (S.borderMode !== 'some') return BASE.borders;
-  const sel = new Set(S.borderCountries);
-  return { type: 'FeatureCollection', features: BASE.borders.features.filter(f => sel.has(f.properties.l) || sel.has(f.properties.r)) };
+// «Vis kun utvalgte land»: bare de valgte landene tegnes; alle andre land utelates helt (blir hav).
+let landCache = { key: null, geo: null };
+function countryVisible(c) { return S.landMode !== 'some' || S.landCountries.includes(countryOf(c)); }
+function landToDraw() {
+  if (S.landMode !== 'some' || !BASE.topo.objects.countries) return BASE.land;
+  const key = S.landCountries.slice().sort().join(',');
+  if (landCache.key !== key) {
+    // Slå sammen de valgte landene så felles grenser ikke tegnes som kystlinje.
+    const geoms = BASE.topo.objects.countries.geometries.filter(g => countryVisible(g.properties.c));
+    landCache = { key, geo: topojson.merge(BASE.topo, geoms) };
+  }
+  return landCache.geo;
 }
-function buildBorderList() {
-  const box = $('borderList');
-  box.style.display = S.borders && S.borderMode === 'some' ? '' : 'none';
+function bordersToDraw() {
+  if (S.landMode !== 'some') return BASE.borders;
+  // Bare grenser mellom to land som begge vises.
+  return { type: 'FeatureCollection', features: BASE.borders.features.filter(f => countryVisible(f.properties.l) && countryVisible(f.properties.r)) };
+}
+function buildLandList() {
+  const box = $('landList');
+  box.style.display = S.landMode === 'some' ? '' : 'none';
   if (box.style.display === 'none') return;
-  const present = BASE ? new Set(BASE.borders.features.flatMap(f => [f.properties.l, f.properties.r])) : new Set(Object.keys(COUNTRIES));
+  const present = BASE && BASE.topo.objects.countries
+    ? new Set(BASE.topo.objects.countries.geometries.map(g => countryOf(g.properties.c))) : new Set(Object.keys(COUNTRIES));
   const codes = Object.keys(COUNTRIES).filter(c => present.has(c)).sort((a, b) => t(COUNTRIES[a]).localeCompare(t(COUNTRIES[b]), LOCALE()));
-  box.innerHTML = codes.map(c => `<label class="row"><input type="checkbox" data-c="${c}" ${S.borderCountries.includes(c) ? 'checked' : ''}> ${t(COUNTRIES[c])}</label>`).join('');
+  box.innerHTML = codes.map(c => `<label class="row"><input type="checkbox" data-c="${c}" ${S.landCountries.includes(c) ? 'checked' : ''}> ${t(COUNTRIES[c])}</label>`).join('');
   box.querySelectorAll('input').forEach(i => i.onchange = () => {
-    S.borderCountries = [...box.querySelectorAll('input:checked')].map(x => x.dataset.c); render();
+    S.landCountries = [...box.querySelectorAll('input:checked')].map(x => x.dataset.c); render();
   });
 }
 
@@ -929,7 +948,7 @@ function render() {
         .attr('fill-opacity', S.transparent ? 0.6 : 1).attr('stroke', 'none');
     });
   }
-  g.append('path').attr('d', path(BASE.land)).attr('fill', S.land).attr('stroke', T.coast).attr('stroke-width', 0.6).attr('stroke-linejoin', 'round');
+  g.append('path').attr('d', path(landToDraw())).attr('fill', S.land).attr('stroke', T.coast).attr('stroke-width', 0.6).attr('stroke-linejoin', 'round');
   if (S.borders) g.append('path').attr('d', path(bordersToDraw())).attr('fill', 'none').attr('stroke', T.border).attr('stroke-width', 0.8).attr('stroke-dasharray', '3 2');
 
   if (S.blocks) {
@@ -1036,7 +1055,8 @@ function render() {
 
   if (S.cities) {
     const cg = g.append('g');
-    for (const [name, lon, lat] of CITIES) {
+    for (const [name, lon, lat, country] of CITIES) {
+      if (!countryVisible(country)) continue;
       const xy = P([lon, lat]);
       if (!xy) continue;
       if (!xy || xy[0] < 0 || xy[1] < 0 || xy[0] > w || xy[1] > h) continue;
@@ -1620,9 +1640,9 @@ function syncAllControls() {
   bindValue('landColor', () => S.land, v => S.land = v, 'input');
   bindCheck('transparent', () => S.transparent, v => S.transparent = v);
   bindCheck('showDepth', () => S.depth, v => S.depth = v);
-  bindCheck('showBorders', () => S.borders, v => { S.borders = v; buildBorderList(); });
-  bindValue('borderMode', () => S.borderMode, v => { S.borderMode = v; buildBorderList(); });
-  buildBorderList();
+  bindCheck('showBorders', () => S.borders, v => S.borders = v);
+  bindValue('landMode', () => S.landMode, v => { S.landMode = v; buildLandList(); });
+  buildLandList();
   bindCheck('showCities', () => S.cities, v => S.cities = v);
   bindCheck('showQuads', () => S.quads, v => S.quads = v);
   bindCheck('showQuadLabels', () => S.quadLabels, v => S.quadLabels = v);
@@ -1747,7 +1767,7 @@ function applyLanguage() {
   $('lang').value = S.lang;
   applyStaticText();
   buildPresetButtons();
-  buildBorderList();
+  buildLandList();
   buildLayerList();
   buildCompanyUI();
   buildPresetList();
@@ -1809,7 +1829,7 @@ function applyState() {
   }
   $('loading').remove();
   updateStatus();
-  buildBorderList();
+  buildLandList();
   buildCompanyUI();
   setupProjection();
   render();
