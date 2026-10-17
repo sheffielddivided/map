@@ -157,6 +157,14 @@
         <label class="row"><input type="checkbox" id="secUk" /> Storbritannia</label>
         <label class="row"><input type="checkbox" id="secDk" /> Danmark</label>
         <label class="row"><input type="checkbox" id="secLines" /> Sektorgrenser</label>
+        <div class="sub">
+          <div class="row">Farge <input type="color" id="secColor" /> Tykkelse
+            <input type="number" id="secWidth" min="0.2" max="8" step="0.1" style="width:60px" />
+            <button class="small" id="secReset" title="Tilbake til temaets standard">↺</button></div>
+          <label class="row"><input type="checkbox" id="secDash" /> Stiplet linje</label>
+          <label class="row"><input type="checkbox" id="secLabels" /> Landnavn langs grensen</label>
+          <div class="row"><span class="grow">Plassering langs linjen</span><input type="range" id="secLabelPos" min="5" max="95" step="1" style="width:110px" /></div>
+        </div>
         <div class="hint">Danske data har ikke funn, felt mangler hydrokarbontype, og brønnene går til 2019.</div>
       </div>
     </details>
@@ -255,6 +263,23 @@
         </label>
         <label class="row"><input type="checkbox" id="showScale" /> Målestokk</label>
         <label class="row"><input type="checkbox" id="showNorth" /> Nordpil</label>
+        <label class="row"><input type="checkbox" id="showInset" /> Miniatyrkart
+          <select id="insetPos" style="margin-left:auto">
+            <option value="tl">Øverst venstre</option><option value="tr">Øverst høyre</option>
+            <option value="bl">Nederst venstre</option><option value="br">Nederst høyre</option>
+          </select>
+        </label>
+        <div class="sub" id="insetOpts">
+          <div class="row">Område <select id="insetArea" class="grow">
+            <option value="auto">Automatisk rundt utsnittet</option><option value="northsea">Nordsjøen</option>
+            <option value="scandinavia">Skandinavia</option><option value="europe">Nord-Europa</option></select></div>
+          <div class="row">Markering <select id="insetMarker" class="grow">
+            <option value="rect">Utsnittets omriss</option><option value="circle">Sirkel</option></select></div>
+          <div class="row"><span class="grow">Størrelse</span><input type="range" id="insetSize" min="14" max="45" step="1" style="width:110px" /><span id="insetSizeVal" style="width:30px"></span></div>
+          <div class="row">Land <input type="color" id="insetLand" /> Markering <input type="color" id="insetMarkerColor" />
+            <button class="small" id="insetReset" title="Tilbake til standardfarger">↺</button></div>
+          <label class="row"><input type="checkbox" id="insetLabels" /> Landnavn i miniatyrkartet</label>
+        </div>
         <label class="row"><input type="checkbox" id="showSource" /> Kildehenvisning</label>
         <div class="row"><span class="grow">Tekststørrelse etiketter</span><input type="range" id="labelSize" min="8" max="28" step="1" style="width:110px" /><span id="labelSizeVal" style="width:22px"></span></div>
         <div class="row"><span class="grow">Symbolstørrelse</span><input type="range" id="symbolSize" min="0.5" max="2.5" step="0.1" style="width:110px" /><span id="symbolSizeVal" style="width:22px"></span></div>
@@ -469,6 +494,10 @@ const EN = {
   'Frankrike': 'France', 'Irland': 'Ireland', 'Polen': 'Poland', 'Estland': 'Estonia', 'Latvia': 'Latvia', 'Litauen': 'Lithuania',
   'Belarus': 'Belarus', 'Ukraina': 'Ukraine', 'Tsjekkia': 'Czechia', 'Slovakia': 'Slovakia', 'Østerrike': 'Austria',
   'Ungarn': 'Hungary', 'Romania': 'Romania', 'Moldova': 'Moldova', 'Kasakhstan': 'Kazakhstan',
+  'Stiplet linje': 'Dashed line', 'Plassering langs linjen': 'Position along the line', 'Landnavn langs grensen': 'Country names along the boundary', 'Miniatyrkart': 'Inset map',
+  'Område': 'Area', 'Automatisk rundt utsnittet': 'Automatic around the view', 'Skandinavia': 'Scandinavia', 'Nord-Europa': 'Northern Europe',
+  'Markering': 'Marker', 'Utsnittets omriss': 'Outline of the view', 'Sirkel': 'Circle', 'Størrelse': 'Size',
+  'Tilbake til standardfarger': 'Back to default colours', 'Landnavn i miniatyrkartet': 'Country names in the inset map',
   'Sektorer': 'Sectors', 'Norge': 'Norway', 'Storbritannia': 'United Kingdom', 'Danmark': 'Denmark', 'Sektorgrenser': 'Sector boundaries',
   'Danske data har ikke funn, felt mangler hydrokarbontype, og brønnene går til 2019.': 'Danish data has no discoveries, fields lack hydrocarbon type, and wells end in 2019.',
   'Hele Nordsjøen': 'Entire North Sea', 'Sentrale Nordsjø': 'Central North Sea', 'Vest for Shetland': 'West of Shetland',
@@ -525,6 +554,8 @@ function defaultState() {
     colorByHC: false,
     dscStatus: ['Production in clarification phase', 'Production likely but unclarified', 'Production not evaluated', 'Undeveloped'],
     sectors: { no: true, uk: true, dk: true }, sectorLines: true,
+    sectorColor: null, sectorWidth: 1.4, sectorDash: true, sectorLabels: false, sectorLabelPos: 50,
+    inset: false, insetPos: 'bl', insetArea: 'auto', insetMarker: 'rect', insetSize: 24, insetLand: null, insetMarkerColor: '#e8590c', insetLabels: true,
     wells: { wildcat: true, appraisal: true, from: CURRENT_YEAR - 10, to: CURRENT_YEAR, classes: Object.keys(WELL_CLASSES), colorByContent: true },
     pipes: { byMedium: false, byDim: true },
     fac: { surface: true, subsea: false, onshore: true },
@@ -607,8 +638,10 @@ async function loadData() {
     land: topojson.feature(base, o.land),
     borders: topojson.feature(base, o.borders),
     sectors: o.sectors ? topojson.feature(base, o.sectors) : null,
+    sectorAreas: o.sectorAreas ? topojson.feature(base, o.sectorAreas) : null,
     depth: ['d200', 'd1000', 'd2000', 'd3000'].map(k => topojson.feature(base, o[k])),
   };
+  if (BASE.sectorAreas) BASE.sectorAreas.features.forEach(f => rewind(f.geometry));
   const counts = new Map(), ccs = new Map();
   for (const src of ['fields', 'discoveries', 'licences']) {
     for (const f of D[src].features) {
@@ -967,8 +1000,11 @@ function render() {
   if (S.quads) g.append('path').attr('d', path({ type: 'FeatureCollection', features: D.quadrants.features.filter(inSector) }))
     .attr('fill', 'none').attr('stroke', S.quadColor || T.grid).attr('stroke-width', S.quadWidth).attr('stroke-opacity', S.quadColor ? 1 : 0.8);
   if (S.sectorLines && BASE.sectors) {
-    g.append('path').attr('d', path(BASE.sectors)).attr('fill', 'none').attr('stroke', T.ink).attr('stroke-opacity', 0.55)
-      .attr('stroke-width', 1.4).attr('stroke-dasharray', '9 3 2 3').attr('stroke-linejoin', 'round');
+    const sw = S.sectorWidth;
+    g.append('path').attr('d', path(BASE.sectors)).attr('fill', 'none').attr('stroke', S.sectorColor || T.ink)
+      .attr('stroke-opacity', S.sectorColor ? 1 : 0.55).attr('stroke-width', sw).attr('stroke-linecap', 'round')
+      .attr('stroke-dasharray', S.sectorDash ? `${(sw * 6).toFixed(1)} ${(sw * 2.2).toFixed(1)} ${(sw * 1.4).toFixed(1)} ${(sw * 2.2).toFixed(1)}` : null)
+      .attr('stroke-linejoin', 'round');
   }
 
   if (persp.tilted && S.haze && !S.transparent) {
@@ -1096,6 +1132,7 @@ function render() {
       obstacles.push({ x0: m.e - r, x1: m.e + r, y0: m.f - r, y1: m.f + r });
     } else obstacles.push({ x0: b.x + m.e - 3, x1: b.x + b.width + m.e + 3, y0: b.y + m.f - 3, y1: b.y + b.height + m.f + 3 });
   });
+  if (S.sectorLines && S.sectorLabels && BASE.sectors) drawSectorLabels(T, obstacles);
   placeLabels(labels, T, obstacles);
   attachInteractions();
   saveToUrl();
@@ -1194,6 +1231,185 @@ function placeLabels(cands, T, obstacles = []) {
   }
 }
 
+// ── Landnavn langs sektorgrensene ──────────────────────────────────────────
+// For hver grenselinje: finn den lengste delen som ligger inne i kartet, og sett landnavnene
+// parallelt med linjen på hver sin side, midt på den delen. Hvilket land som ligger på hvilken
+// side avgjøres ved å teste et punkt litt ut fra linjen mot sektorpolygonene.
+function drawSectorLabels(T, obstacles) {
+  const fs = S.labelSize * 1.15, margin = 40;
+  const color = S.sectorColor || T.ink;
+  const inside = q => q && q[0] > margin && q[0] < W() - margin && q[1] > margin && q[1] < H() - margin;
+  const blocked = q => obstacles.some(o => q[0] > o.x0 && q[0] < o.x1 && q[1] > o.y0 && q[1] < o.y1);
+  const sideOf = (q) => {
+    const geo = Pinv(q);
+    if (!geo || !BASE.sectorAreas) return null;
+    const hit = BASE.sectorAreas.features.find(f => d3.geoContains(f, geo));
+    return hit ? hit.properties.cc : null;
+  };
+  const g = gLabels.append('g').attr('class', 'seclab');
+  for (const f of BASE.sectors.features) {
+    const { l, r } = f.properties;
+    const parts = f.geometry.type === 'LineString' ? [f.geometry.coordinates] : f.geometry.coordinates;
+    // Tett punktfølge i skjermkoordinater (lineært interpolert i lengde/bredde), og lengste sammenhengende synlige del.
+    let best = null;
+    for (const part of parts) {
+      let run = [];
+      const flush = () => { if (run.length > 1) { const len = d3.sum(run.slice(1), (q, i) => Math.hypot(q[0] - run[i][0], q[1] - run[i][1])); if (!best || len > best.len) best = { pts: run, len }; } run = []; };
+      for (let i = 0; i < part.length - 1; i++) {
+        const [a, b] = [part[i], part[i + 1]];
+        const n = Math.max(2, Math.ceil(d3.geoDistance(a, b) / 0.002));
+        for (let k = 0; k < n; k++) {
+          const q = P([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
+          if (inside(q) && !blocked(q)) run.push(q); else flush();
+        }
+      }
+      const q = P(part[part.length - 1]);
+      if (inside(q) && !blocked(q)) run.push(q);
+      flush();
+    }
+    const names = [t(SECTORS[l]), t(SECTORS[r])];
+    const need = Math.max(...names.map(n => textWidth(n, fs))) * 1.2 + 20;
+    if (!best || best.len < need) continue;
+    // Punktet midt på den synlige delen, og retningen der.
+    // Plassering langs den synlige delen (glidebryter), men aldri så nær enden at teksten stikker utenfor.
+    const target = Math.max(need / 2, Math.min(best.len - need / 2, best.len * S.sectorLabelPos / 100));
+    let acc = 0, mid = best.pts[0], dir = [1, 0];
+    for (let i = 1; i < best.pts.length; i++) {
+      const [a, b] = [best.pts[i - 1], best.pts[i]], d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (acc + d >= target) {
+        const tt = d ? (target - acc) / d : 0;
+        mid = [a[0] + (b[0] - a[0]) * tt, a[1] + (b[1] - a[1]) * tt];
+        const a2 = best.pts[Math.max(0, i - 4)], b2 = best.pts[Math.min(best.pts.length - 1, i + 3)];
+        dir = [b2[0] - a2[0], b2[1] - a2[1]];
+        break;
+      }
+      acc += d;
+    }
+    const dl = Math.hypot(dir[0], dir[1]) || 1;
+    let ux = dir[0] / dl, uy = dir[1] / dl;
+    if (ux < 0) { ux = -ux; uy = -uy; }                 // tekst skal leses fra venstre mot høyre
+    const nx = -uy, ny = ux;                             // normal (peker «opp» i forhold til teksten)
+    const ang = Math.atan2(uy, ux) * 180 / Math.PI;
+    const off = fs * 0.75 + S.sectorWidth;
+    const upSide = sideOf([mid[0] - nx * 25, mid[1] - ny * 25]);
+    const upName = upSide === r ? names[1] : names[0];
+    const downName = upSide === r ? names[0] : names[1];
+    for (const [name, sgn] of [[upName, -1], [downName, 1]]) {
+      const cx = mid[0] + nx * off * sgn, cy = mid[1] + ny * off * sgn;
+      const tw = textWidth(name, fs);
+      const attrs = el => el.attr('x', 0).attr('y', 0).attr('dy', (fs * 0.35).toFixed(1)).attr('text-anchor', 'middle')
+        .attr('font-family', FONT).attr('font-size', fs.toFixed(1)).attr('letter-spacing', (fs * 0.04).toFixed(2)).text(name);
+      const tg = g.append('g').attr('transform', `translate(${cx.toFixed(1)},${cy.toFixed(1)}) rotate(${ang.toFixed(2)})`);
+      attrs(tg.append('text')).attr('fill', 'none').attr('stroke', T.halo).attr('stroke-width', Math.max(2.4, fs * 0.22)).attr('stroke-linejoin', 'round').attr('stroke-opacity', 0.85);
+      attrs(tg.append('text')).attr('fill', color);
+      // Omsluttende boks for den roterte teksten, så andre etiketter holder seg unna.
+      const hw = tw / 2 + 4, hh = fs * 0.6;
+      const xs = [-hw, hw].flatMap(x => [-hh, hh].map(y => cx + x * ux - y * uy)), ys = [-hw, hw].flatMap(x => [-hh, hh].map(y => cy + x * uy + y * ux));
+      obstacles.push({ x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) });
+    }
+  }
+}
+
+// ── Miniatyrkart som viser hvor utsnittet er hentet fra ───────────────────
+// Bakgrunnskartet dekker 14° V–50° Ø og 48–83° N, så områdene holdes innenfor det.
+const INSET_AREAS = { northsea: [[-5, 51], [13, 63]], scandinavia: [[-6, 53.5], [32, 71.5]], europe: [[-11, 50], [38, 71.5]] };
+let insetBox = null;
+function frameRing() {
+  // Utsnittets omriss i lengde/bredde (også når kartet er vippet eller rotert).
+  const pts = [];
+  const edge = (x0, y0, x1, y1) => { for (let i = 0; i < 12; i++) pts.push([x0 + (x1 - x0) * i / 12, y0 + (y1 - y0) * i / 12]); };
+  edge(0, 0, W(), 0); edge(W(), 0, W(), H()); edge(W(), H(), 0, H()); edge(0, H(), 0, 0);
+  const ring = pts.map(q => Pinv(q)).filter(q => q && isFinite(q[0]));
+  if (ring.length < 4) return null;
+  ring.push(ring[0]);
+  return ring;
+}
+function layoutInset() {
+  insetBox = null;
+  if (!S.inset) return;
+  const w = Math.round(Math.max(150, Math.min(W(), H()) * S.insetSize / 100 * 1.25)), m = 22;
+  const ring = frameRing();
+  if (!ring) return;
+  let bounds = INSET_AREAS[S.insetArea];
+  if (!bounds) {
+    const lons = ring.map(q => q[0]), lats = ring.map(q => q[1]);
+    const c = [(d3.min(lons) + d3.max(lons)) / 2, (d3.min(lats) + d3.max(lats)) / 2];
+    const hx = Math.max(7, (d3.max(lons) - d3.min(lons)) * 2.2), hy = Math.max(4, (d3.max(lats) - d3.min(lats)) * 2.2);
+    bounds = [[Math.max(-13, c[0] - hx), Math.max(50, c[1] - hy)], [Math.min(45, c[0] + hx), Math.min(80, c[1] + hy)]];
+  }
+  const cm = (bounds[0][0] + bounds[1][0]) / 2;
+  const ip = d3.geoTransverseMercator().rotate([-cm, 0]).precision(0.5);
+  ip.fitWidth(w, boundsToGeo(bounds));
+  const bb = d3.geoPath(ip).bounds(boundsToGeo(bounds));
+  const h = Math.round(Math.max(w * 0.6, Math.min(w * 1.4, bb[1][1] - bb[0][1])));
+  ip.fitSize([w, h], boundsToGeo(bounds));
+  insetBox = { w, h, ip, ring, x: 0, y: 0 };
+}
+function placeInset(topY) {
+  if (!insetBox) return;
+  const m = 22, pos = S.insetPos;
+  insetBox.x = pos.includes('l') ? m : W() - insetBox.w - m;
+  insetBox.y = pos.includes('t') ? (pos === 'tl' ? Math.max(m, topY) : m) : H() - insetBox.h - m - (S.source ? 14 : 0);
+}
+function drawInset(g, T) {
+  if (!insetBox) return;
+  const { x, y, w, h, ip, ring } = insetBox;
+  const id = 'insetclip';
+  svg.select('defs').append('clipPath').attr('id', id).append('rect').attr('width', w).attr('height', h);
+  const landCol = S.insetLand || (S.theme === 'dark' ? '#8fb3e8' : '#1f3b73');
+  const ig = g.append('g').attr('transform', `translate(${x},${y})`).attr('class', 'inset');
+  ig.append('rect').attr('width', w).attr('height', h).attr('fill', S.theme === 'dark' ? T.box : '#ffffff');
+  const cg = ig.append('g').attr('clip-path', `url(#${id})`);
+  const ipath = d3.geoPath(ip.clipExtent([[-5, -5], [w + 5, h + 5]]));
+  cg.append('path').attr('d', ipath(landToDraw())).attr('fill', landCol).attr('stroke', 'none');
+  if (S.insetLabels && BASE.topo.objects.countries) {
+    const lum = d3.hsl(landCol).l;
+    const labCol = lum < 0.55 ? '#ffffff' : '#1c2430';
+    const fs = Math.max(10, Math.round(w / 24));
+    const cands = [];
+    for (const gm of BASE.topo.objects.countries.geometries) {
+      const c = countryOf(gm.properties.c);
+      if (!COUNTRIES[c] || !countryVisible(gm.properties.c) || gm.properties.c !== c) continue;
+      const f = topojson.feature(BASE.topo, gm);
+      // Etikett i den største delen av landet som er synlig i miniatyrkartet.
+      const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+      let bestA = 0, bestP = null;
+      for (const pc of polys) { const pg = { type: 'Polygon', coordinates: pc }; const a = ipath.area(pg); if (a > bestA) { bestA = a; bestP = pg; } }
+      if (!bestP || bestA < w * h * 0.012) continue;
+      cands.push({ c, a: bestA, ctr: ipath.centroid(bestP) });
+    }
+    // Største land først; hopp over etiketter som overlapper eller går utenfor kanten.
+    const boxes = [];
+    for (const cd of cands.sort((x, y) => y.a - x.a)) {
+      const name = t(COUNTRIES[cd.c]), tw = textWidth(name, fs);
+      const b = { x0: cd.ctr[0] - tw / 2 - 2, x1: cd.ctr[0] + tw / 2 + 2, y0: cd.ctr[1] - fs * 0.6, y1: cd.ctr[1] + fs * 0.6 };
+      if (b.x0 < 2 || b.x1 > w - 2 || b.y0 < 2 || b.y1 > h - 2) continue;
+      if (boxes.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0)) continue;
+      boxes.push(b);
+      const txt = el => el.attr('x', cd.ctr[0]).attr('y', cd.ctr[1]).attr('dy', (fs * 0.35).toFixed(1)).attr('text-anchor', 'middle')
+        .attr('font-family', FONT).attr('font-size', fs).text(name);
+      // Kontur i landfargen, så teksten også er lesbar der den går ut over havet.
+      txt(cg.append('text')).attr('fill', 'none').attr('stroke', landCol).attr('stroke-width', 3).attr('stroke-linejoin', 'round');
+      txt(cg.append('text')).attr('fill', labCol);
+    }
+  }
+  // Markering av utsnittet.
+  const fr = ipath.bounds({ type: 'LineString', coordinates: ring });
+  if (fr && isFinite(fr[0][0])) {
+    const mc = S.insetMarkerColor;
+    const small = (fr[1][0] - fr[0][0]) < 10 && (fr[1][1] - fr[0][1]) < 10;
+    if (S.insetMarker === 'circle' || small) {
+      const cx = (fr[0][0] + fr[1][0]) / 2, cy = (fr[0][1] + fr[1][1]) / 2;
+      const rr = Math.max(9, Math.hypot(fr[1][0] - fr[0][0], fr[1][1] - fr[0][1]) / 2 + 4);
+      cg.append('circle').attr('cx', cx).attr('cy', cy).attr('r', rr).attr('fill', 'none').attr('stroke', mc).attr('stroke-width', 2);
+    } else {
+      cg.append('path').attr('d', ipath({ type: 'LineString', coordinates: ring })).attr('fill', mc).attr('fill-opacity', 0.12)
+        .attr('stroke', mc).attr('stroke-width', 2).attr('stroke-linejoin', 'round');
+    }
+  }
+  ig.append('rect').attr('width', w).attr('height', h).attr('fill', 'none').attr('stroke', T.ink).attr('stroke-width', 1.5);
+}
+
 // ── Overlay: tittel, tegnforklaring, målestokk, nordpil, kilde ─────────────
 function drawOverlay(T) {
   const w = W(), h = H(), g = gOverlay, m = 22;
@@ -1206,6 +1422,9 @@ function drawOverlay(T) {
     if (S.subtitleText) { g.append('text').attr('x', m).attr('y', y).attr('font-family', FONT).attr('font-size', ts * 0.55).attr('fill', ink).attr('fill-opacity', 0.8).text(S.subtitleText); y += ts * 0.6; }
     titleBottom = y + 6;
   }
+  layoutInset();
+  placeInset(titleBottom);
+  drawInset(g, T);
   if (S.legend) drawLegend(g, T, titleBottom);
 
   if (S.scale) drawScaleBar(g, T);
@@ -1292,7 +1511,9 @@ function drawLegend(g, T, topY) {
   const pos = S.legendPos;
   let x = pos.includes('l') ? m : W() - bw - m;
   let y = pos.includes('t') ? (pos === 'tl' ? Math.max(m, topY) : m) : H() - bh - m - (S.source ? 14 : 0);
-  if (pos === 'bl' && S.scale) y -= 44;
+  if (pos === 'bl' && S.scale && !(insetBox && S.insetPos === 'bl')) y -= 44;
+  // Samme hjørne som miniatyrkartet: stable tegnforklaringen innenfor (mot midten av kartet).
+  if (insetBox && S.insetPos === pos) y = pos.includes('t') ? insetBox.y + insetBox.h + 12 : insetBox.y - bh - 12;
   const lg = g.append('g').attr('transform', `translate(${x},${y})`).attr('class', 'legend');
   lg.append('rect').attr('width', bw).attr('height', bh).attr('rx', 4).attr('fill', T.box).attr('fill-opacity', 0.9).attr('stroke', T.coast).attr('stroke-width', 0.6);
   let cy = pad + lh / 2 - 2;
@@ -1317,7 +1538,7 @@ function drawLegend(g, T, topY) {
 function drawScaleBar(g, T) {
   // Målestokken måles langs selve linjen den står på. I perspektiv (3D) og i Mercator varierer
   // målestokken over kartet, men den er lik langs en vannrett linje i bildet - så den blir riktig der.
-  const x = 26, y = H() - 34;
+  const x = insetBox && S.insetPos === 'bl' ? insetBox.x + insetBox.w + 28 : 26, y = H() - 34;
   const a = Pinv([x, y]), b = Pinv([x + 100, y]);
   if (!a || !b) return;
   const kpp = d3.geoDistance(a, b) * 6371.0088 / 100;
@@ -1341,7 +1562,9 @@ function drawNorth(g, T) {
   const p0 = P(c), p1 = P([c[0], Math.min(c[1] + 0.2, 89.9)]);
   const ang = Math.atan2(p1[0] - p0[0], -(p1[1] - p0[1])) * 180 / Math.PI;
   const s = 15;
-  const pos = S.legend && S.legendPos === 'br' ? [W() - 34, 40] : [W() - 34, H() - 62];
+  let pos = S.legend && S.legendPos === 'br' ? [W() - 34, 40] : [W() - 34, H() - 62];
+  if (insetBox && S.insetPos === 'br' && pos[1] > H() / 2) pos = [insetBox.x - 26, H() - 40];
+  if (insetBox && S.insetPos === 'tr' && pos[1] < H() / 2) pos = [insetBox.x - 26, 40];
   const ng = g.append('g').attr('transform', `translate(${pos[0]},${pos[1]}) rotate(${ang.toFixed(2)})`);
   ng.append('path').attr('d', `M0,${-s}L${s * 0.45},${s * 0.55}L0,${s * 0.25}Z`).attr('fill', T.ink);
   ng.append('path').attr('d', `M0,${-s}L${-s * 0.45},${s * 0.55}L0,${s * 0.25}Z`).attr('fill', T.box).attr('stroke', T.ink).attr('stroke-width', 0.8);
@@ -1687,6 +1910,33 @@ function syncAllControls() {
   bindCheck('secUk', () => S.sectors.uk, v => S.sectors.uk = v);
   bindCheck('secDk', () => S.sectors.dk, v => S.sectors.dk = v);
   bindCheck('secLines', () => S.sectorLines, v => S.sectorLines = v);
+  bindCheck('secDash', () => S.sectorDash, v => S.sectorDash = v);
+  bindCheck('secLabels', () => S.sectorLabels, v => S.sectorLabels = v);
+  bindValue('secLabelPos', () => S.sectorLabelPos, v => S.sectorLabelPos = +v, 'input');
+  {
+    const col = $('secColor'), wid = $('secWidth');
+    const sync = () => { col.value = S.sectorColor || theme().ink; wid.value = S.sectorWidth; };
+    sync();
+    col.oninput = () => { S.sectorColor = col.value; scheduleRender(); };
+    wid.oninput = () => { const v = parseFloat(wid.value); if (v > 0) { S.sectorWidth = Math.min(8, v); scheduleRender(); } };
+    $('secReset').onclick = () => { S.sectorColor = null; S.sectorWidth = defaultState().sectorWidth; sync(); render(); };
+  }
+  bindCheck('showInset', () => S.inset, v => { S.inset = v; $('insetOpts').style.display = v ? '' : 'none'; });
+  $('insetOpts').style.display = S.inset ? '' : 'none';
+  bindValue('insetPos', () => S.insetPos, v => S.insetPos = v);
+  bindValue('insetArea', () => S.insetArea, v => S.insetArea = v);
+  bindValue('insetMarker', () => S.insetMarker, v => S.insetMarker = v);
+  bindValue('insetSize', () => S.insetSize, v => { S.insetSize = +v; $('insetSizeVal').textContent = v + ' %'; }, 'input');
+  $('insetSizeVal').textContent = S.insetSize + ' %';
+  bindCheck('insetLabels', () => S.insetLabels, v => S.insetLabels = v);
+  {
+    const land = $('insetLand'), mk = $('insetMarkerColor');
+    const sync = () => { land.value = S.insetLand || (S.theme === 'dark' ? '#8fb3e8' : '#1f3b73'); mk.value = S.insetMarkerColor; };
+    sync();
+    land.oninput = () => { S.insetLand = land.value; scheduleRender(); };
+    mk.oninput = () => { S.insetMarkerColor = mk.value; scheduleRender(); };
+    $('insetReset').onclick = () => { S.insetLand = null; S.insetMarkerColor = defaultState().insetMarkerColor; sync(); render(); };
+  }
   bindCheck('extFields', () => S.extFields, v => S.extFields = v);
   bindCheck('extDsc', () => S.extDsc, v => S.extDsc = v);
   bindCheck('shadow', () => S.shadow, v => S.shadow = v);

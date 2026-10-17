@@ -7,11 +7,14 @@ Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-pres
 
 - **Kartlag:** felt i produksjon, felt under utbygging, nedstengte felt, funn, aktive lisenser,
   transportrørledninger, innretninger og letebrønner (filtrert på år, formål og resultat).
-- **Sektorer:** norsk, britisk og dansk sektor kan slås av og på hver for seg, med sektorgrenser.
+- **Sektorer:** norsk, britisk og dansk sektor kan slås av og på hver for seg. Sektorgrensene kan få egen
+  farge, tykkelse og stil, og landnavn parallelt med linjen på hver side.
 - **Selskapsfilter:** velg ett eller flere selskaper som operatør og/eller partner. De kan fremheves
   (andre vises i grått) eller vises alene, med valgfri eierandel i etiketten. Gjelder felt, funn og lisenser.
 - **Bakgrunn:** vektorkart med kystlinje, dybdekurver, landegrenser, valg av hvilke land som vises (f.eks. bare Norge og Danmark), byer og kvadrant-/blokknett (kvadranter med eller uten nummer, valgfri farge og linjetykkelse).
   Fire fargetemaer pluss egne farger, og transparent bakgrunn.
+- **Miniatyrkart:** valgfritt oversiktskart i et hjørne som viser hvor utsnittet er hentet fra
+  (automatisk område eller Nordsjøen/Skandinavia/Nord-Europa, markert med omriss eller sirkel).
 - **Slide-format:** 16:9, halvside, 4:3, kvadrat, stående eller egendefinert. Rammen viser nøyaktig
   det som eksporteres.
 - **Eksport:** *Kopier* legger en PNG på utklippstavlen (lim inn i PowerPoint med Ctrl+V), *PNG*
@@ -64,8 +67,11 @@ mapshaper -i land.json borders.json d200.json d1000.json d2000.json d3000.json s
   combine-files -o basemap.json format=topojson quantization=100000
 ```
 
-Sektorgrensene (`sectors`) er de felles kantene mellom hvert lands blokknett (Sodir, NSTA og ENS),
-laget med `mapshaper -i no.json uk.json dk.json combine-files snap -merge-layers force -dissolve2 cc -innerlines`.
+Sektorområdene (`sectorAreas`) er hvert lands blokknett (Sodir, NSTA og ENS) slått sammen
+(`mapshaper -i no.json uk.json dk.json combine-files snap snap-interval=0.0005 -merge-layers force -dissolve2 cc`).
+Sektorgrensene (`sectors`, med landene på hver side i `l`/`r`) er den delen av ett lands sektoromriss
+som ligger innenfor 0,01° fra nabolandets sektor. Det gir én sammenhengende linje per grense, også
+der blokknettene fra ulike kilder ikke deler punkter nøyaktig.
 
 Siden må serveres over HTTP(S), f.eks. via GitHub Pages eller lokalt med
 `python -m http.server`. Den fungerer ikke åpnet direkte som fil.
