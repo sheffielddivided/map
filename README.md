@@ -10,7 +10,7 @@ Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-pres
 - **Sektorer:** norsk, britisk og dansk sektor kan slås av og på hver for seg, med sektorgrenser.
 - **Selskapsfilter:** velg ett eller flere selskaper som operatør og/eller partner. De kan fremheves
   (andre vises i grått) eller vises alene, med valgfri eierandel i etiketten. Gjelder felt, funn og lisenser.
-- **Bakgrunn:** vektorkart med kystlinje, dybdekurver, landegrenser, valg av hvilke land som vises (f.eks. bare Norge og Danmark), byer og kvadrant-/blokknett (kvadranter med eller uten nummer).
+- **Bakgrunn:** vektorkart med kystlinje, dybdekurver, landegrenser, valg av hvilke land som vises (f.eks. bare Norge og Danmark), byer og kvadrant-/blokknett (kvadranter med eller uten nummer, valgfri farge og linjetykkelse).
   Fire fargetemaer pluss egne farger, og transparent bakgrunn.
 - **Slide-format:** 16:9, halvside, 4:3, kvadrat, stående eller egendefinert. Rammen viser nøyaktig
   det som eksporteres.

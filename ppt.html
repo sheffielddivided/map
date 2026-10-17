@@ -231,7 +231,13 @@
         <label class="row"><input type="checkbox" id="showQuads" /> Kvadranter
           <label class="lbl" style="margin-left:auto" title="Vis kvadrantnummer"><input type="checkbox" id="showQuadLabels" /> Nummer</label>
         </label>
+        <div class="sub"><div class="row">Farge <input type="color" id="quadColor" /> Tykkelse
+          <input type="number" id="quadWidth" min="0.1" max="6" step="0.1" style="width:60px" />
+          <button class="small" id="quadReset" title="Tilbake til temaets standard">↺</button></div></div>
         <label class="row"><input type="checkbox" id="showBlocks" /> Blokker</label>
+        <div class="sub"><div class="row">Farge <input type="color" id="blockColor" /> Tykkelse
+          <input type="number" id="blockWidth" min="0.1" max="6" step="0.1" style="width:60px" />
+          <button class="small" id="blockReset" title="Tilbake til temaets standard">↺</button></div></div>
       </div>
     </details>
 
@@ -436,7 +442,7 @@ const EN = {
   'Bakgrunnskart': 'Basemap', 'Tema': 'Theme', 'Lys': 'Light', 'Grå / nøytral': 'Grey / neutral', 'Mørk': 'Dark', 'Blå hav': 'Blue sea',
   'Hav': 'Sea', 'Land': 'Land', 'Transparent bakgrunn (ingen havfarge)': 'Transparent background (no sea colour)',
   'Dybdekurver (200, 1000, 2000, 3000 m)': 'Depth contours (200, 1000, 2000, 3000 m)', 'Landegrenser': 'Country borders',
-  'Byer og steder': 'Cities and places', 'Kvadranter': 'Quadrants', 'Nummer': 'Numbers', 'Vis kvadrantnummer': 'Show quadrant numbers', 'Blokker': 'Blocks',
+  'Byer og steder': 'Cities and places', 'Tykkelse': 'Width', 'Tilbake til temaets standard': 'Back to theme default', 'Kvadranter': 'Quadrants', 'Nummer': 'Numbers', 'Vis kvadrantnummer': 'Show quadrant numbers', 'Blokker': 'Blocks',
   // Tittel og tekst
   'Tittel, tegnforklaring og tekst': 'Title, legend and text', 'Tittel': 'Title', 'Undertittel (valgfritt)': 'Subtitle (optional)',
   'Tegnforklaring': 'Legend', 'Øverst venstre': 'Top left', 'Øverst høyre': 'Top right', 'Nederst venstre': 'Bottom left', 'Nederst høyre': 'Bottom right',
@@ -525,6 +531,8 @@ function defaultState() {
     companies: [], role: 'any', mode: 'highlight', splitRole: false, labelsOnlySel: true, labelShare: false, otherColor: '#c3c8cf',
     theme: 'light', sea: THEMES.light.sea, land: THEMES.light.land, transparent: false,
     depth: true, borders: true, landMode: 'all', landCountries: ['NOR'], cities: true, quads: false, quadLabels: true, blocks: false,
+    // null = følg temaets rutenettfarge / standard tykkelse.
+    quadColor: null, quadWidth: 0.8, blockColor: null, blockWidth: 0.35,
     title: false, titleText: '', subtitleText: '',
     legend: true, legendPos: 'tr', scale: true, north: true, source: true,
     labelSize: 16, symbolSize: 1.2, declutter: true,
@@ -953,11 +961,11 @@ function render() {
 
   if (S.blocks) {
     if (D.blocks) g.append('path').attr('d', path({ type: 'FeatureCollection', features: D.blocks.features.filter(inSector) }))
-      .attr('fill', 'none').attr('stroke', T.grid).attr('stroke-width', 0.35).attr('stroke-opacity', 0.6);
+      .attr('fill', 'none').attr('stroke', S.blockColor || T.grid).attr('stroke-width', S.blockWidth).attr('stroke-opacity', S.blockColor ? 1 : 0.6);
     else ensureLazy('blocks');
   }
   if (S.quads) g.append('path').attr('d', path({ type: 'FeatureCollection', features: D.quadrants.features.filter(inSector) }))
-    .attr('fill', 'none').attr('stroke', T.grid).attr('stroke-width', 0.8).attr('stroke-opacity', 0.8);
+    .attr('fill', 'none').attr('stroke', S.quadColor || T.grid).attr('stroke-width', S.quadWidth).attr('stroke-opacity', S.quadColor ? 1 : 0.8);
   if (S.sectorLines && BASE.sectors) {
     g.append('path').attr('d', path(BASE.sectors)).attr('fill', 'none').attr('stroke', T.ink).attr('stroke-opacity', 0.55)
       .attr('stroke-width', 1.4).attr('stroke-dasharray', '9 3 2 3').attr('stroke-linejoin', 'round');
@@ -1069,7 +1077,7 @@ function render() {
     for (const f of D.quadrants.features.filter(inSector)) {
       const c = path.centroid(f);
       if (!isFinite(c[0]) || c[0] < 0 || c[1] < 0 || c[0] > w || c[1] > h) continue;
-      labels.push({ key: `quad:${f.properties.cc || 'no'}:${f.properties.name}`, text: f.properties.name, x: c[0], y: c[1], anchor: 'center', size: S.labelSize * 1.15, weight: 'bold', color: T.grid, priority: 1, faint: true });
+      labels.push({ key: `quad:${f.properties.cc || 'no'}:${f.properties.name}`, text: f.properties.name, x: c[0], y: c[1], anchor: 'center', size: S.labelSize * 1.15, weight: 'bold', color: S.quadColor || T.grid, priority: 1, faint: true });
     }
   }
 
@@ -1647,6 +1655,14 @@ function syncAllControls() {
   bindCheck('showQuads', () => S.quads, v => S.quads = v);
   bindCheck('showQuadLabels', () => S.quadLabels, v => S.quadLabels = v);
   bindCheck('showBlocks', () => S.blocks, v => S.blocks = v);
+  for (const k of ['quad', 'block']) {
+    const col = $(k + 'Color'), wid = $(k + 'Width');
+    const sync = () => { col.value = S[k + 'Color'] || theme().grid; wid.value = S[k + 'Width']; };
+    sync();
+    col.oninput = () => { S[k + 'Color'] = col.value; scheduleRender(); };
+    wid.oninput = () => { const v = parseFloat(wid.value); if (v > 0) { S[k + 'Width'] = Math.min(6, v); scheduleRender(); } };
+    $(k + 'Reset').onclick = () => { S[k + 'Color'] = null; S[k + 'Width'] = defaultState()[k + 'Width']; sync(); render(); };
+  }
   bindCheck('showTitle', () => S.title, v => S.title = v);
   bindValue('titleText', () => S.titleText, v => { S.titleText = v; if (v) { S.title = true; $('showTitle').checked = true; } }, 'input');
   bindValue('subtitleText', () => S.subtitleText, v => { S.subtitleText = v; if (v) { S.title = true; $('showTitle').checked = true; } }, 'input');
@@ -1713,7 +1729,10 @@ function initStaticControls() {
     S.theme = $('theme').value;
     const T = THEMES[S.theme];
     S.sea = T.sea; S.land = T.land; S.otherColor = T.other;
-    $('seaColor').value = S.sea; $('landColor').value = S.land; $('otherColor').value = S.otherColor; render();
+    $('seaColor').value = S.sea; $('landColor').value = S.land; $('otherColor').value = S.otherColor;
+    if (!S.quadColor) $('quadColor').value = T.grid;
+    if (!S.blockColor) $('blockColor').value = T.grid;
+    render();
   };
   $('btnResetLabels').onclick = () => { S.offsets = {}; S.hidden = []; render(); };
 
