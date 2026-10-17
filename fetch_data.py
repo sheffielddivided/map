@@ -4,8 +4,10 @@ GeoJSON-filer under data/ for ppt.html:
 
 - Norge: Sodir (Norwegian Offshore Directorate) FactMaps
 - Storbritannia: NSTA (North Sea Transition Authority) Open Data, ArcGIS
-- Danmark: Energistyrelsens shapefiler, slik de er bygget til GeoJSON i
-  github.com/sheffielddivided/ens (ENS har ikke noe åpent kart-API)
+- Danmark: GEUS sin WFS-tjeneste for Energistyrelsens data (feltavgrensninger,
+  rørledninger, brønnresultater), supplert med GeoJSON bygget fra ENS sine
+  shapefiler i github.com/sheffielddivided/ens (lisenser, brønner,
+  innretninger, blokker, eierandeler og produksjon)
 
 Alle features får egenskapen cc ('no', 'uk' eller 'dk'), og selskapsnavn
 normaliseres til konsernnavn (se GROUPS), slik at ett valg i selskapsfilteret
@@ -30,11 +32,14 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
 BASE = 'https://factmaps.sodir.no/api/rest/services/DataService/Data/MapServer'
 NSTA = 'https://services-eu1.arcgis.com/OZMfUznmLTnWccBc/arcgis/rest/services'
 ENS_RAW = 'https://raw.githubusercontent.com/sheffielddivided/ens/main/docs/data'
+# GEUS sin WFS-tjeneste for Energistyrelsens data (lenket fra ENS sin shapefil-side), i WGS84.
+GEUS_WFS = 'https://data.geus.dk/geusmap/ows/4326.jsp'
 OUT_DIR = 'data'
 PAGE_SIZE = 2000
 TIMEOUT = 180
@@ -44,7 +49,7 @@ SIMPLIFY = 0.0005
 PRECISION = 4
 
 SOURCE = ('Sodir FactMaps (NLOD 2.0); NSTA Open Data (Open Government Licence v3.0); '
-          'Energistyrelsen via github.com/sheffielddivided/ens')
+          'Energistyrelsen via GEUS WFS og github.com/sheffielddivided/ens')
 
 
 # ── HTTP ─────────────────────────────────────────────────────────────────────
@@ -538,17 +543,23 @@ def round_geom(g):
 
 
 def dk_field_status():
-    """Produserende = produksjon siste 12 måneder i ENS-dataene; ellers nedstengt."""
-    recs = ens('monthly.json')['records']
-    latest = max(r['year'] * 12 + r['month'] for r in recs)
+    """Produserende = produksjon siste 12 måneder (månedsdata) eller i siste år (årsdata).
+    Felt med tidligere produksjon er nedstengt; felt uten produksjon er godkjent for utbygging."""
+    produced = lambda r: (r.get('oil') or 0) > 0 or (r.get('gas') or 0) > 0  # noqa: E731
+    monthly = ens('monthly.json')['records']
+    yearly = ens('yearly.json')['records']
+    latest_m = max(r['year'] * 12 + r['month'] for r in monthly)
+    latest_y = max(r['year'] for r in yearly)
     status = {}
-    for r in recs:
-        produced = (r.get('oil') or 0) > 0 or (r.get('gas') or 0) > 0
-        recent = r['year'] * 12 + r['month'] > latest - 12
-        if produced and recent:
-            status[r['field']] = 'Producing'
-        else:
+    for r in yearly + monthly:
+        if produced(r):
             status.setdefault(r['field'], 'Shut down')
+    for r in monthly:
+        if produced(r) and r['year'] * 12 + r['month'] > latest_m - 12:
+            status[r['field']] = 'Producing'
+    for r in yearly:
+        if produced(r) and r['year'] == latest_y:
+            status[r['field']] = 'Producing'
     return status
 
 
@@ -558,26 +569,162 @@ def dk_ownership():
             for slug_, shares_ in own.items()}
 
 
+# GEUS leverer GML2 (ikke GeoJSON); det leses med standardbiblioteket.
+_GML = {'gml': 'http://www.opengis.net/gml', 'ms': 'http://mapserver.gis.umn.edu/mapserver'}
+
+
+def _gml_coords(el):
+    return [[round(float(v), PRECISION) for v in p.split(',')[:2]] for p in el.text.split()]
+
+
+def _gml_geom(g):
+    tag = g.tag.split('}')[1]
+    c = lambda e: _gml_coords(e.find('gml:coordinates', _GML))  # noqa: E731
+    if tag == 'Point':
+        return {'type': 'Point', 'coordinates': c(g)[0]}
+    if tag == 'LineString':
+        return {'type': 'LineString', 'coordinates': c(g)}
+    if tag == 'MultiLineString':
+        return {'type': 'MultiLineString', 'coordinates': [c(ls) for ls in g.iter('{%s}LineString' % _GML['gml'])]}
+
+    def poly(pg):
+        rings = [_gml_coords(pg.find('gml:outerBoundaryIs/gml:LinearRing/gml:coordinates', _GML))]
+        return rings + [_gml_coords(r) for r in pg.findall('gml:innerBoundaryIs/gml:LinearRing/gml:coordinates', _GML)]
+    if tag == 'Polygon':
+        return {'type': 'Polygon', 'coordinates': poly(g)}
+    if tag == 'MultiPolygon':
+        return {'type': 'MultiPolygon', 'coordinates': [poly(pg) for pg in g.iter('{%s}Polygon' % _GML['gml'])]}
+    raise ValueError(f'ukjent GML-geometri {tag}')
+
+
+def geus(typename):
+    """Henter et WFS-lag fra GEUS som liste av {'geometry', 'properties'}."""
+    params = {'nocache': 'nocache', 'whoami': 'ul@geus.dk', 'SERVICE': 'WFS', 'VERSION': '1.0.0',
+              'REQUEST': 'GetFeature', 'TYPENAME': typename, 'outputformat': 'gml2'}
+    url = f'{GEUS_WFS}?{urllib.parse.urlencode(params)}'
+    last = None
+    for attempt in range(RETRIES):
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'ppt-map-fetch'})
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                root = ET.fromstring(resp.read())
+            break
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            if attempt < RETRIES - 1:
+                time.sleep(2 ** (attempt + 1))
+    else:
+        raise RuntimeError(f'GEUS {typename}: {last}')
+    out = []
+    for member in root.findall('gml:featureMember', _GML):
+        f = list(member)[0]
+        props, geom = {}, None
+        for child in f:
+            name = child.tag.split('}')[1]
+            if name == 'msGeometry':
+                geom = _gml_geom(list(child)[0])
+            elif name != 'boundedBy':
+                props[name] = child.text
+        out.append({'geometry': geom, 'properties': props})
+    print(f'  GEUS {typename}: {len(out)} rader')
+    return out
+
+
+# GEUS-feltnavn -> slug i ens-datasettet (eierandeler og produksjon er nøklet på slug).
+# Igor og Sif regnes som Halfdan, slik ENS gjør i produksjonstallene.
+DK_FIELD_SLUG = {'igor': 'halfdan', 'sif': 'halfdan', 'tyra se': 'tyra_se', 'syd arne': 'syd_arne'}
+
+
+def dk_slug(field_name):
+    low = field_name.strip().lower()
+    return DK_FIELD_SLUG.get(low, low.replace(' ', '_'))
+
+
 def build_dk_fields():
-    feats = ens('gis/fields.geojson')['features']
     meta = ens('fields.json')['fields']
     status = dk_field_status()
     own = dk_ownership()
-    merged = {}
-    for f in feats:
-        p = f['properties']
-        sl = p['slug']
-        if sl in merged:
-            merged[sl]['geometry'] = merge_geoms(merged[sl]['geometry'], round_geom(f['geometry']))
-            continue
+
+    def props(sl, fallback_name):
         m = meta.get(sl, {})
-        # Felt uten produksjon i ENS-dataene har en godkjent avgrensning, men er ikke i produksjon ennå.
-        name = m.get('display_name') or p['name'].split(' - ')[0].split(' (')[0]
-        merged[sl] = feature(round_geom(f['geometry']), {
-            'id': 'dk-' + sl, 'cc': 'dk', 'name': name, 'status': status.get(sl, 'Approved for production'),
+        return {
+            'id': 'dk-' + sl, 'cc': 'dk', 'name': fallback_name or m.get('display_name'),
+            # Felt uten produksjon i ENS-dataene har en godkjent avgrensning, men er ikke i produksjon ennå.
+            'status': status.get(sl, 'Approved for production'),
             'hc': None, 'op': m.get('operator'), 'year': m.get('first_year'), 'area': None, 'lic': own.get(sl, []),
+        }
+
+    merged = {}
+
+    def add(sl, name, geom):
+        if sl in merged:
+            merged[sl]['geometry'] = merge_geoms(merged[sl]['geometry'], geom)
+        else:
+            merged[sl] = feature(geom, props(sl, name))
+
+    try:
+        for r in geus('samba_fields'):
+            name = r['properties'].get('field_name')
+            if name and r['geometry']:
+                add(dk_slug(name), 'Halfdan' if dk_slug(name) == 'halfdan' else name, r['geometry'])
+    except Exception as exc:  # noqa: BLE001
+        print(f'  ! GEUS-felt feilet ({exc}) - bruker bare ENS-shapefilen', file=sys.stderr)
+    # Felt som bare finnes i ENS-shapefilen (f.eks. Lulita), eller alle hvis GEUS feilet.
+    from_geus = set(merged)
+    for f in ens('gis/fields.geojson')['features']:
+        p = f['properties']
+        if p['slug'] not in from_geus:
+            add(p['slug'], p['name'].split(' - ')[0].split(' (')[0], round_geom(f['geometry']))
+    return list(merged.values())
+
+
+DK_PIPE_MEDIUM = {'Gas': 'Gas', 'Oil': 'Oil', 'Multi-phase': 'Mixed'}
+
+
+def build_dk_pipelines():
+    merged = {}
+    for r in geus('pipelines_simplified'):
+        p, g = r['properties'], r['geometry']
+        if not g:
+            continue
+        lines = [g['coordinates']] if g['type'] == 'LineString' else g['coordinates']
+        name = p.get('name') or '?'
+        key = (name, p.get('content_name'))
+        if key in merged:
+            merged[key]['geometry']['coordinates'] += lines
+            continue
+        merged[key] = feature({'type': 'MultiLineString', 'coordinates': lines}, {
+            'id': f'dk-{slug(name)}-{slug(p.get("content_name") or "")}', 'cc': 'dk', 'name': name, 'label': None,
+            'medium': DK_PIPE_MEDIUM.get(p.get('content_name')), 'phase': 'IN SERVICE', 'dim': None,
+            'op': None, 'from': None, 'to': None,
         })
     return list(merged.values())
+
+
+# GEUS-brønnstatus -> Sodirs innholdsvokabular (brukes til «farge etter resultat»).
+DK_WELL_CONTENT = {
+    'Dry': 'DRY', 'Oil': 'OIL', 'Gas': 'GAS', 'Oil/gas': 'OIL/GAS', 'Gas/condensate': 'GAS/CONDENSATE',
+    'Oil w. gas shows': 'OIL', 'Gas w. oil shows': 'GAS', 'Show oil': 'OIL SHOWS', 'Show gas': 'GAS SHOWS',
+    'Show oil/gas': 'OIL/GAS SHOWS', 'Show': 'SHOWS',
+}
+
+
+def dk_well_results():
+    """Brønnnavn (store bokstaver, også sidesteg) -> innhold, fra GEUS."""
+    out = {}
+    try:
+        for r in geus('samba_wellbores'):
+            p = r['properties']
+            content = DK_WELL_CONTENT.get(p.get('status'))
+            if not content:
+                continue
+            names = [p.get('well_name') or ''] + (p.get('segment_names') or '').split(',')
+            for n in names:
+                if n.strip():
+                    out.setdefault(n.strip().upper(), content)
+    except Exception as exc:  # noqa: BLE001
+        print(f'  ! GEUS-brønnresultater feilet ({exc}) - brønnene får ukjent resultat', file=sys.stderr)
+    return out
 
 
 def build_dk_licences():
@@ -596,6 +743,7 @@ def build_dk_licences():
 
 
 def build_dk_wells():
+    results = dk_well_results()
     out = []
     for f in ens('gis/wells.geojson')['features']:
         p = f['properties']
@@ -606,7 +754,8 @@ def build_dk_wells():
         out.append(feature(round_geom(f['geometry']), {
             'id': 'dk-' + (p.get('Well_Numb') or p.get('Well_Name')), 'cc': 'dk',
             'name': p.get('Well_Numb') or p.get('Well_Name'),
-            'purpose': 'WILDCAT' if cls.startswith('EXPLORATION') else 'APPRAISAL', 'content': None, 'status': None,
+            'purpose': 'WILDCAT' if cls.startswith('EXPLORATION') else 'APPRAISAL',
+            'content': results.get((p.get('Well_Name') or '').upper()), 'status': None,
             'op': p.get('Operator'), 'year': int(date[:4]) if date[:4].isdigit() else None, 'dsc': None, 'area': None,
         }))
     return out
@@ -750,7 +899,7 @@ def main():
         'discoveries': {'no': lambda: build_discoveries(prl_lic, baa_lic), 'uk': build_uk_discoveries},
         'licences': {'no': lambda: build_licences(prl_lic), 'uk': build_uk_licences, 'dk': build_dk_licences},
         'wells': {'no': build_wells, 'uk': build_uk_wells, 'dk': build_dk_wells},
-        'pipelines': {'no': build_pipelines, 'uk': build_uk_pipelines},
+        'pipelines': {'no': build_pipelines, 'uk': build_uk_pipelines, 'dk': build_dk_pipelines},
         'facilities': {'no': build_facilities, 'uk': build_uk_facilities, 'dk': build_dk_facilities},
         'quadrants': {'no': build_quadrants, 'uk': build_uk_quadrants},
         'blocks': {'no': build_blocks, 'uk': build_uk_blocks, 'dk': build_dk_blocks},

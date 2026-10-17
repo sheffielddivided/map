@@ -32,7 +32,7 @@ feature har `cc` = `no`, `uk` eller `dk`.
 | --- | --- | --- |
 | Norge | [Sodir FactMaps](https://factmaps.sodir.no) (NLOD 2.0) | felt, funn, lisenser, letebrønner, rørledninger, innretninger, kvadranter, blokker |
 | Storbritannia | [NSTA Open Data](https://opendata-nstauthority.hub.arcgis.com) (Open Government Licence v3.0) | felt (med rettighetshavere), uutbygde funn (punkter), lisens-delområder med eierandel, lete-/avgrensningsbrønner, transportrør ≥ 16", plattformer/FPSO/terminaler, havbunnsrammer, kvadranter, blokker |
-| Danmark | Energistyrelsens shapefiler via [sheffielddivided/ens](https://github.com/sheffielddivided/ens) | felt (status fra månedsproduksjonen, eierandeler fra `ownership.json`), lisenser, letebrønner (til 2019), innretninger, blokker |
+| Danmark | Energistyrelsens data via [GEUS WFS](https://data.geus.dk/geusmap/ows/4326.jsp) (feltavgrensninger, rørledninger, brønnresultater) og shapefilene i [sheffielddivided/ens](https://github.com/sheffielddivided/ens) | felt (status fra års- og månedsproduksjonen, eierandeler fra `ownership.json`), rørledninger (gass/olje/flerfase), lisenser, letebrønner med resultat (til 2019), innretninger, blokker |
 
 Selskapsnavn normaliseres til konsernnavn (`GROUPS` i skriptet), så ett valg dekker datterselskaper
 i alle land. `data/companies.json` kobler juridiske navn til konsernnavn, slik at eldre lenker og
