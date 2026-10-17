@@ -172,7 +172,7 @@
         <label class="row"><input type="checkbox" id="extDsc" /> Funn som klosser</label>
         <label class="row"><input type="checkbox" id="shadow" /> Skygge</label>
         <label class="row"><input type="checkbox" id="haze" /> Dis mot horisonten</label>
-        <div class="hint">Klossene vises når kartet er vippet. Målestokken skjules i perspektiv fordi den ikke er gyldig over hele kartet.</div>
+        <div class="hint">Klossene vises når kartet er vippet. I perspektiv gjelder målestokken langs linjen den står på (nederst i kartet).</div>
       </div>
     </details>
 
@@ -411,7 +411,7 @@ const EN = {
   '3D-effekt': '3D effect', 'Lett skrå': 'Slight tilt', 'Skrå': 'Tilted', 'Dramatisk': 'Dramatic', 'Vipping': 'Tilt', 'Rotasjon': 'Rotation',
   'Klosshøyde': 'Block height', 'Felt som klosser': 'Fields as blocks', 'Funn som klosser': 'Discoveries as blocks', 'Skygge': 'Shadow',
   'Dis mot horisonten': 'Haze towards the horizon',
-  'Klossene vises når kartet er vippet. Målestokken skjules i perspektiv fordi den ikke er gyldig over hele kartet.': 'Blocks are shown when the map is tilted. The scale bar is hidden in perspective because it is not valid across the whole map.',
+  'Klossene vises når kartet er vippet. I perspektiv gjelder målestokken langs linjen den står på (nederst i kartet).': 'Blocks are shown when the map is tilted. In perspective the scale bar applies along the line it sits on (at the bottom of the map).',
   // Selskap
   'Selskap': 'Company', 'Søk etter selskap …': 'Search for a company …', 'Rolle': 'Role', 'Operatør eller partner': 'Operator or partner',
   'Operatør': 'Operator', 'Partner': 'Partner', 'Visning': 'Display', 'Fremhev': 'Highlight', 'Vis kun valgte': 'Show selected only',
@@ -1208,8 +1208,7 @@ function drawOverlay(T) {
   }
   if (S.legend) drawLegend(g, T, titleBottom);
 
-  // Målestokken varierer i perspektiv, så den vises bare når kartet ikke er vippet.
-  if (S.scale && !persp.tilted) drawScaleBar(g, T);
+  if (S.scale) drawScaleBar(g, T);
   if (S.north) drawNorth(g, T);
   if (S.source) {
     const src = [];
@@ -1316,12 +1315,17 @@ function drawLegend(g, T, topY) {
 }
 
 function drawScaleBar(g, T) {
-  const kpp = kmPerPx();
+  // Målestokken måles langs selve linjen den står på. I perspektiv (3D) og i Mercator varierer
+  // målestokken over kartet, men den er lik langs en vannrett linje i bildet - så den blir riktig der.
+  const x = 26, y = H() - 34;
+  const a = Pinv([x, y]), b = Pinv([x + 100, y]);
+  if (!a || !b) return;
+  const kpp = d3.geoDistance(a, b) * 6371.0088 / 100;
+  if (!(kpp > 0)) return;
   const target = 160 * kpp;
-  const nice = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000];
+  const nice = [0.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
   const km = nice.reduce((best, n) => (Math.abs(n - target) < Math.abs(best - target) ? n : best), nice[0]);
   const len = km / kpp;
-  const x = 26, y = H() - 34;
   const sg = g.append('g').attr('transform', `translate(${x},${y})`);
   sg.append('rect').attr('x', -8).attr('y', -22).attr('width', len + 16 + textWidth(' km', 13) + 4).attr('height', 36).attr('rx', 3).attr('fill', T.box).attr('fill-opacity', 0.75);
   for (let i = 0; i < 4; i++) sg.append('rect').attr('x', len * i / 4).attr('y', 0).attr('width', len / 4).attr('height', 5)
