@@ -1228,11 +1228,17 @@ function polyLabelPoint(f) {
   return c;
 }
 
-// Funn heter ofte «brønnnummer (navn)», f.eks. «35/8-3 (Aurora)». I etiketten vises bare navnet i parentesen
-// når det finnes; ellers hele navnet. Verktøytips og søk bruker fortsatt hele navnet.
+// Funn heter ofte «brønnnummer (navn)», f.eks. «35/8-3 (Aurora)», eller «brønnnummer navn», f.eks.
+// «16/1-12 Troldhaugen». I etiketten vises bare navnet når det finnes; ellers hele navnet. En enkelt
+// bokstav eller sidestegskode etter brønnnummeret («25/4-10 A», «34/4-12 S») regnes ikke som navn.
+// Verktøytips og søk bruker fortsatt hele navnet.
 function discoveryLabelName(name) {
-  const m = /\(([^()]*)\)\s*$/.exec(name || '');
-  return m && m[1].trim() ? m[1].trim() : name;
+  const n = name || '';
+  const m = /\(([^()]*)\)\s*$/.exec(n);
+  if (m && m[1].trim()) return m[1].trim();
+  const w = /^\d{1,4}\/\d{1,2}[a-z]?-\s?(?:[A-Z]-)?\d+[A-Z]{0,2}\s+(.+)$/.exec(n);
+  if (w && /\p{L}{2,}/u.test(w[1]) && !/^ST\d*$/i.test(w[1].trim())) return w[1].trim();
+  return name;
 }
 
 function labelCandidate(key, it, [x, y], priority, anchor) {
