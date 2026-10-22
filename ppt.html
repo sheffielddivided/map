@@ -512,7 +512,8 @@ const EN = {
   'Frankrike': 'France', 'Irland': 'Ireland', 'Polen': 'Poland', 'Estland': 'Estonia', 'Latvia': 'Latvia', 'Litauen': 'Lithuania',
   'Belarus': 'Belarus', 'Ukraina': 'Ukraine', 'Tsjekkia': 'Czechia', 'Slovakia': 'Slovakia', 'Østerrike': 'Austria',
   'Ungarn': 'Hungary', 'Romania': 'Romania', 'Moldova': 'Moldova', 'Kasakhstan': 'Kazakhstan',
-  'Stiplet linje': 'Dashed line', 'Stil': 'Style', 'Omriss (stiplet)': 'Outline (dashed)', 'Helfarge uten omriss': 'Solid fill, no outline', 'Dekkevne': 'Opacity', 'Plassering langs linjen': 'Position along the line', 'Landnavn langs grensen': 'Country names along the boundary', 'Miniatyrkart': 'Inset map',
+  'Stiplet linje': 'Dashed line', 'Kun rørledninger knyttet til utvalget': 'Only pipelines linked to the selection',
+  'Rør som starter, slutter eller går innenfor ca. 3 km fra valgte felt og funn (valgt selskap eller portefølje).': 'Pipelines that start, end or pass within about 3 km of the selected fields and discoveries (selected company or portfolio).', 'Stil': 'Style', 'Omriss (stiplet)': 'Outline (dashed)', 'Helfarge uten omriss': 'Solid fill, no outline', 'Dekkevne': 'Opacity', 'Plassering langs linjen': 'Position along the line', 'Landnavn langs grensen': 'Country names along the boundary', 'Miniatyrkart': 'Inset map',
   'Område': 'Area', 'Bredde': 'Width', 'Egen størrelse': 'Own size', 'Samme som tegnforklaringen': 'Same as the legend', 'Automatisk rundt utsnittet': 'Automatic around the view', 'Skandinavia': 'Scandinavia', 'Nord-Europa': 'Northern Europe',
   'Markering': 'Marker', 'Utsnittets omriss': 'Outline of the view', 'Sirkel': 'Circle', 'Størrelse': 'Size',
   'Tilbake til standardfarger': 'Back to default colours', 'Landnavn i miniatyrkartet': 'Country names in the inset map',
@@ -576,7 +577,7 @@ function defaultState() {
     sectorColor: null, sectorWidth: 1.4, sectorDash: true, sectorLabels: false, sectorLabelPos: 50,
     inset: false, insetPos: 'bl', insetArea: 'auto', insetMarker: 'rect', insetSize: 24, insetWidth: 'size', insetLand: null, insetMarkerColor: '#e8590c', insetLabels: true,
     wells: { wildcat: true, appraisal: true, from: CURRENT_YEAR - 10, to: CURRENT_YEAR, classes: Object.keys(WELL_CLASSES), colorByContent: true },
-    pipes: { byMedium: false, byDim: true },
+    pipes: { byMedium: false, byDim: true, media: ['Gas', 'Oil', 'Condensate', 'Mixed', 'Co2 injection', 'other'], related: false },
     fac: { surface: true, subsea: false, onshore: true },
     selMode: 'company', portfolio: [], portfolioName: '',
     companies: [], role: 'any', mode: 'highlight', splitRole: false, labelsOnlySel: true, labelShare: false, otherColor: '#c3c8cf',
@@ -970,6 +971,11 @@ function layerItems(L) {
     });
   }
   if (L.key === 'facilities') feats = feats.filter(f => S.fac[f.properties.cls]);
+  if (L.key === 'pipelines') {
+    const media = new Set(S.pipes.media);
+    feats = feats.filter(f => media.has(PIPE_MEDIUM[f.properties.medium] ? f.properties.medium : 'other'));
+    if (S.pipes.related && selectionActive()) { const rel = relatedPipes(); feats = feats.filter(f => rel.has(f)); }
+  }
 
   const out = [];
   for (const f of feats) {
@@ -1107,6 +1113,7 @@ function render() {
         }
       }
     } else if (L.kind === 'line') {
+      const pipeLabels = new Map();
       for (const it of items) {
         const d = path(it.f);
         if (!d) continue;
@@ -1115,6 +1122,21 @@ function render() {
         const sw = S.pipes.byDim && it.p.dim ? Math.max(0.8, Math.min(3.2, it.p.dim / 14)) * k : 1.4 * k;
         lg.append('path').attr('d', d).attr('fill', 'none').attr('stroke', it.color).attr('stroke-width', sw)
           .attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round').attr('data-k', fk);
+        if (st.labels) {
+          // Én etikett per rørnavn: den lengste synlige biten vinner.
+          const text = pipeLabelText(it.p);
+          const run = text && longestVisibleRun(it.f.geometry);
+          const size = S.labelSize * 0.8;
+          if (run && run.len > textWidth(text, size) * 1.15 + 10) {
+            const prev = pipeLabels.get(text);
+            if (!prev || run.len > prev.len) pipeLabels.set(text, { run, len: run.len, it, size, fk });
+          }
+        }
+      }
+      for (const [text, pl] of pipeLabels) {
+        const pt = pointAlong(pl.run, pl.len / 2);
+        if (pt) labels.push({ key: pl.fk, text, x: pt.x, y: pt.y, rot: pt.rot, anchor: 'center', size: pl.size, weight: 'normal', italic: true,
+          color: d3.color(pl.it.color).darker(0.6).formatHex(), priority: 2.5 });
       }
     } else {
       for (const it of items) {
@@ -1222,6 +1244,97 @@ function labelCandidate(key, it, [x, y], priority, anchor) {
 function licenceName(p) { return (p.cc || 'no') === 'no' ? 'PL ' + p.name : p.name; }
 function fmtShare(v) { return (Math.round(v * 100) / 100).toLocaleString(LOCALE(), { maximumFractionDigits: 2 }) + (S.lang === 'en' ? '%' : ' %'); }
 
+// ── Rørledninger knyttet til utvalget ──────────────────────────────────────
+// En rørledning regnes som knyttet til utvalget hvis den starter, slutter eller går innenfor
+// ca. 3 km fra et valgt felt eller funn (de fleste rør går fra en innretning i feltet).
+const PIPE_LINK_KM = 3;
+let relCache = { key: null, set: null };
+function relatedPipes() {
+  const keys = ['producing', 'approved', 'shutdown', 'discoveries'];
+  const ck = JSON.stringify([S.selMode, S.portfolio, S.companies, S.role, S.sectors, S.dscStatus, keys.map(k => S.layers[k].on)]);
+  if (relCache.key === ck) return relCache.set;
+  const targets = [];
+  for (const k of keys) {
+    for (const it of layerItems(LAYER[k])) {
+      if (!(it.cm && it.cm.match)) continue;
+      const b = d3.geoBounds(it.f), pad = PIPE_LINK_KM / 111, padLon = pad / Math.cos((b[0][1] + b[1][1]) / 2 * Math.PI / 180);
+      const verts = [];
+      const g = it.f.geometry;
+      if (g.type === 'Point') verts.push(g.coordinates);
+      else (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).forEach(pg => pg.forEach(r => r.forEach(v => verts.push(v))));
+      targets.push({ f: it.f, poly: g.type !== 'Point', verts, x0: b[0][0] - padLon, x1: b[1][0] + padLon, y0: b[0][1] - pad, y1: b[1][1] + pad });
+    }
+  }
+  const maxRad = PIPE_LINK_KM / 6371.0088;
+  const near = v => targets.some(tg => v[0] >= tg.x0 && v[0] <= tg.x1 && v[1] >= tg.y0 && v[1] <= tg.y1 &&
+    ((tg.poly && d3.geoContains(tg.f, v)) || tg.verts.some(q => d3.geoDistance(q, v) < maxRad)));
+  const set = new Set();
+  for (const f of D.pipelines.features) {
+    const parts = f.geometry.type === 'LineString' ? [f.geometry.coordinates] : f.geometry.coordinates;
+    let hit = false;
+    for (const part of parts) {
+      for (let i = 0; i < part.length && !hit; i++) {
+        if (near(part[i])) { hit = true; break; }
+        // Lange segmenter deles opp, så rør som bare passerer gjennom feltet også fanges opp.
+        if (i + 1 < part.length) {
+          const n = Math.ceil(d3.geoDistance(part[i], part[i + 1]) / (maxRad * 0.8));
+          for (let j = 1; j < n && !hit; j++) hit = near(d3.geoInterpolate(part[i], part[i + 1])(j / n));
+        }
+      }
+      if (hit) break;
+    }
+    if (hit) set.add(f);
+  }
+  relCache = { key: ck, set };
+  return set;
+}
+
+// Lengste sammenhengende del av en linje som ligger inne i rammen, i skjermkoordinater.
+function longestVisibleRun(geom, margin = 12) {
+  const parts = geom.type === 'LineString' ? [geom.coordinates] : geom.coordinates;
+  const inside = q => q && q[0] > margin && q[0] < W() - margin && q[1] > margin && q[1] < H() - margin;
+  let best = null, run = [];
+  const flush = () => {
+    if (run.length > 1) { const len = d3.sum(run.slice(1), (q, i) => Math.hypot(q[0] - run[i][0], q[1] - run[i][1])); if (!best || len > best.len) best = { pts: run, len }; }
+    run = [];
+  };
+  for (const part of parts) {
+    for (let i = 0; i < part.length; i++) {
+      const steps = i + 1 < part.length ? Math.max(1, Math.ceil(d3.geoDistance(part[i], part[i + 1]) / 0.002)) : 1;
+      const interp = i + 1 < part.length ? d3.geoInterpolate(part[i], part[i + 1]) : null;
+      for (let k = 0; k < steps; k++) {
+        const q = P(k === 0 || !interp ? part[i] : interp(k / steps));
+        if (inside(q)) run.push(q); else flush();
+      }
+    }
+    flush();
+  }
+  return best;
+}
+// Punkt og retning (grader, lesbar fra venstre) et gitt stykke ut langs en skjermlinje.
+function pointAlong(run, at) {
+  let acc = 0;
+  for (let i = 1; i < run.pts.length; i++) {
+    const [a, b] = [run.pts[i - 1], run.pts[i]], d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (acc + d >= at) {
+      const tt = d ? (at - acc) / d : 0;
+      const a2 = run.pts[Math.max(0, i - 4)], b2 = run.pts[Math.min(run.pts.length - 1, i + 3)];
+      let ux = b2[0] - a2[0], uy = b2[1] - a2[1];
+      if (ux < 0) { ux = -ux; uy = -uy; }
+      return { x: a[0] + (b[0] - a[0]) * tt, y: a[1] + (b[1] - a[1]) * tt, rot: Math.atan2(uy, ux) * 180 / Math.PI };
+    }
+    acc += d;
+  }
+  return null;
+}
+const titleIfUpper = v => (v && v === v.toUpperCase() ? v.toLowerCase().replace(/(^|[\s\-/(])([a-zæøå])/g, (m, a, b) => a + b.toUpperCase()) : v);
+function pipeLabelText(p) {
+  if ((p.cc || 'no') === 'no') return p.label || titleIfUpper(p.name);
+  // Britiske navn er lange beskrivelser («PIPER 16" GAS EXPORT - PIPER B TO GAS ESV»); bruk første del.
+  if (p.cc === 'uk') return titleIfUpper((p.name || '').split(' - ')[0].trim());
+  return p.name;
+}
+
 function placeLabels(cands, T, obstacles = []) {
   const hidden = new Set(S.hidden);
   const placed = [];
@@ -1239,7 +1352,13 @@ function placeLabels(cands, T, obstacles = []) {
     else { tx = c.x; ty = c.y; ta = 'middle'; }
     tx += off[0]; ty += off[1];
     const x0 = ta === 'start' ? tx : tx - tw / 2;
-    const b = { x0: x0 - 2, x1: x0 + tw + 2, y0: ty - c.size * 0.6, y1: ty + c.size * 0.6 };
+    let b = { x0: x0 - 2, x1: x0 + tw + 2, y0: ty - c.size * 0.6, y1: ty + c.size * 0.6 };
+    if (c.rot) {
+      // Rotert etikett (langs en linje): omsluttende boks rundt den roterte teksten.
+      const r = c.rot * Math.PI / 180, cs = Math.cos(r), sn = Math.sin(r), hw = tw / 2 + 2, hh = c.size * 0.6;
+      const xs = [-hw, hw].flatMap(x => [-hh, hh].map(y => tx + x * cs - y * sn)), ys = [-hw, hw].flatMap(x => [-hh, hh].map(y => ty + x * sn + y * cs));
+      b = { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+    }
     if (!c.moved && (b.x0 < 0 || b.x1 > W() || b.y0 < 0 || b.y1 > H())) continue;
     if (!c.moved && (c.faint ? obstacles.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0) : (S.declutter ? overlaps(b) : false))) continue;
     if (!S.declutter && !c.moved && !c.faint && obstacles.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0)) continue;
@@ -1256,7 +1375,7 @@ function placeLabels(cands, T, obstacles = []) {
     }
     const attrs = t => t.attr('x', c.tx).attr('y', c.ty).attr('text-anchor', c.ta).attr('dy', (c.size * 0.35).toFixed(1))
       .attr('font-family', FONT).attr('font-size', c.size.toFixed(1)).attr('font-weight', c.weight)
-      .attr('font-style', c.italic ? 'italic' : null).text(c.text);
+      .attr('font-style', c.italic ? 'italic' : null).attr('transform', c.rot ? `rotate(${c.rot.toFixed(2)} ${c.tx.toFixed(1)} ${c.ty.toFixed(1)})` : null).text(c.text);
     if (!c.faint) {
       // Glorie som eget tekstelement (i stedet for paint-order) slik at PowerPoint tolker SVG-en riktig.
       attrs(grp.append('text')).attr('fill', 'none').attr('stroke', T.halo).attr('stroke-width', Math.max(2.4, c.size * 0.24)).attr('stroke-linejoin', 'round').attr('stroke-opacity', 0.9);
@@ -1834,9 +1953,17 @@ function buildLayerList() {
     }
     if (key === 'pipelines') {
       sub.innerHTML = `<label class="row"><input type="checkbox" id="o_pm" ${S.pipes.byMedium ? 'checked' : ''}> ${t('Farge etter medium (gass/olje/kondensat)')}</label>
-        <label class="row"><input type="checkbox" id="o_pd" ${S.pipes.byDim ? 'checked' : ''}> ${t('Linjetykkelse etter dimensjon')}</label>`;
+        <label class="row"><input type="checkbox" id="o_pd" ${S.pipes.byDim ? 'checked' : ''}> ${t('Linjetykkelse etter dimensjon')}</label>
+        <div class="row" style="flex-wrap:wrap;gap:4px 10px">${[...Object.entries(PIPE_MEDIUM), ['other', { name: 'Annet / ukjent', color: '#adb5bd' }]]
+          .map(([m, v]) => `<label><input type="checkbox" data-pm="${m}" ${S.pipes.media.includes(m) ? 'checked' : ''}> <span style="color:${v.color}">━</span> ${t(v.name)}</label>`).join('')}</div>
+        <label class="row"><input type="checkbox" id="o_prel" ${S.pipes.related ? 'checked' : ''}> ${t('Kun rørledninger knyttet til utvalget')}</label>
+        <div class="hint" style="margin-left:22px">${t('Rør som starter, slutter eller går innenfor ca. 3 km fra valgte felt og funn (valgt selskap eller portefølje).')}</div>`;
       sub.querySelector('#o_pm').onchange = e => { S.pipes.byMedium = e.target.checked; render(); };
       sub.querySelector('#o_pd').onchange = e => { S.pipes.byDim = e.target.checked; render(); };
+      sub.querySelectorAll('[data-pm]').forEach(i => i.onchange = () => {
+        S.pipes.media = [...sub.querySelectorAll('[data-pm]:checked')].map(x => x.dataset.pm); render();
+      });
+      sub.querySelector('#o_prel').onchange = e => { S.pipes.related = e.target.checked; render(); };
     }
     if (key === 'facilities') {
       sub.innerHTML = [['surface', 'Overflateinnretninger'], ['subsea', 'Havbunnsinnretninger'], ['onshore', 'Landanlegg']]
