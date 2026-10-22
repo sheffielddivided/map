@@ -1228,10 +1228,18 @@ function polyLabelPoint(f) {
   return c;
 }
 
+// Funn heter ofte «brønnnummer (navn)», f.eks. «35/8-3 (Aurora)». I etiketten vises bare navnet i parentesen
+// når det finnes; ellers hele navnet. Verktøytips og søk bruker fortsatt hele navnet.
+function discoveryLabelName(name) {
+  const m = /\(([^()]*)\)\s*$/.exec(name || '');
+  return m && m[1].trim() ? m[1].trim() : name;
+}
+
 function labelCandidate(key, it, [x, y], priority, anchor) {
   const p = it.p, T = theme();
   let text = p.name;
   if (key === 'licences') text = licenceName(p);
+  if (key === 'discoveries') text = discoveryLabelName(p.name);
   if (S.labelShare && it.cm && it.cm.match && it.cm.share > 0) text += ` (${fmtShare(it.cm.share)})`;
   const isField = key === 'producing' || key === 'approved';
   return {
