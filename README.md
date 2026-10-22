@@ -11,6 +11,9 @@ Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-pres
   farge, tykkelse og stil, og landnavn parallelt med linjen på hver side.
 - **Selskapsfilter:** velg ett eller flere selskaper som operatør og/eller partner. De kan fremheves
   (andre vises i grått) eller vises alene, med valgfri eierandel i etiketten. Gjelder felt, funn og lisenser.
+- **Egendefinert portefølje:** alternativ til selskapsfilteret. Velg enkeltfelt og -funn ved å søke
+  eller klikke i kartet, og gi porteføljen et navn som vises i tegnforklaringen. Fremhev/vis kun
+  valgte og «Zoom til utvalg» virker som for selskaper.
 - **Bakgrunn:** vektorkart med kystlinje, dybdekurver, landegrenser, valg av hvilke land som vises (f.eks. bare Norge og Danmark), byer og kvadrant-/blokknett (kvadranter med eller uten nummer, valgfri farge og linjetykkelse).
   Fire fargetemaer pluss egne farger, og transparent bakgrunn.
 - **Miniatyrkart:** valgfritt oversiktskart i et hjørne som viser hvor utsnittet er hentet fra

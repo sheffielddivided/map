@@ -185,8 +185,12 @@
     </details>
 
     <details open>
-      <summary>Selskap</summary>
+      <summary>Selskap / portefølje</summary>
       <div class="sec">
+        <div class="seg" id="segSel">
+          <button data-v="company">Selskap</button><button data-v="custom">Egendefinert portefølje</button>
+        </div>
+        <div id="selCompany" class="sec" style="padding:0">
         <input type="search" id="compSearch" placeholder="Søk etter selskap …" />
         <div class="complist" id="compList"></div>
         <div class="chips" id="compChips"></div>
@@ -195,16 +199,24 @@
             <button data-v="any">Operatør eller partner</button><button data-v="op">Operatør</button><button data-v="partner">Partner</button>
           </div>
         </div>
+        </div>
+        <div id="selCustom" class="sec" style="padding:0">
+          <input type="text" id="portfolioName" placeholder="Navn på porteføljen (vises i tegnforklaringen)" />
+          <input type="search" id="pfSearch" placeholder="Søk etter felt eller funn …" />
+          <div class="complist" id="pfList"></div>
+          <div class="chips" id="pfChips"></div>
+          <div class="hint">Klikk på felt og funn i kartet for å legge dem til eller fjerne dem.</div>
+        </div>
         <div class="row"><span>Visning</span>
           <div class="seg grow" id="segMode">
             <button data-v="highlight">Fremhev</button><button data-v="only">Vis kun valgte</button>
           </div>
         </div>
-        <label class="row"><input type="checkbox" id="splitRole" /> Skill operatør (mørk) og partner (lys)</label>
+        <label class="row" id="splitRoleRow"><input type="checkbox" id="splitRole" /> Skill operatør (mørk) og partner (lys)</label>
         <label class="row"><input type="checkbox" id="labelsOnlySel" /> Etiketter kun for valgte</label>
-        <label class="row"><input type="checkbox" id="labelShare" /> Vis eierandel i etiketten</label>
+        <label class="row" id="labelShareRow"><input type="checkbox" id="labelShare" /> Vis eierandel i etiketten</label>
         <div class="row"><span class="grow">Farge for andre selskaper</span><input type="color" id="otherColor" /></div>
-        <div class="hint">Gjelder felt, funn og lisenser.</div>
+        <div class="hint" id="selHint">Gjelder felt, funn og lisenser.</div>
       </div>
     </details>
 
@@ -440,7 +452,11 @@ const EN = {
   'Dis mot horisonten': 'Haze towards the horizon',
   'Klossene vises når kartet er vippet. I perspektiv gjelder målestokken langs linjen den står på (nederst i kartet).': 'Blocks are shown when the map is tilted. In perspective the scale bar applies along the line it sits on (at the bottom of the map).',
   // Selskap
-  'Selskap': 'Company', 'Søk etter selskap …': 'Search for a company …', 'Rolle': 'Role', 'Operatør eller partner': 'Operator or partner',
+  'Selskap': 'Company', 'Selskap / portefølje': 'Company / portfolio', 'Egendefinert portefølje': 'Custom portfolio',
+  'Navn på porteføljen (vises i tegnforklaringen)': 'Portfolio name (shown in the legend)', 'Søk etter felt eller funn …': 'Search for a field or discovery …',
+  'Klikk på felt og funn i kartet for å legge dem til eller fjerne dem.': 'Click fields and discoveries in the map to add or remove them.',
+  'Gjelder felt og funn. Lisenser vises som vanlig.': 'Applies to fields and discoveries. Licences are shown as usual.',
+  'Andre felt og funn': 'Other fields and discoveries', 'Ingen treff': 'No matches', 'Søk etter selskap …': 'Search for a company …', 'Rolle': 'Role', 'Operatør eller partner': 'Operator or partner',
   'Operatør': 'Operator', 'Partner': 'Partner', 'Visning': 'Display', 'Fremhev': 'Highlight', 'Vis kun valgte': 'Show selected only',
   'Skill operatør (mørk) og partner (lys)': 'Distinguish operator (dark) and partner (light)', 'Etiketter kun for valgte': 'Labels for selected only',
   'Vis eierandel i etiketten': 'Show equity share in label', 'Farge for andre selskaper': 'Colour for other companies',
@@ -562,6 +578,7 @@ function defaultState() {
     wells: { wildcat: true, appraisal: true, from: CURRENT_YEAR - 10, to: CURRENT_YEAR, classes: Object.keys(WELL_CLASSES), colorByContent: true },
     pipes: { byMedium: false, byDim: true },
     fac: { surface: true, subsea: false, onshore: true },
+    selMode: 'company', portfolio: [], portfolioName: '',
     companies: [], role: 'any', mode: 'highlight', splitRole: false, labelsOnlySel: true, labelShare: false, otherColor: '#c3c8cf',
     theme: 'light', sea: THEMES.light.sea, land: THEMES.light.land, transparent: false,
     depth: true, borders: true, landMode: 'all', landCountries: ['NOR'], cities: true, quads: false, quadLabels: true, blocks: false,
@@ -716,7 +733,16 @@ function shortName(n) {
           .replace(/\s+Energy$/i, '').trim();
 }
 // Returnerer null hvis ingen selskaper er valgt; ellers {match, op, share}.
-function companyMatch(p) {
+// Er et selskap eller en egendefinert portefølje valgt?
+function selectionActive() { return S.selMode === 'custom' ? S.portfolio.length > 0 : S.companies.length > 0; }
+// Felt-lagene deler kilde; nøkkelen i porteføljen er kilde + id.
+const PORTFOLIO_SRC = { producing: 'fields', approved: 'fields', shutdown: 'fields', discoveries: 'discoveries' };
+function companyMatch(p, src) {
+  if (S.selMode === 'custom') {
+    // Egendefinert portefølje: bare felt og funn velges; lisenser vises som vanlig.
+    if (!S.portfolio.length || src === 'licences') return null;
+    return { match: S.portfolio.includes(`${src}:${p.id}`), op: true, share: 0 };
+  }
   if (!S.companies.length) return null;
   const sel = new Set(S.companies);
   const isOp = sel.has(p.op);
@@ -954,7 +980,7 @@ function layerItems(L) {
     if (L.key === 'pipelines' && S.pipes.byMedium && PIPE_MEDIUM[p.medium]) color = PIPE_MEDIUM[p.medium].color;
     let cm = null, other = false, partner = false;
     if (L.company) {
-      cm = companyMatch(p);
+      cm = companyMatch(p, L.src);
       if (cm && !cm.match) {
         if (S.mode === 'only') continue;
         other = true;
@@ -1456,7 +1482,7 @@ function fmtDate(iso) {
 
 function legendEntries() {
   const E = [];
-  const sel = S.companies.length > 0;
+  const sel = selectionActive();
   const hcSeen = new Set();
   for (const key of ['producing', 'approved', 'shutdown', 'discoveries', 'licences', 'pipelines', 'facilities', 'wells']) {
     const L = LAYER[key], st = S.layers[key];
@@ -1497,12 +1523,12 @@ function legendEntries() {
     const hcE = HC_ORDER.filter(hc => hcSeen.has(hc)).map(hc => ({ sym: 'poly', color: HC[hc].color, fo: 0.85, label: t(HC[hc].name) }));
     E.splice(E.hcSlot, 1, ...hcE);
   }
-  if (sel && S.splitRole) {
+  if (sel && S.splitRole && S.selMode !== 'custom') {
     const nm = S.companies.map(shortName).join(', ');
     E.push({ sym: 'poly', color: '#6c757d', fo: 0.85, label: `${nm} – ${t('operatør')}` });
     E.push({ sym: 'poly', color: lighten('#6c757d', 0.55), stroke: '#6c757d', fo: 0.85, label: `${nm} – ${t('partner')}` });
   }
-  if (sel && S.mode === 'highlight' && drewOther) E.push({ sym: 'poly', color: S.otherColor, fo: 0.5, label: t('Andre selskaper') });
+  if (sel && S.mode === 'highlight' && drewOther) E.push({ sym: 'poly', color: S.otherColor, fo: 0.5, label: t(S.selMode === 'custom' ? 'Andre felt og funn' : 'Andre selskaper') });
   E.forEach(e => { if (e.fo != null && e.stroke && e.stroke === e.color) e.fo = Math.max(e.fo, 0.35); });
   return E;
 }
@@ -1512,9 +1538,14 @@ function legendMetrics() {
   const E = legendEntries();
   if (!E.length) return null;
   const fs = 16, lh = 24, pad = 12, sw = 22;
-  let heading = S.companies.length ? S.companies.map(shortName).join(', ') : '';
-  if (heading && S.role === 'op') heading += ` (${t('operatør')})`;
-  if (heading && S.role === 'partner') heading += ` (${t('partner')})`;
+  let heading = '';
+  if (S.selMode === 'custom') {
+    if (S.portfolio.length) heading = S.portfolioName.trim() || t('Egendefinert portefølje');
+  } else if (S.companies.length) {
+    heading = S.companies.map(shortName).join(', ');
+    if (S.role === 'op') heading += ` (${t('operatør')})`;
+    if (S.role === 'partner') heading += ` (${t('partner')})`;
+  }
   const widths = E.map(e => textWidth(e.label, e.note ? fs * 0.9 : fs));
   if (heading) widths.push(textWidth(heading, fs, 'bold'));
   const bw = Math.max(...widths) + sw + pad * 2 + 8;
@@ -1628,9 +1659,10 @@ function zoomBy(f) {
 
 function attachInteractions() {
   gLabels.selectAll('.lab').call(d3.drag()
-    .on('start', function () { d3.select(this).raise(); })
     .on('drag', function (ev) {
       const c = d3.select(this).datum();
+      // Løft etiketten først når den faktisk flyttes; å flytte noden ved mousedown hindrer klikk på den.
+      if (!c._dx && !c._dy) d3.select(this).raise();
       c._dx = (c._dx || 0) + ev.dx; c._dy = (c._dy || 0) + ev.dy;
       d3.select(this).attr('transform', `translate(${c._dx},${c._dy})`);
     })
@@ -1862,6 +1894,81 @@ function buildCompanyChips() {
     box.appendChild(b);
   }
 }
+// ── Egendefinert portefølje ────────────────────────────────────────────────
+let PF_INDEX = null;   // nøkkel -> {name, type, cc}
+function portfolioIndex() {
+  if (!PF_INDEX && D.fields) {
+    PF_INDEX = new Map();
+    for (const f of D.fields.features) PF_INDEX.set(`fields:${f.properties.id}`, { name: f.properties.name, type: 'Felt', cc: f.properties.cc || 'no' });
+    for (const f of D.discoveries.features) PF_INDEX.set(`discoveries:${f.properties.id}`, { name: f.properties.name, type: 'Funn', cc: f.properties.cc || 'no' });
+  }
+  return PF_INDEX || new Map();
+}
+function togglePortfolio(key, on) {
+  const has = S.portfolio.includes(key);
+  if (on === undefined) on = !has;
+  if (on && !has) S.portfolio.push(key);
+  if (!on && has) S.portfolio = S.portfolio.filter(k => k !== key);
+}
+function buildPortfolioUI() {
+  const idx = portfolioIndex();
+  const q = $('pfSearch').value.trim().toLowerCase();
+  const list = $('pfList');
+  list.innerHTML = '';
+  list.style.display = q ? '' : 'none';
+  if (q) {
+    const hits = [...idx].filter(([, v]) => v.name && v.name.toLowerCase().includes(q))
+      .sort((a, b) => (a[1].name.toLowerCase().startsWith(q) ? 0 : 1) - (b[1].name.toLowerCase().startsWith(q) ? 0 : 1) || a[1].name.localeCompare(b[1].name, LOCALE()))
+      .slice(0, 60);
+    for (const [key, v] of hits) {
+      const l = document.createElement('label');
+      l.innerHTML = `<input type="checkbox" ${S.portfolio.includes(key) ? 'checked' : ''}><span>${esc(v.name)}</span><span class="cnt">${(S.lang === 'en' ? { Felt: 'Field', Funn: 'Discovery' } : { Felt: 'Felt', Funn: 'Funn' })[v.type]} · ${v.cc.toUpperCase()}</span>`;
+      l.querySelector('input').onchange = e => { togglePortfolio(key, e.target.checked); buildPortfolioChips(); render(); };
+      list.appendChild(l);
+    }
+    if (!hits.length) list.innerHTML = `<div class="hint" style="padding:4px 8px">${t('Ingen treff')}</div>`;
+  }
+  buildPortfolioChips();
+}
+function buildPortfolioChips() {
+  const idx = portfolioIndex(), box = $('pfChips');
+  box.innerHTML = '';
+  for (const key of S.portfolio) {
+    const v = idx.get(key);
+    const c = document.createElement('span');
+    c.className = 'chip';
+    c.innerHTML = `${esc(v ? v.name : key)}<button title="${t('Fjern')}">×</button>`;
+    c.querySelector('button').onclick = () => { togglePortfolio(key, false); buildPortfolioUI(); render(); };
+    box.appendChild(c);
+  }
+  if (S.portfolio.length) {
+    const b = document.createElement('button'); b.className = 'small'; b.textContent = t('Fjern alle');
+    b.onclick = () => { S.portfolio = []; buildPortfolioUI(); render(); };
+    box.appendChild(b);
+  }
+}
+function syncSelMode() {
+  const custom = S.selMode === 'custom';
+  $('selCompany').style.display = custom ? 'none' : '';
+  $('selCustom').style.display = custom ? '' : 'none';
+  $('splitRoleRow').style.display = custom ? 'none' : '';
+  $('labelShareRow').style.display = custom ? 'none' : '';
+  $('selHint').textContent = t(custom ? 'Gjelder felt og funn. Lisenser vises som vanlig.' : 'Gjelder felt, funn og lisenser.');
+  if (custom) buildPortfolioUI();
+}
+// Klikk i kartet legger felt/funn til eller fjerner dem fra porteføljen (bare i porteføljemodus).
+svg.on('click', ev => {
+  if (S.selMode !== 'custom') return;
+  // Klikk på selve feltet eller på navnet dets (etiketten ligger ofte midt i feltet).
+  const el = ev.target.closest && (ev.target.closest('[data-k]') || ev.target.closest('[data-lk]'));
+  if (!el) return;
+  const [layer, id] = (el.getAttribute('data-k') || el.getAttribute('data-lk')).split(/:(.+)/);
+  const src = PORTFOLIO_SRC[layer];
+  if (!src) return;
+  togglePortfolio(`${src}:${id}`);
+  buildPortfolioUI(); render();
+});
+
 function bindSeg(id, get, set) {
   const el = $(id);
   const sync = () => el.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === get()));
@@ -1902,6 +2009,10 @@ function syncAllControls() {
   bindCheck('labelShare', () => S.labelShare, v => S.labelShare = v);
   bindValue('otherColor', () => S.otherColor, v => S.otherColor = v, 'input');
   bindSeg('segRole', () => S.role, v => S.role = v);
+  bindSeg('segSel', () => S.selMode, v => { S.selMode = v; syncSelMode(); });
+  bindValue('portfolioName', () => S.portfolioName, v => S.portfolioName = v, 'input');
+  $('pfSearch').oninput = buildPortfolioUI;
+  syncSelMode();
   bindSeg('segMode', () => S.mode, v => S.mode = v);
   $('theme').value = S.theme;
   bindValue('seaColor', () => S.sea, v => S.sea = v, 'input');
@@ -2075,6 +2186,7 @@ function applyLanguage() {
   $('lang').value = S.lang;
   applyStaticText();
   buildPresetButtons();
+  syncSelMode();
   buildLandList();
   buildLayerList();
   buildCompanyUI();
@@ -2083,8 +2195,8 @@ function applyLanguage() {
 }
 
 function fitToSelection() {
-  // Med valgt selskap: zoom til selskapets felt/funn/lisenser. Ellers: alt som er synlig.
-  const sel = S.companies.length > 0;
+  // Med valgt selskap/portefølje: zoom til de valgte feltene/funnene (og selskapets lisenser). Ellers: alt som er synlig.
+  const sel = selectionActive();
   const feats = [];
   for (const L of LAYERS) {
     if (!S.layers[L.key].on || (sel && !L.company)) continue;
@@ -2137,6 +2249,7 @@ function applyState() {
   }
   $('loading').remove();
   updateStatus();
+  syncSelMode();
   buildLandList();
   buildCompanyUI();
   setupProjection();
