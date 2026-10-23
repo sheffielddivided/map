@@ -299,6 +299,12 @@
         <label class="row"><input type="checkbox" id="showSource" /> Kildehenvisning</label>
         <div class="row"><span class="grow">Tekststørrelse etiketter</span><input type="range" id="labelSize" min="8" max="28" step="1" style="width:110px" /><span id="labelSizeVal" style="width:22px"></span></div>
         <div class="row"><span class="grow">Symbolstørrelse</span><input type="range" id="symbolSize" min="0.5" max="2.5" step="0.1" style="width:110px" /><span id="symbolSizeVal" style="width:22px"></span></div>
+        <div class="row"><span class="grow">Forstørr felt</span><input type="range" id="fieldScale" min="1" max="6" step="0.25" style="width:110px" /><span id="fieldScaleVal" style="width:36px"></span></div>
+        <div id="fieldScaleOpts" class="sub">
+          <label class="row"><input type="checkbox" id="fieldScaleDsc" /> Også funn</label>
+          <label class="row"><input type="checkbox" id="fieldScaleSel" /> Bare valgte felt og funn</label>
+          <div class="hint">Hvert felt forstørres rundt sitt eget midtpunkt. Avstanden mellom feltene endres ikke, så store forstørrelser kan gi overlapp.</div>
+        </div>
         <label class="row"><input type="checkbox" id="declutter" /> Skjul overlappende etiketter</label>
         <div class="row"><button id="btnResetLabels" class="grow">Nullstill flyttede/skjulte etiketter</button></div>
       </div>
@@ -502,7 +508,8 @@ const EN = {
   'Tittel, tegnforklaring og tekst': 'Title, legend and text', 'Tittel': 'Title', 'Undertittel (valgfritt)': 'Subtitle (optional)',
   'Tegnforklaring': 'Legend', 'Øverst venstre': 'Top left', 'Øverst høyre': 'Top right', 'Nederst venstre': 'Bottom left', 'Nederst høyre': 'Bottom right',
   'Målestokk': 'Scale bar', 'Nordpil': 'North arrow', 'Kildehenvisning': 'Source credit', 'Tekststørrelse etiketter': 'Label text size',
-  'Symbolstørrelse': 'Symbol size', 'Skjul overlappende etiketter': 'Hide overlapping labels', 'Nullstill flyttede/skjulte etiketter': 'Reset moved/hidden labels',
+  'Symbolstørrelse': 'Symbol size', 'Forstørr felt': 'Enlarge fields', 'Også funn': 'Discoveries too', 'Bare valgte felt og funn': 'Only selected fields and discoveries',
+  'Hvert felt forstørres rundt sitt eget midtpunkt. Avstanden mellom feltene endres ikke, så store forstørrelser kan gi overlapp.': 'Each field is enlarged around its own centre. The distance between fields does not change, so large factors can cause overlap.', 'Skjul overlappende etiketter': 'Hide overlapping labels', 'Nullstill flyttede/skjulte etiketter': 'Reset moved/hidden labels',
   // Lagre og del
   'Lagre og del': 'Save and share',
   'Hele oppsettet ligger i lenken, så bokmerk eller del den. Maler lagres lokalt i denne nettleseren.': 'The whole setup is stored in the link, so bookmark or share it. Templates are saved locally in this browser.',
@@ -602,7 +609,7 @@ function defaultState() {
     quadColor: null, quadWidth: 0.8, blockColor: null, blockWidth: 0.35,
     title: false, titleText: '', subtitleText: '',
     legend: true, legendPos: 'tr', scale: true, north: true, source: true,
-    labelSize: 16, symbolSize: 1.2, declutter: true,
+    labelSize: 16, symbolSize: 1.2, declutter: true, fieldScale: 1, fieldScaleDsc: false, fieldScaleSel: false,
     tilt: 0, bearing: 0, extrude: 10, extFields: true, extDsc: false, shadow: true, haze: true,
     offsets: {}, hidden: [],
     lang: storedLang() === 'en' ? 'en' : 'no',
@@ -1110,6 +1117,11 @@ function render() {
     ((S.extFields && (key === 'producing' || key === 'approved' || key === 'shutdown')) || (S.extDsc && key === 'discoveries'));
   const flushBlocks = () => { if (blocks.length) drawBlocks(g.append('g').attr('data-layer', 'blocks'), blocks, T); blocks = []; };
 
+  // Forstørrede felt (og eventuelt funn), valgfritt bare de valgte.
+  const enlarged = (key, it) => S.fieldScale > 1 && !it.other &&
+    (key === 'producing' || key === 'approved' || key === 'shutdown' || (S.fieldScaleDsc && key === 'discoveries')) &&
+    (!S.fieldScaleSel || selectionActive());
+
   for (const key of L_ORDER) {
     const L = LAYER[key], st = S.layers[key];
     if (L.kind === 'point') flushBlocks();   // rørledninger ligger på havbunnen, under klossene
@@ -1118,7 +1130,7 @@ function render() {
     const lg = g.append('g').attr('data-layer', key);
 
     if (L.kind === 'poly') {
-      for (const it of items) {
+      for (let it of items) {
         if (it.f.geometry.type === 'Point') {
           // Britiske uutbygde funn finnes bare som punkter.
           const xy = P(it.f.geometry.coordinates);
@@ -1132,6 +1144,7 @@ function render() {
           if (st.labels && !(it.other && S.labelsOnlySel)) labels.push(labelCandidate(key, it, xy, labelPriority[key], 'right'));
           continue;
         }
+        if (enlarged(key, it)) it = { ...it, f: scaledFeature(it.f, S.fieldScale) };
         const d = path(it.f);
         if (!d) continue;
         const fk = `${key}:${it.p.id}`;
@@ -2030,9 +2043,31 @@ document.getElementById('btnCopy').onclick = async () => {
 // Kontrollpanel
 // ════════════════════════════════════════════════════════════════════════════
 const $ = id => document.getElementById(id);
+function syncFieldScale() {
+  $('fieldScaleVal').textContent = '×' + (+S.fieldScale).toLocaleString(S.lang === 'en' ? 'en' : 'nb', { maximumFractionDigits: 2 });
+  $('fieldScaleOpts').style.display = S.fieldScale > 1 ? '' : 'none';
+}
 function bindCheck(id, get, set) { const el = $(id); el.checked = get(); el.onchange = () => { set(el.checked); render(); }; }
 let rafId = 0;
 function scheduleRender() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(render); }
+// Forstørrer et polygon rundt sitt arealtyngdepunkt. Lengdegrad skaleres i lengdegradsrom, så formen
+// bevares lokalt (cos(breddegrad) er tilnærmet konstant innenfor et felt). Resultatet caches per faktor.
+const SCALED = new Map();
+function scaledFeature(f, s) {
+  let byF = SCALED.get(s);
+  if (!byF) { byF = new WeakMap(); SCALED.set(s, byF); }
+  let out = byF.get(f);
+  if (out) return out;
+  const [cx, cy] = d3.geoCentroid(f);
+  const sc = c => [cx + (c[0] - cx) * s, cy + (c[1] - cy) * s];
+  const g = f.geometry;
+  const coords = g.type === 'Polygon' ? g.coordinates.map(r => r.map(sc))
+    : g.type === 'MultiPolygon' ? g.coordinates.map(p => p.map(r => r.map(sc))) : g.coordinates;
+  out = { ...f, geometry: { type: g.type, coordinates: coords } };
+  byF.set(f, out);
+  return out;
+}
+
 function bindValue(id, get, set, ev = 'change') { const el = $(id); el.value = get(); el['on' + ev] = () => { set(el.value); ev === 'input' ? scheduleRender() : render(); }; }
 
 function buildLayerList() {
@@ -2299,6 +2334,9 @@ function syncAllControls() {
   bindCheck('declutter', () => S.declutter, v => S.declutter = v);
   bindValue('labelSize', () => S.labelSize, v => { S.labelSize = +v; $('labelSizeVal').textContent = v; }, 'input');
   bindValue('symbolSize', () => S.symbolSize, v => { S.symbolSize = +v; $('symbolSizeVal').textContent = (+v).toFixed(1); }, 'input');
+  bindValue('fieldScale', () => S.fieldScale, v => { S.fieldScale = +v; syncFieldScale(); }, 'input');
+  bindCheck('fieldScaleDsc', () => S.fieldScaleDsc, v => S.fieldScaleDsc = v);
+  bindCheck('fieldScaleSel', () => S.fieldScaleSel, v => S.fieldScaleSel = v);
   const deg = v => `${v}°`;
   bindValue('tilt', () => S.tilt, v => { S.tilt = +v; $('tiltVal').textContent = deg(v); setupProjection(); }, 'input');
   bindValue('bearing', () => S.bearing, v => { S.bearing = +v; $('bearingVal').textContent = deg(v); setupProjection(); }, 'input');
@@ -2343,6 +2381,7 @@ function syncAllControls() {
   bindCheck('haze', () => S.haze, v => S.haze = v);
   $('labelSizeVal').textContent = S.labelSize;
   $('symbolSizeVal').textContent = (+S.symbolSize).toFixed(1);
+  syncFieldScale();
   buildLayerList();
   buildCompanyUI();
 }
