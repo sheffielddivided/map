@@ -12,6 +12,8 @@ Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-pres
   farge, tykkelse og stil, og landnavn parallelt med linjen på hver side.
 - **Selskapsfilter:** velg ett eller flere selskaper som operatør og/eller partner. De kan fremheves
   (andre vises i grått) eller vises alene, med valgfri eierandel i etiketten. Gjelder felt, funn og lisenser.
+  Med «Farge per selskap» får hvert valgte selskap sin egen farge, og felt med flere av de valgte
+  selskapene som eiere skraveres i deres farger.
 - **Egendefinert portefølje:** alternativ til selskapsfilteret. Velg enkeltfelt og -funn ved å søke
   eller klikke i kartet, og gi porteføljen et navn som vises i tegnforklaringen. Fremhev/vis kun
   valgte og «Zoom til utvalg» virker som for selskaper.

@@ -195,6 +195,7 @@
         <input type="search" id="compSearch" placeholder="Søk etter selskap …" />
         <div class="complist" id="compList"></div>
         <div class="chips" id="compChips"></div>
+        <label class="row"><input type="checkbox" id="colorByCompany" /> Farge per selskap (felles felt skraveres)</label>
         <div class="row"><span>Rolle</span>
           <div class="seg grow" id="segRole">
             <button data-v="any">Operatør eller partner</button><button data-v="op">Operatør</button><button data-v="partner">Partner</button>
@@ -453,7 +454,7 @@ const EN = {
   'Dis mot horisonten': 'Haze towards the horizon',
   'Klossene vises når kartet er vippet. I perspektiv gjelder målestokken langs linjen den står på (nederst i kartet).': 'Blocks are shown when the map is tilted. In perspective the scale bar applies along the line it sits on (at the bottom of the map).',
   // Selskap
-  'Selskap': 'Company', 'Overskrift i tegnforklaringen (valgfritt – standard er selskapsnavnene)': 'Legend heading (optional – default is the company names)', 'Selskap / portefølje': 'Company / portfolio', 'Egendefinert portefølje': 'Custom portfolio',
+  'Selskap': 'Company', 'Farge per selskap (felles felt skraveres)': 'Colour per company (shared fields are hatched)', 'Delt eierskap': 'Shared ownership', 'Overskrift i tegnforklaringen (valgfritt – standard er selskapsnavnene)': 'Legend heading (optional – default is the company names)', 'Selskap / portefølje': 'Company / portfolio', 'Egendefinert portefølje': 'Custom portfolio',
   'Navn på porteføljen (vises i tegnforklaringen)': 'Portfolio name (shown in the legend)', 'Søk etter felt eller funn …': 'Search for a field or discovery …',
   'Klikk på felt og funn i kartet for å legge dem til eller fjerne dem.': 'Click fields and discoveries in the map to add or remove them.',
   'Gjelder felt og funn. Lisenser vises som vanlig.': 'Applies to fields and discoveries. Licences are shown as usual.',
@@ -581,7 +582,7 @@ function defaultState() {
     pipes: { byMedium: false, byDim: true, media: ['Gas', 'Oil', 'Condensate', 'Mixed', 'Co2 injection', 'other'], related: false },
     fac: { surface: true, subsea: false, onshore: true },
     selMode: 'company', portfolio: [], portfolioName: '', companyLegendTitle: '',
-    companies: [], role: 'any', mode: 'highlight', splitRole: false, labelsOnlySel: true, labelShare: false, otherColor: '#c3c8cf',
+    companies: [], role: 'any', colorByCompany: false, companyColors: {}, mode: 'highlight', splitRole: false, labelsOnlySel: true, labelShare: false, otherColor: '#c3c8cf',
     theme: 'light', sea: THEMES.light.sea, land: THEMES.light.land, transparent: false,
     depth: true, borders: true, landMode: 'all', landCountries: ['NOR'], cities: true, quads: false, quadLabels: true, blocks: false,
     // null = følg temaets rutenettfarge / standard tykkelse.
@@ -754,7 +755,34 @@ function companyMatch(p, src) {
   if (S.role === 'op') match = isOp;
   else if (S.role === 'partner') match = isLic && !isOp;
   else match = isOp || isLic;
-  return { match, op: isOp, share };
+  // Hvilke av de valgte selskapene som er med (for «Farge per selskap»), i valgt rekkefølge.
+  const lic = new Set(p.lic.map(l => l[0]));
+  const who = S.companies.filter(c => (S.role === 'op' ? c === p.op : S.role === 'partner' ? lic.has(c) && c !== p.op : c === p.op || lic.has(c)));
+  return { match, op: isOp, share, who };
+}
+
+// ── Farge per selskap ──────────────────────────────────────────────────────
+const COMPANY_PALETTE = ['#2f6fdf', '#e8590c', '#2f9e44', '#ae3ec9', '#f2b705', '#0ca678', '#d6336c', '#5c3d2e', '#495057'];
+function companyColor(name) {
+  if (!S.companyColors[name]) {
+    const used = new Set(Object.values(S.companyColors));
+    S.companyColors[name] = COMPANY_PALETTE.find(c => !used.has(c)) || COMPANY_PALETTE[S.companies.indexOf(name) % COMPANY_PALETTE.length];
+  }
+  return S.companyColors[name];
+}
+const colorByCompanyOn = () => S.selMode !== 'custom' && S.colorByCompany && S.companies.length > 0;
+// Skravering for felt med flere av de valgte selskapene: like brede diagonale striper i hver farge.
+let patternDefs = null, patternIds = null;
+function stripePattern(colors) {
+  const key = colors.join(',');
+  if (patternIds.has(key)) return patternIds.get(key);
+  const id = 'stripe' + patternIds.size;
+  const sw = 5, size = sw * colors.length;
+  const pat = patternDefs.append('pattern').attr('id', id).attr('patternUnits', 'userSpaceOnUse')
+    .attr('width', size).attr('height', size).attr('patternTransform', 'rotate(45)');
+  colors.forEach((c, i) => pat.append('rect').attr('x', i * sw).attr('y', 0).attr('width', sw).attr('height', size).attr('fill', c));
+  patternIds.set(key, `url(#${id})`);
+  return `url(#${id})`;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -992,9 +1020,14 @@ function layerItems(L) {
         if (S.mode === 'only') continue;
         other = true;
       }
-      if (cm && cm.match && S.splitRole && !cm.op) partner = true;
+      if (cm && cm.match && S.splitRole && !cm.op && !colorByCompanyOn()) partner = true;
     }
-    out.push({ f, p, color, other, partner, cm });
+    let colors = null;
+    if (L.company && cm && cm.match && colorByCompanyOn() && cm.who && cm.who.length) {
+      colors = cm.who.map(companyColor);
+      color = colors[0];
+    }
+    out.push({ f, p, color, other, partner, cm, colors });
   }
   // Andre selskaper tegnes under de valgte.
   out.sort((a, b) => (b.other - a.other));
@@ -1011,6 +1044,7 @@ function render() {
   drewOther = false;
 
   const defs = svg.append('defs');
+  patternDefs = defs; patternIds = new Map();
   defs.append('clipPath').attr('id', 'frameclip').append('rect').attr('width', w).attr('height', h);
   gRoot = svg.append('g').attr('clip-path', 'url(#frameclip)');
   if (!S.transparent) gRoot.append('rect').attr('width', w).attr('height', h).attr('fill', S.sea);
@@ -1078,10 +1112,10 @@ function render() {
           if (!xy || xy[0] < -20 || xy[1] < -20 || xy[0] > w + 20 || xy[1] > h + 20) continue;
           const fk = `${key}:${it.p.id}`;
           featIndex.set(fk, { L, p: it.p });
-          const r = 4.2 * k, fill = it.other ? S.otherColor : (it.partner ? lighten(it.color, 0.55) : it.color);
+          const r = 4.2 * k, fill = it.other ? S.otherColor : it.colors && it.colors.length > 1 ? stripePattern(it.colors) : (it.partner ? lighten(it.color, 0.55) : it.color);
           if (it.other) drewOther = true;
           lg.append('path').attr('d', `M${xy[0]},${xy[1] - r}L${xy[0] + r},${xy[1]}L${xy[0]},${xy[1] + r}L${xy[0] - r},${xy[1]}Z`)
-            .attr('fill', fill).attr('stroke', d3.color(fill).darker(0.8).formatHex()).attr('stroke-width', 0.8).attr('data-k', fk);
+            .attr('fill', fill).attr('stroke', d3.color(it.other ? S.otherColor : it.color).darker(0.8).formatHex()).attr('stroke-width', 0.8).attr('data-k', fk);
           if (st.labels && !(it.other && S.labelsOnlySel)) labels.push(labelCandidate(key, it, xy, labelPriority[key], 'right'));
           continue;
         }
@@ -1091,11 +1125,14 @@ function render() {
         featIndex.set(fk, { L, p: it.p });
         let fill = it.color, stroke = d3.color(it.color).darker(0.7).formatHex(), fo = st.fill, so = 1, sw = key === 'licences' ? 0.9 : 0.8;
         if (it.partner) { fill = lighten(it.color, 0.55); stroke = it.color; }
+        // Flere valgte selskaper i samme felt: skravering i selskapenes farger. Kanten i første selskaps farge.
+        const striped = !it.other && it.colors && it.colors.length > 1;
+        if (striped) fill = stripePattern(it.colors);
         if (it.other) { drewOther = true; fill = S.otherColor; stroke = d3.color(S.otherColor).darker(0.6).formatHex(); fo = Math.min(st.fill, 0.5); so = 0.7; }
         const solidLic = key === 'licences' && S.licStyle === 'solid';
         if (solidLic) {
           // Helfarge uten omriss. Kanten tegnes i fyllfargen for å skjule hårfine sprekker mellom nabolisenser.
-          fo = S.licOpacity; stroke = fill; so = S.licOpacity; sw = 0.6;
+          fo = S.licOpacity; stroke = striped ? it.color : fill; so = S.licOpacity; sw = 0.6;
         }
         const ext = extruded(key);
         const el = ext ? null : lg.append('path').attr('d', d).attr('fill', fill).attr('fill-opacity', fo)
@@ -1103,8 +1140,9 @@ function render() {
         const dash = st.dash || (key === 'licences' && !solidLic) || (key === 'approved' && S.colorByHC);
         if (ext) {
           // Opake klosser; veggene er mørkere toner av toppfargen.
-          const top = it.other ? fill : (fo < 0.99 ? d3.interpolateRgb(S.sea, fill)(Math.max(fo, 0.75)) : fill);
-          const wall = [0.25, 0.55, 0.85, 1.15].map(v => d3.color(top).darker(v).formatHex());
+          const solid = striped ? it.color : fill;
+          const top = it.other || striped ? fill : (fo < 0.99 ? d3.interpolateRgb(S.sea, fill)(Math.max(fo, 0.75)) : fill);
+          const wall = [0.25, 0.55, 0.85, 1.15].map(v => d3.color(it.other ? fill : (fo < 0.99 && !striped ? top : solid)).darker(v).formatHex());
           blocks.push({ f: it.f, fk, fill: top, stroke, wall, dash });
         } else if (dash) el.attr('stroke-dasharray', key === 'licences' ? '4 2' : '3 2');
         if (st.labels && !(it.other && S.labelsOnlySel)) {
@@ -1633,8 +1671,10 @@ function legendEntries() {
         if (key === 'discoveries' && shown.length) E.push({ sym: 'none', note: true, label: t('Lys fyll = funn') });
         if (key === 'approved' && shown.length) E.push({ sym: 'none', note: true, label: t('Stiplet kant = under utbygging') });
       } else if (shown.length) {
-        if (key === 'licences' && S.licStyle === 'solid') E.push({ sym: 'poly', color: st.color, fo: S.licOpacity, stroke: st.color, label: t(L.legend) });
-        else E.push({ sym: 'poly', color: st.color, fo: st.fill, dash: st.dash || key === 'licences', label: t(L.legend) });
+        // Med farge per selskap viser lagoppføringene bare stilen (nøytral grå); fargene står under selskapene.
+        const lc = colorByCompanyOn() ? '#8a929b' : st.color;
+        if (key === 'licences' && S.licStyle === 'solid') E.push({ sym: 'poly', color: lc, fo: S.licOpacity, stroke: lc, label: t(L.legend) });
+        else E.push({ sym: 'poly', color: lc, fo: st.fill, dash: st.dash || key === 'licences', label: t(L.legend) });
       }
     } else if (key === 'pipelines') {
       if (S.pipes.byMedium) {
@@ -1657,7 +1697,19 @@ function legendEntries() {
     const hcE = HC_ORDER.filter(hc => hcSeen.has(hc)).map(hc => ({ sym: 'poly', color: HC[hc].color, fo: 0.85, label: t(HC[hc].name) }));
     E.splice(E.hcSlot, 1, ...hcE);
   }
-  if (sel && S.splitRole && S.selMode !== 'custom') {
+  if (colorByCompanyOn()) {
+    // Én farge per selskap som faktisk er tegnet, og skravering for delt eierskap.
+    const drawn = [...featIndex.keys()].map(k => k.split(':')[0]);
+    const companyItems = LAYERS.filter(L => L.company && drawn.includes(L.key)).flatMap(L => layerItems(L).filter(i => featIndex.has(`${L.key}:${i.p.id}`) && i.colors));
+    const present = S.companies.filter(c => companyItems.some(i => i.cm.who.includes(c)));
+    present.forEach(c => E.push({ sym: 'poly', color: companyColor(c), fo: 0.85, label: shortName(c) }));
+    const shared = companyItems.filter(i => i.colors.length > 1);
+    if (shared.length) {
+      const all = S.companies.filter(c => shared.some(i => i.cm.who.includes(c))).map(companyColor);
+      E.push({ sym: 'poly', color: all[0], pattern: stripePattern(all), fo: 0.85, label: t('Delt eierskap') });
+    }
+  }
+  if (sel && S.splitRole && S.selMode !== 'custom' && !colorByCompanyOn()) {
     const nm = S.companies.map(shortName).join(', ');
     E.push({ sym: 'poly', color: '#6c757d', fo: 0.85, label: `${nm} – ${t('operatør')}` });
     E.push({ sym: 'poly', color: lighten('#6c757d', 0.55), stroke: '#6c757d', fo: 0.85, label: `${nm} – ${t('partner')}` });
@@ -1714,7 +1766,7 @@ function drawLegend(g, T, topY) {
   for (const e of E) {
     const sx = pad, sy = cy;
     const halo = T.halo;
-    if (e.sym === 'poly') lg.append('rect').attr('x', sx).attr('y', sy - 7).attr('width', sw).attr('height', 14).attr('rx', 2).attr('fill', e.color).attr('fill-opacity', Math.max(e.fo ?? 0.8, 0.35))
+    if (e.sym === 'poly') lg.append('rect').attr('x', sx).attr('y', sy - 7).attr('width', sw).attr('height', 14).attr('rx', 2).attr('fill', e.pattern || e.color).attr('fill-opacity', Math.max(e.fo ?? 0.8, 0.35))
       .attr('stroke', e.stroke || d3.color(e.color).darker(0.7).formatHex()).attr('stroke-width', 0.8).attr('stroke-dasharray', e.dash ? '3 2' : null);
     else if (e.sym === 'line') lg.append('line').attr('x1', sx).attr('x2', sx + sw).attr('y1', sy).attr('y2', sy).attr('stroke', e.color).attr('stroke-width', 2.4).attr('stroke-linecap', 'round');
     else if (e.sym === 'circle') lg.append('circle').attr('cx', sx + sw / 2).attr('cy', sy).attr('r', 5).attr('fill', e.color).attr('stroke', halo).attr('stroke-width', 0.8);
@@ -2030,8 +2082,11 @@ function buildCompanyChips() {
   S.companies.forEach(n => {
     const c = document.createElement('span');
     c.className = 'chip';
-    c.innerHTML = `${esc(shortName(n))}<button title="${t('Fjern')}">×</button>`;
+    const col = S.colorByCompany ? `<input type="color" value="${companyColor(n)}" title="${t('Farge')}" style="width:18px;height:16px;border:0">` : '';
+    c.innerHTML = `${col}${esc(shortName(n))}<button title="${t('Fjern')}">×</button>`;
     c.querySelector('button').onclick = () => { S.companies = S.companies.filter(x => x !== n); buildCompanyUI(); render(); };
+    const ci = c.querySelector('input[type=color]');
+    if (ci) ci.oninput = () => { S.companyColors[n] = ci.value; scheduleRender(); };
     box.appendChild(c);
   });
   if (S.companies.length) {
@@ -2153,6 +2208,7 @@ function syncAllControls() {
   bindCheck('splitRole', () => S.splitRole, v => S.splitRole = v);
   bindCheck('labelsOnlySel', () => S.labelsOnlySel, v => S.labelsOnlySel = v);
   bindCheck('labelShare', () => S.labelShare, v => S.labelShare = v);
+  bindCheck('colorByCompany', () => S.colorByCompany, v => { S.colorByCompany = v; buildCompanyChips(); });
   bindValue('otherColor', () => S.otherColor, v => S.otherColor = v, 'input');
   bindSeg('segRole', () => S.role, v => S.role = v);
   bindSeg('segSel', () => S.selMode, v => { S.selMode = v; syncSelMode(); });
