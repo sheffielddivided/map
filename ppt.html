@@ -304,6 +304,16 @@
       </div>
     </details>
 
+    <details id="labelPanel">
+      <summary>Etiketter i kartet</summary>
+      <div class="sec">
+        <div class="hint">Alle etiketter som vises i kartet nå. Fjern krysset for å skjule en etikett; skjulte etiketter står i listen til de slås på igjen.</div>
+        <input type="search" id="labelSearch" placeholder="Søk i etiketter …" />
+        <div class="row"><button class="small grow" id="labelsAllOn">Vis alle</button><button class="small grow" id="labelsAllOff">Skjul alle i listen</button></div>
+        <div class="complist" id="labelList" style="max-height:320px"></div>
+      </div>
+    </details>
+
     <details>
       <summary>Lagre og del</summary>
       <div class="sec">
@@ -514,7 +524,10 @@ const EN = {
   'Frankrike': 'France', 'Irland': 'Ireland', 'Polen': 'Poland', 'Estland': 'Estonia', 'Latvia': 'Latvia', 'Litauen': 'Lithuania',
   'Belarus': 'Belarus', 'Ukraina': 'Ukraine', 'Tsjekkia': 'Czechia', 'Slovakia': 'Slovakia', 'Østerrike': 'Austria',
   'Ungarn': 'Hungary', 'Romania': 'Romania', 'Moldova': 'Moldova', 'Kasakhstan': 'Kazakhstan',
-  'Stiplet linje': 'Dashed line', 'Kun rørledninger knyttet til utvalget': 'Only pipelines linked to the selection',
+  'Stiplet linje': 'Dashed line', 'Etiketter i kartet': 'Labels in the map',
+  'Alle etiketter som vises i kartet nå. Fjern krysset for å skjule en etikett; skjulte etiketter står i listen til de slås på igjen.': 'All labels currently shown in the map. Untick to hide a label; hidden labels stay in the list until switched back on.',
+  'Søk i etiketter …': 'Search labels …', 'Vis alle': 'Show all', 'Skjul alle i listen': 'Hide all in list', 'Ingen etiketter i kartet': 'No labels in the map',
+  'Lisenser': 'Licences', 'Annet': 'Other', 'Felt': 'Fields', 'Rørledninger': 'Pipelines', 'Kun rørledninger knyttet til utvalget': 'Only pipelines linked to the selection',
   'Rør som starter, slutter eller går innenfor ca. 3 km fra valgte felt og funn (valgt selskap eller portefølje).': 'Pipelines that start, end or pass within about 3 km of the selected fields and discoveries (selected company or portfolio).', 'Stil': 'Style', 'Omriss (stiplet)': 'Outline (dashed)', 'Helfarge uten omriss': 'Solid fill, no outline', 'Dekkevne': 'Opacity', 'Plassering langs linjen': 'Position along the line', 'Landnavn langs grensen': 'Country names along the boundary', 'Miniatyrkart': 'Inset map',
   'Område': 'Area', 'Bredde': 'Width', 'Egen størrelse': 'Own size', 'Samme som tegnforklaringen': 'Same as the legend', 'Automatisk rundt utsnittet': 'Automatic around the view', 'Skandinavia': 'Scandinavia', 'Nord-Europa': 'Northern Europe',
   'Markering': 'Marker', 'Utsnittets omriss': 'Outline of the view', 'Sirkel': 'Circle', 'Størrelse': 'Size',
@@ -1230,6 +1243,7 @@ function render() {
   if (S.sectorLines && S.sectorLabels && BASE.sectors) drawSectorLabels(T, obstacles);
   placeLabels(labels, T, obstacles);
   attachInteractions();
+  buildLabelList();
   saveToUrl();
 }
 
@@ -1388,6 +1402,40 @@ function pipeLabelText(p) {
   return p.name;
 }
 
+// Etiketter i kartet akkurat nå (vist / skjult av bruker), for listen i «Etiketter i kartet».
+let LABEL_STATE = { placed: [], hidden: [] };
+const LABEL_GROUPS = [
+  ['producing', 'Felt'], ['approved', 'Felt'], ['shutdown', 'Felt'], ['discoveries', 'Funn'], ['licences', 'Lisenser'],
+  ['facilities', 'Innretninger'], ['wells', 'Letebrønner'], ['pipelines', 'Rørledninger'], ['city', 'Byer og steder'], ['quad', 'Kvadranter'],
+];
+function buildLabelList() {
+  const panel = $('labelPanel');
+  if (!panel || !panel.open) return;
+  const box = $('labelList'), q = $('labelSearch').value.trim().toLowerCase();
+  const scroll = box.scrollTop;
+  const all = [...LABEL_STATE.placed.map(c => ({ c, on: true })), ...LABEL_STATE.hidden.map(c => ({ c, on: false }))]
+    .filter(x => !q || x.c.text.toLowerCase().includes(q));
+  const groupOf = key => (LABEL_GROUPS.find(([pfx]) => key.startsWith(pfx + ':')) || [null, 'Annet'])[1];
+  const groups = new Map();
+  for (const x of all) { const g = groupOf(x.c.key); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(x); }
+  const order = [...new Set(LABEL_GROUPS.map(g => g[1])), 'Annet'];
+  let html = '';
+  for (const g of order) {
+    const xs = groups.get(g);
+    if (!xs) continue;
+    xs.sort((a, b) => a.c.text.localeCompare(b.c.text, LOCALE()));
+    html += `<div class="hint" style="padding:4px 8px 0;font-weight:600">${t(g)} (${xs.filter(x => x.on).length}/${xs.length})</div>`;
+    html += xs.map(x => `<label><input type="checkbox" data-lk="${esc(x.c.key)}" ${x.on ? 'checked' : ''}><span>${esc(x.c.text)}</span></label>`).join('');
+  }
+  box.innerHTML = html || `<div class="hint" style="padding:4px 8px">${t('Ingen etiketter i kartet')}</div>`;
+  box.scrollTop = scroll;
+  box.querySelectorAll('input[data-lk]').forEach(i => i.onchange = () => {
+    const k = i.dataset.lk;
+    S.hidden = i.checked ? S.hidden.filter(h => h !== k) : [...new Set([...S.hidden, k])];
+    render();
+  });
+}
+
 function placeLabels(cands, T, obstacles = []) {
   const hidden = new Set(S.hidden);
   const placed = [];
@@ -1396,8 +1444,9 @@ function placeLabels(cands, T, obstacles = []) {
   // Flyttede etiketter først, deretter etter prioritet.
   cands.forEach(c => { c.moved = !!S.offsets[c.key]; });
   cands.sort((a, b) => (b.moved - a.moved) || (b.priority - a.priority));
+  LABEL_STATE = { placed: [], hidden: [] };
   for (const c of cands) {
-    if (hidden.has(c.key)) continue;
+    if (hidden.has(c.key)) { LABEL_STATE.hidden.push(c); continue; }
     const tw = textWidth(c.text, c.size, c.weight);
     const off = S.offsets[c.key] || [0, 0];
     let tx, ty, ta;
@@ -1418,6 +1467,7 @@ function placeLabels(cands, T, obstacles = []) {
     if (!c.faint) boxes.push(b);
     placed.push({ ...c, tx, ty, ta, tw });
   }
+  LABEL_STATE.placed = placed;
   for (const c of placed) {
     const grp = gLabels.append('g').attr('class', 'lab').attr('data-lk', c.key).datum(c);
     const moved = S.offsets[c.key];
@@ -2338,6 +2388,19 @@ function initStaticControls() {
     render();
   };
   $('btnResetLabels').onclick = () => { S.offsets = {}; S.hidden = []; render(); };
+  $('labelPanel').addEventListener('toggle', buildLabelList);
+  $('labelSearch').oninput = buildLabelList;
+  $('labelsAllOn').onclick = () => {
+    // Slå på alle skjulte som er i listen (søket respekteres).
+    const q = $('labelSearch').value.trim().toLowerCase();
+    const keys = new Set(LABEL_STATE.hidden.filter(c => !q || c.text.toLowerCase().includes(q)).map(c => c.key));
+    S.hidden = S.hidden.filter(k => !keys.has(k)); render();
+  };
+  $('labelsAllOff').onclick = () => {
+    const q = $('labelSearch').value.trim().toLowerCase();
+    const keys = LABEL_STATE.placed.filter(c => !q || c.text.toLowerCase().includes(q)).map(c => c.key);
+    S.hidden = [...new Set([...S.hidden, ...keys])]; render();
+  };
 
   $('btnLink').onclick = async () => {
     history.replaceState(null, '', '#s=' + encodeState(S));
