@@ -528,7 +528,7 @@ const EN = {
   'Alle etiketter som vises i kartet nå. Fjern krysset for å skjule en etikett; skjulte etiketter står i listen til de slås på igjen.': 'All labels currently shown in the map. Untick to hide a label; hidden labels stay in the list until switched back on.',
   'Søk i etiketter …': 'Search labels …', 'Vis alle': 'Show all', 'Skjul alle i listen': 'Hide all in list', 'Ingen etiketter i kartet': 'No labels in the map',
   'Lisenser': 'Licences', 'Annet': 'Other', 'Felt': 'Fields', 'Rørledninger': 'Pipelines', 'Kun rørledninger knyttet til utvalget': 'Only pipelines linked to the selection',
-  'Rør som starter, slutter eller går innenfor ca. 3 km fra valgte felt og funn (valgt selskap eller portefølje).': 'Pipelines that start, end or pass within about 3 km of the selected fields and discoveries (selected company or portfolio).', 'Stil': 'Style', 'Omriss (stiplet)': 'Outline (dashed)', 'Helfarge uten omriss': 'Solid fill, no outline', 'Dekkevne': 'Opacity', 'Plassering langs linjen': 'Position along the line', 'Landnavn langs grensen': 'Country names along the boundary', 'Miniatyrkart': 'Inset map',
+  'Rør som starter, slutter eller går innenfor ca. 3 km fra valgte felt og funn (valgt selskap eller portefølje).': 'Pipelines that start, end or pass within about 3 km of the selected fields and discoveries (selected company or portfolio).', 'Stil': 'Style', 'Omriss (stiplet)': 'Outline (dashed)', 'Omriss (heltrukket)': 'Outline (solid line)', 'Helfarge uten omriss': 'Solid fill, no outline', 'Dekkevne': 'Opacity', 'Plassering langs linjen': 'Position along the line', 'Landnavn langs grensen': 'Country names along the boundary', 'Miniatyrkart': 'Inset map',
   'Område': 'Area', 'Bredde': 'Width', 'Egen størrelse': 'Own size', 'Samme som tegnforklaringen': 'Same as the legend', 'Automatisk rundt utsnittet': 'Automatic around the view', 'Skandinavia': 'Scandinavia', 'Nord-Europa': 'Northern Europe',
   'Markering': 'Marker', 'Utsnittets omriss': 'Outline of the view', 'Sirkel': 'Circle', 'Størrelse': 'Size',
   'Tilbake til standardfarger': 'Back to default colours', 'Landnavn i miniatyrkartet': 'Country names in the inset map',
@@ -1150,7 +1150,8 @@ function render() {
         const ext = extruded(key);
         const el = ext ? null : lg.append('path').attr('d', d).attr('fill', fill).attr('fill-opacity', fo)
           .attr('stroke', stroke).attr('stroke-opacity', so).attr('stroke-width', sw).attr('stroke-linejoin', 'round').attr('data-k', fk);
-        const dash = st.dash || (key === 'licences' && !solidLic) || (key === 'approved' && S.colorByHC);
+        // Lisenser: stiplet omriss («outline»), heltrukket omriss («line») eller helfarge uten omriss («solid»).
+        const dash = st.dash || (key === 'licences' && S.licStyle === 'outline') || (key === 'approved' && S.colorByHC);
         if (ext) {
           // Opake klosser; veggene er mørkere toner av toppfargen.
           const solid = striped ? it.color : fill;
@@ -1724,7 +1725,7 @@ function legendEntries() {
         // Med farge per selskap viser lagoppføringene bare stilen (nøytral grå); fargene står under selskapene.
         const lc = colorByCompanyOn() ? '#8a929b' : st.color;
         if (key === 'licences' && S.licStyle === 'solid') E.push({ sym: 'poly', color: lc, fo: S.licOpacity, stroke: lc, label: t(L.legend) });
-        else E.push({ sym: 'poly', color: lc, fo: st.fill, dash: st.dash || key === 'licences', label: t(L.legend) });
+        else E.push({ sym: 'poly', color: lc, fo: st.fill, dash: st.dash || (key === 'licences' && S.licStyle === 'outline'), label: t(L.legend) });
       }
     } else if (key === 'pipelines') {
       if (S.pipes.byMedium) {
@@ -2065,7 +2066,7 @@ function buildLayerList() {
     }
     if (key === 'licences') {
       sub.innerHTML = `<div class="row">${t('Stil')} <select id="o_ls" class="grow">
-          <option value="outline">${t('Omriss (stiplet)')}</option><option value="solid">${t('Helfarge uten omriss')}</option></select></div>
+          <option value="outline">${t('Omriss (stiplet)')}</option><option value="line">${t('Omriss (heltrukket)')}</option><option value="solid">${t('Helfarge uten omriss')}</option></select></div>
         <div class="row" ${S.licStyle === 'solid' ? '' : 'style="display:none"'}><span class="grow">${t('Dekkevne')}</span>
           <input type="range" id="o_lo" min="0.1" max="1" step="0.05" value="${S.licOpacity}" style="width:110px"><span id="o_lov" style="width:36px">${Math.round(S.licOpacity * 100)} %</span></div>`;
       sub.querySelector('#o_ls').value = S.licStyle;

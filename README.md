@@ -5,7 +5,7 @@ Aker BP map
 
 Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-presentasjoner.
 
-- **Kartlag:** felt i produksjon, felt under utbygging, nedstengte felt, funn, aktive lisenser (stiplet omriss eller helfarge uten omriss),
+- **Kartlag:** felt i produksjon, felt under utbygging, nedstengte felt, funn, aktive lisenser (stiplet eller heltrukket omriss, eller helfarge uten omriss),
   transportrørledninger (filtrert på medium, valgfritt bare de som er knyttet til valgt selskap/portefølje,
   med etiketter langs røret), innretninger og letebrønner (filtrert på år, formål og resultat).
 - **Sektorer:** norsk, britisk og dansk sektor kan slås av og på hver for seg. Sektorgrensene kan få egen
