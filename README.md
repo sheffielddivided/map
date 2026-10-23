@@ -5,7 +5,7 @@ Aker BP map
 
 Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-presentasjoner.
 
-- **Kartlag:** felt i produksjon, felt under utbygging, nedstengte felt, funn, aktive lisenser (stiplet omriss eller helfarge uten omriss),
+- **Kartlag:** felt i produksjon, felt under utbygging, nedstengte felt, funn, aktive lisenser (stiplet eller heltrukket omriss, eller helfarge uten omriss),
   transportrørledninger (filtrert på medium, valgfritt bare de som er knyttet til valgt selskap/portefølje,
   med etiketter langs røret), innretninger og letebrønner (filtrert på år, formål og resultat).
 - **Sektorer:** norsk, britisk og dansk sektor kan slås av og på hver for seg. Sektorgrensene kan få egen
@@ -27,7 +27,8 @@ Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-pres
   laster ned i opptil 8K, og *SVG* gir vektorgrafikk. I PowerPoint kan SVG-en konverteres til figur
   ved å høyreklikke og velge «Konverter til figur».
 - **Etiketter:** overlappende etiketter skjules automatisk. Dra en etikett for å flytte den, og
-  dobbeltklikk for å skjule den.
+  dobbeltklikk for å skjule den. Panelet «Etiketter i kartet» lister alle etiketter som vises nå,
+  gruppert etter type, med avkrysning for å skjule/vise hver enkelt.
 - **Språk:** norsk eller engelsk, både i grensesnittet og i kartet (tegnforklaring, kildehenvisning, verktøytips).
 - **Lagring:** hele oppsettet ligger i URL-en, så kart kan bokmerkes og deles. Navngitte maler
   lagres lokalt i nettleseren.
