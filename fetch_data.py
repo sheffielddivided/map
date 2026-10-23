@@ -161,6 +161,19 @@ def feature(geom, props):
     return {'type': 'Feature', 'geometry': geom, 'properties': props}
 
 
+def previous_geometries(name, cc='no'):
+    """Geometri per id fra forrige kjøring. Sodir sender av og til features uten geometri
+    (23.10.2026 manglet 42 felt, blant dem Johan Sverdrup) - da brukes forrige kjente omriss."""
+    return {f['properties']['id']: f['geometry'] for f in previous(name, cc) if f.get('geometry')}
+
+
+def with_geometry(r, prev, kind):
+    geom = r.get('geometry') or prev.get(r['properties'].get(kind))
+    if geom and not r.get('geometry'):
+        print(f'    ! mangler geometri fra kilden, bruker forrige: {r["properties"].get(kind)}')
+    return geom
+
+
 def build_fields():
     hist = fetch(7108, ['fldNpdidField', 'cmpLongName', 'fldCompanyShare', 'fldLicenseeTo'],
                  geometry=False)
@@ -177,12 +190,14 @@ def build_fields():
     lic = shares(current, 'fldNpdidField', 'cmpLongName', 'fldCompanyShare')
     rows = fetch(7100, ['fldNpdidField', 'fldName', 'fldCurrentActivitySatus',
                         'fldHcType', 'cmpLongName', 'fldDiscoveryYear', 'fldMainArea'])
+    prev = previous_geometries('fields')
     out = []
     for r in rows:
         p = r['properties']
-        if not r.get('geometry'):
+        geom = with_geometry(r, prev, 'fldNpdidField')
+        if not geom:
             continue
-        out.append(feature(r['geometry'], {
+        out.append(feature(geom, {
             'id': p['fldNpdidField'],
             'name': title(p['fldName']),
             'status': p['fldCurrentActivitySatus'],
@@ -203,11 +218,15 @@ def build_discoveries(prl_lic, baa_lic):
     prl_by_name = {}
     for r in fetch(3000, ['prlNpdidLicence', 'prlName'], geometry=False):
         prl_by_name[r['properties']['prlName']] = r['properties']['prlNpdidLicence']
+    prev = previous_geometries('discoveries')
     out = []
     for r in rows:
         p = r['properties']
         # Funn som er en del av et felt vises via feltlaget.
-        if not r.get('geometry') or p['fldName']:
+        if p['fldName']:
+            continue
+        geom = with_geometry(r, prev, 'dscNpdidDiscovery')
+        if not geom:
             continue
         if p['dscCurrentActivityStatus'] in ('Producing', 'Shut down', 'Approved for production',
                                              'Included in other discovery'):
@@ -218,7 +237,7 @@ def build_discoveries(prl_lic, baa_lic):
             lic = baa_lic.get(p['dscOwnerName'], [])
         else:
             lic = []
-        out.append(feature(r['geometry'], {
+        out.append(feature(geom, {
             'id': p['dscNpdidDiscovery'],
             'name': p['dscName'] if any(c.isdigit() for c in p['dscName']) else title(p['dscName']),
             'status': p['dscCurrentActivityStatus'],
