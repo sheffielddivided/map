@@ -60,6 +60,12 @@
   .complist label { display: flex; gap: 6px; padding: 3px 8px; align-items: center; cursor: pointer; }
   .complist label:hover { background: var(--hover); }
   .complist .cnt { margin-left: auto; color: var(--muted); font-size: 11px; }
+  .complist .lbedit { margin-left: auto; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 2px; font-size: 13px; }
+  .complist .lbedit:hover { color: inherit; }
+  .complist input.lbtext { flex: 1; min-width: 0; padding: 1px 4px; font: inherit; }
+  .complist .edited { font-style: italic; }
+  #labelEditor { position: absolute; z-index: 20; font: 14px system-ui, sans-serif; padding: 2px 6px; border: 1px solid #1c64d8;
+    border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,.25); min-width: 120px; }
   .presets { display: flex; flex-wrap: wrap; gap: 5px; }
 
   #stage { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 18px; position: relative; }
@@ -146,7 +152,7 @@
             <option value="merc">Web Mercator</option>
           </select>
         </div>
-        <div class="hint">Dra for å panorere, scroll for å zoome. Etiketter kan dras til ny plass – dobbeltklikk skjuler en etikett.</div>
+        <div class="hint">Dra for å panorere, scroll for å zoome. Etiketter kan dras til ny plass – dobbeltklikk skjuler en etikett, høyreklikk redigerer teksten.</div>
       </div>
     </details>
 
@@ -306,7 +312,7 @@
           <div class="hint">Hvert felt forstørres rundt sitt eget midtpunkt. Avstanden mellom feltene endres ikke, så store forstørrelser kan gi overlapp.</div>
         </div>
         <label class="row"><input type="checkbox" id="declutter" /> Skjul overlappende etiketter</label>
-        <div class="row"><button id="btnResetLabels" class="grow">Nullstill flyttede/skjulte etiketter</button></div>
+        <div class="row"><button id="btnResetLabels" class="grow">Nullstill flyttede/skjulte/redigerte etiketter</button></div>
       </div>
     </details>
 
@@ -314,6 +320,7 @@
       <summary>Etiketter i kartet</summary>
       <div class="sec">
         <div class="hint">Alle etiketter som vises i kartet nå. Fjern krysset for å skjule en etikett; skjulte etiketter står i listen til de slås på igjen.</div>
+        <div class="hint">Klikk ✎ (eller høyreklikk etiketten i kartet) for å endre teksten. Tøm feltet for å gå tilbake til standardteksten.</div>
         <input type="search" id="labelSearch" placeholder="Søk i etiketter …" />
         <div class="row"><button class="small grow" id="labelsAllOn">Vis alle</button><button class="small grow" id="labelsAllOff">Skjul alle i listen</button></div>
         <div class="complist" id="labelList" style="max-height:320px"></div>
@@ -461,7 +468,7 @@ const EN = {
   'Projeksjon': 'Projection', 'Transvers Mercator, nord opp (anbefalt)': 'Transverse Mercator, north up (recommended)',
   'UTM sone 31 (3° Ø)': 'UTM zone 31 (3° E)', 'UTM sone 32 (9° Ø)': 'UTM zone 32 (9° E)', 'UTM sone 33 (15° Ø)': 'UTM zone 33 (15° E)',
   'UTM sone 34 (21° Ø)': 'UTM zone 34 (21° E)', 'UTM sone 35 (27° Ø)': 'UTM zone 35 (27° E)', 'Lambert konform (hele sokkelen)': 'Lambert conformal (entire shelf)',
-  'Dra for å panorere, scroll for å zoome. Etiketter kan dras til ny plass – dobbeltklikk skjuler en etikett.': 'Drag to pan, scroll to zoom. Labels can be dragged to a new position – double-click hides a label.',
+  'Dra for å panorere, scroll for å zoome. Etiketter kan dras til ny plass – dobbeltklikk skjuler en etikett, høyreklikk redigerer teksten.': 'Drag to pan, scroll to zoom. Labels can be dragged to a new position – double-click hides a label, right-click edits its text.',
   'Hele sokkelen': 'Entire shelf', 'Nordsjøen': 'North Sea', 'Nordlige Nordsjø': 'Northern North Sea', 'Norskehavet': 'Norwegian Sea', 'Barentshavet': 'Barents Sea',
   'Zoom inn': 'Zoom in', 'Zoom ut': 'Zoom out',
   // 3D
@@ -509,7 +516,7 @@ const EN = {
   'Tegnforklaring': 'Legend', 'Øverst venstre': 'Top left', 'Øverst høyre': 'Top right', 'Nederst venstre': 'Bottom left', 'Nederst høyre': 'Bottom right',
   'Målestokk': 'Scale bar', 'Nordpil': 'North arrow', 'Kildehenvisning': 'Source credit', 'Tekststørrelse etiketter': 'Label text size',
   'Symbolstørrelse': 'Symbol size', 'Forstørr felt': 'Enlarge fields', 'Også funn': 'Discoveries too', 'Bare valgte felt og funn': 'Only selected fields and discoveries',
-  'Hvert felt forstørres rundt sitt eget midtpunkt. Avstanden mellom feltene endres ikke, så store forstørrelser kan gi overlapp.': 'Each field is enlarged around its own centre. The distance between fields does not change, so large factors can cause overlap.', 'Skjul overlappende etiketter': 'Hide overlapping labels', 'Nullstill flyttede/skjulte etiketter': 'Reset moved/hidden labels',
+  'Hvert felt forstørres rundt sitt eget midtpunkt. Avstanden mellom feltene endres ikke, så store forstørrelser kan gi overlapp.': 'Each field is enlarged around its own centre. The distance between fields does not change, so large factors can cause overlap.', 'Skjul overlappende etiketter': 'Hide overlapping labels', 'Nullstill flyttede/skjulte/redigerte etiketter': 'Reset moved/hidden/edited labels',
   // Lagre og del
   'Lagre og del': 'Save and share',
   'Hele oppsettet ligger i lenken, så bokmerk eller del den. Maler lagres lokalt i denne nettleseren.': 'The whole setup is stored in the link, so bookmark or share it. Templates are saved locally in this browser.',
@@ -533,6 +540,8 @@ const EN = {
   'Ungarn': 'Hungary', 'Romania': 'Romania', 'Moldova': 'Moldova', 'Kasakhstan': 'Kazakhstan',
   'Stiplet linje': 'Dashed line', 'Etiketter i kartet': 'Labels in the map',
   'Alle etiketter som vises i kartet nå. Fjern krysset for å skjule en etikett; skjulte etiketter står i listen til de slås på igjen.': 'All labels currently shown in the map. Untick to hide a label; hidden labels stay in the list until switched back on.',
+  'Klikk ✎ (eller høyreklikk etiketten i kartet) for å endre teksten. Tøm feltet for å gå tilbake til standardteksten.': 'Click ✎ (or right-click the label in the map) to change its text. Clear the field to return to the default text.',
+  'Rediger tekst': 'Edit text', 'Standardtekst': 'Default text', 'redigert': 'edited',
   'Søk i etiketter …': 'Search labels …', 'Vis alle': 'Show all', 'Skjul alle i listen': 'Hide all in list', 'Ingen etiketter i kartet': 'No labels in the map',
   'Lisenser': 'Licences', 'Annet': 'Other', 'Felt': 'Fields', 'Rørledninger': 'Pipelines', 'Kun rørledninger knyttet til utvalget': 'Only pipelines linked to the selection',
   'Rør som starter, slutter eller går innenfor ca. 3 km fra valgte felt og funn (valgt selskap eller portefølje).': 'Pipelines that start, end or pass within about 3 km of the selected fields and discoveries (selected company or portfolio).', 'Stil': 'Style', 'Omriss (stiplet)': 'Outline (dashed)', 'Omriss (heltrukket)': 'Outline (solid line)', 'Helfarge uten omriss': 'Solid fill, no outline', 'Dekkevne': 'Opacity', 'Plassering langs linjen': 'Position along the line', 'Landnavn langs grensen': 'Country names along the boundary', 'Miniatyrkart': 'Inset map',
@@ -611,7 +620,7 @@ function defaultState() {
     legend: true, legendPos: 'tr', scale: true, north: true, source: true,
     labelSize: 16, symbolSize: 1.2, declutter: true, fieldScale: 1, fieldScaleDsc: false, fieldScaleSel: false,
     tilt: 0, bearing: 0, extrude: 10, extFields: true, extDsc: false, shadow: true, haze: true,
-    offsets: {}, hidden: [],
+    offsets: {}, hidden: [], labelText: {},
     lang: storedLang() === 'en' ? 'en' : 'no',
   };
 }
@@ -1439,7 +1448,8 @@ function buildLabelList() {
     if (!xs) continue;
     xs.sort((a, b) => a.c.text.localeCompare(b.c.text, LOCALE()));
     html += `<div class="hint" style="padding:4px 8px 0;font-weight:600">${t(g)} (${xs.filter(x => x.on).length}/${xs.length})</div>`;
-    html += xs.map(x => `<label><input type="checkbox" data-lk="${esc(x.c.key)}" ${x.on ? 'checked' : ''}><span>${esc(x.c.text)}</span></label>`).join('');
+    html += xs.map(x => `<label><input type="checkbox" data-lk="${esc(x.c.key)}" ${x.on ? 'checked' : ''}><span${x.c.orig != null ? ` class="edited" title="${esc(t('Standardtekst'))}: ${esc(x.c.orig)}"` : ''}>${esc(x.c.text)}</span>`
+      + `<button class="lbedit" data-le="${esc(x.c.key)}" title="${esc(t('Rediger tekst'))}">✎</button></label>`).join('');
   }
   box.innerHTML = html || `<div class="hint" style="padding:4px 8px">${t('Ingen etiketter i kartet')}</div>`;
   box.scrollTop = scroll;
@@ -1448,6 +1458,44 @@ function buildLabelList() {
     S.hidden = i.checked ? S.hidden.filter(h => h !== k) : [...new Set([...S.hidden, k])];
     render();
   });
+  box.querySelectorAll('button[data-le]').forEach(btn => btn.onclick = ev => {
+    ev.preventDefault();
+    const k = btn.dataset.le, span = btn.previousElementSibling;
+    const c = [...LABEL_STATE.placed, ...LABEL_STATE.hidden].find(x => x.key === k);
+    const inp = document.createElement('input');
+    inp.className = 'lbtext'; inp.value = c ? c.text : span.textContent;
+    span.replaceWith(inp); btn.style.display = 'none';
+    inp.focus(); inp.select();
+    let done = false;
+    const finish = save => { if (done) return; done = true; if (save) setLabelText(k, inp.value, c && (c.orig ?? c.text)); else buildLabelList(); };
+    inp.onkeydown = e => { if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); e.stopPropagation(); };
+    inp.onclick = e => e.preventDefault();
+    inp.onblur = () => finish(true);
+  });
+}
+// Lagrer egendefinert etikettekst. Tom tekst eller standardteksten fjerner overstyringen.
+function setLabelText(key, value, orig) {
+  const v = value.trim();
+  if (!v || v === orig) delete S.labelText[key]; else S.labelText[key] = v;
+  render();
+}
+// Redigering direkte i kartet: tekstfelt oppå etiketten.
+function editLabelInMap(node, c) {
+  const old = document.getElementById('labelEditor');
+  if (old) old.remove();
+  const frame = $('frame'), fr = frame.getBoundingClientRect(), r = node.getBoundingClientRect();
+  const inp = document.createElement('input');
+  inp.id = 'labelEditor'; inp.value = c.text;
+  frame.appendChild(inp);
+  const w = Math.max(140, r.width + 40);
+  inp.style.width = w + 'px';
+  inp.style.left = Math.max(0, Math.min(fr.width - w, r.left - fr.left + r.width / 2 - w / 2)) + 'px';
+  inp.style.top = Math.max(0, r.top - fr.top + r.height / 2 - 14) + 'px';
+  inp.focus(); inp.select();
+  let done = false;
+  const finish = save => { if (done) return; done = true; inp.remove(); if (save) setLabelText(c.key, inp.value, c.orig ?? c.text); };
+  inp.onkeydown = e => { if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); e.stopPropagation(); };
+  inp.onblur = () => finish(true);
 }
 
 function placeLabels(cands, T, obstacles = []) {
@@ -1455,11 +1503,14 @@ function placeLabels(cands, T, obstacles = []) {
   const placed = [];
   const boxes = [...obstacles];
   const overlaps = b => boxes.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
-  // Flyttede etiketter først, deretter etter prioritet.
-  cands.forEach(c => { c.moved = !!S.offsets[c.key]; });
+  // Flyttede og redigerte etiketter vises alltid (brukeren har tatt et aktivt valg).
+  cands.forEach(c => { c.moved = !!S.offsets[c.key] || S.labelText[c.key] != null; });
   cands.sort((a, b) => (b.moved - a.moved) || (b.priority - a.priority));
   LABEL_STATE = { placed: [], hidden: [] };
   for (const c of cands) {
+    // Egendefinert tekst (redigert av brukeren) erstatter standardteksten.
+    const custom = S.labelText[c.key];
+    if (custom != null && c.orig == null) { c.orig = c.text; c.text = custom; }
     if (hidden.has(c.key)) { LABEL_STATE.hidden.push(c); continue; }
     const tw = textWidth(c.text, c.size, c.weight);
     const off = S.offsets[c.key] || [0, 0];
@@ -1932,6 +1983,10 @@ function attachInteractions() {
       const c = d3.select(this).datum();
       if (!S.hidden.includes(c.key)) S.hidden.push(c.key);
       render();
+    })
+    .on('contextmenu', function (ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      editLabelInMap(this, d3.select(this).datum());
     });
 }
 
@@ -2427,7 +2482,7 @@ function initStaticControls() {
     if (!S.blockColor) $('blockColor').value = T.grid;
     render();
   };
-  $('btnResetLabels').onclick = () => { S.offsets = {}; S.hidden = []; render(); };
+  $('btnResetLabels').onclick = () => { S.offsets = {}; S.hidden = []; S.labelText = {}; render(); };
   $('labelPanel').addEventListener('toggle', buildLabelList);
   $('labelSearch').oninput = buildLabelList;
   $('labelsAllOn').onclick = () => {
