@@ -198,6 +198,7 @@
         </div>
         <div id="selCompany" class="sec" style="padding:0">
         <input type="text" id="companyLegendTitle" placeholder="Overskrift i tegnforklaringen (valgfritt – standard er selskapsnavnene)" />
+        <label class="row"><input type="checkbox" id="hideLegendHeading" /> Skjul overskriften i tegnforklaringen</label>
         <input type="search" id="compSearch" placeholder="Søk etter selskap …" />
         <div class="complist" id="compList"></div>
         <div class="chips" id="compChips"></div>
@@ -210,6 +211,7 @@
         </div>
         <div id="selCustom" class="sec" style="padding:0">
           <input type="text" id="portfolioName" placeholder="Navn på porteføljen (vises i tegnforklaringen)" />
+          <label class="row"><input type="checkbox" id="hideLegendHeading2" /> Skjul overskriften i tegnforklaringen</label>
           <input type="search" id="pfSearch" placeholder="Søk etter felt eller funn …" />
           <div class="complist" id="pfList"></div>
           <div class="chips" id="pfChips"></div>
@@ -477,7 +479,7 @@ const EN = {
   'Dis mot horisonten': 'Haze towards the horizon',
   'Klossene vises når kartet er vippet. I perspektiv gjelder målestokken langs linjen den står på (nederst i kartet).': 'Blocks are shown when the map is tilted. In perspective the scale bar applies along the line it sits on (at the bottom of the map).',
   // Selskap
-  'Selskap': 'Company', 'Farge per selskap (felles felt skraveres)': 'Colour per company (shared fields are hatched)', 'Delt eierskap': 'Shared ownership', 'Overskrift i tegnforklaringen (valgfritt – standard er selskapsnavnene)': 'Legend heading (optional – default is the company names)', 'Selskap / portefølje': 'Company / portfolio', 'Egendefinert portefølje': 'Custom portfolio',
+  'Selskap': 'Company', 'Farge per selskap (felles felt skraveres)': 'Colour per company (shared fields are hatched)', 'Delt eierskap': 'Shared ownership', 'Skjul overskriften i tegnforklaringen': 'Hide the legend heading', 'Overskrift i tegnforklaringen (valgfritt – standard er selskapsnavnene)': 'Legend heading (optional – default is the company names)', 'Selskap / portefølje': 'Company / portfolio', 'Egendefinert portefølje': 'Custom portfolio',
   'Navn på porteføljen (vises i tegnforklaringen)': 'Portfolio name (shown in the legend)', 'Søk etter felt eller funn …': 'Search for a field or discovery …',
   'Klikk på felt og funn i kartet for å legge dem til eller fjerne dem.': 'Click fields and discoveries in the map to add or remove them.',
   'Gjelder felt og funn. Lisenser vises som vanlig.': 'Applies to fields and discoveries. Licences are shown as usual.',
@@ -610,7 +612,7 @@ function defaultState() {
     wells: { wildcat: true, appraisal: true, from: CURRENT_YEAR - 10, to: CURRENT_YEAR, classes: Object.keys(WELL_CLASSES), colorByContent: true },
     pipes: { byMedium: false, byDim: true, media: ['Gas', 'Oil', 'Condensate', 'Mixed', 'Co2 injection', 'other'], related: false },
     fac: { surface: true, subsea: false, onshore: true },
-    selMode: 'company', portfolio: [], portfolioName: '', companyLegendTitle: '',
+    selMode: 'company', portfolio: [], portfolioName: '', companyLegendTitle: '', hideLegendHeading: false,
     companies: [], role: 'any', colorByCompany: false, companyColors: {}, mode: 'highlight', splitRole: false, labelsOnlySel: true, labelShare: false, otherColor: '#c3c8cf',
     theme: 'light', sea: THEMES.light.sea, land: THEMES.light.land, transparent: false,
     depth: true, borders: true, landMode: 'all', landCountries: ['NOR'], cities: true, quads: false, quadLabels: true, blocks: false,
@@ -1771,6 +1773,8 @@ function fmtDate(iso) {
 }
 
 function legendEntries() {
+  // Farge per selskap: tegnforklaringen viser bare selskapene (og skraveringen for delt eierskap).
+  if (colorByCompanyOn()) return companyLegendEntries();
   const E = [];
   const sel = selectionActive();
   const hcSeen = new Set();
@@ -1815,7 +1819,18 @@ function legendEntries() {
     const hcE = HC_ORDER.filter(hc => hcSeen.has(hc)).map(hc => ({ sym: 'poly', color: HC[hc].color, fo: 0.85, label: t(HC[hc].name) }));
     E.splice(E.hcSlot, 1, ...hcE);
   }
-  if (colorByCompanyOn()) {
+  if (sel && S.splitRole && S.selMode !== 'custom' && !colorByCompanyOn()) {
+    const nm = S.companies.map(shortName).join(', ');
+    E.push({ sym: 'poly', color: '#6c757d', fo: 0.85, label: `${nm} – ${t('operatør')}` });
+    E.push({ sym: 'poly', color: lighten('#6c757d', 0.55), stroke: '#6c757d', fo: 0.85, label: `${nm} – ${t('partner')}` });
+  }
+  if (sel && S.mode === 'highlight' && drewOther) E.push({ sym: 'poly', color: S.otherColor, fo: 0.5, label: t(S.selMode === 'custom' ? 'Andre felt og funn' : 'Andre selskaper') });
+  E.forEach(e => { if (e.fo != null && e.stroke && e.stroke === e.color) e.fo = Math.max(e.fo, 0.35); });
+  return E;
+}
+function companyLegendEntries() {
+  const E = [];
+  {
     // Én farge per selskap som faktisk er tegnet, og skravering for delt eierskap.
     const drawn = [...featIndex.keys()].map(k => k.split(':')[0]);
     const companyItems = LAYERS.filter(L => L.company && drawn.includes(L.key)).flatMap(L => layerItems(L).filter(i => featIndex.has(`${L.key}:${i.p.id}`) && i.colors));
@@ -1827,13 +1842,6 @@ function legendEntries() {
       E.push({ sym: 'poly', color: all[0], pattern: stripePattern(all), fo: 0.85, label: t('Delt eierskap') });
     }
   }
-  if (sel && S.splitRole && S.selMode !== 'custom' && !colorByCompanyOn()) {
-    const nm = S.companies.map(shortName).join(', ');
-    E.push({ sym: 'poly', color: '#6c757d', fo: 0.85, label: `${nm} – ${t('operatør')}` });
-    E.push({ sym: 'poly', color: lighten('#6c757d', 0.55), stroke: '#6c757d', fo: 0.85, label: `${nm} – ${t('partner')}` });
-  }
-  if (sel && S.mode === 'highlight' && drewOther) E.push({ sym: 'poly', color: S.otherColor, fo: 0.5, label: t(S.selMode === 'custom' ? 'Andre felt og funn' : 'Andre selskaper') });
-  E.forEach(e => { if (e.fo != null && e.stroke && e.stroke === e.color) e.fo = Math.max(e.fo, 0.35); });
   return E;
 }
 
@@ -1843,11 +1851,13 @@ function legendMetrics() {
   if (!E.length) return null;
   const fs = 16, lh = 24, pad = 12, sw = 22;
   let heading = '';
-  if (S.selMode === 'custom') {
+  if (S.hideLegendHeading) heading = '';
+  else if (S.selMode === 'custom') {
     if (S.portfolio.length) heading = S.portfolioName.trim() || t('Egendefinert portefølje');
   } else if (S.companies.length) {
     // Egen overskrift overstyrer selskapsnavnene (og rollen) når den er fylt ut.
     if (S.companyLegendTitle.trim()) heading = S.companyLegendTitle.trim();
+    else if (colorByCompanyOn()) heading = '';   // selskapsnavnene står allerede som egne oppføringer
     else {
       heading = S.companies.map(shortName).join(', ');
       if (S.role === 'op') heading += ` (${t('operatør')})`;
@@ -2357,6 +2367,9 @@ function syncAllControls() {
   bindSeg('segRole', () => S.role, v => S.role = v);
   bindSeg('segSel', () => S.selMode, v => { S.selMode = v; syncSelMode(); });
   bindValue('portfolioName', () => S.portfolioName, v => S.portfolioName = v, 'input');
+  // Samme valg i begge modusene (selskap og egendefinert portefølje).
+  for (const id of ['hideLegendHeading', 'hideLegendHeading2'])
+    bindCheck(id, () => S.hideLegendHeading, v => { S.hideLegendHeading = v; $('hideLegendHeading').checked = $('hideLegendHeading2').checked = v; });
   bindValue('companyLegendTitle', () => S.companyLegendTitle, v => S.companyLegendTitle = v, 'input');
   $('pfSearch').oninput = buildPortfolioUI;
   syncSelMode();
