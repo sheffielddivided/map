@@ -23,6 +23,7 @@ Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-pres
   blir synlige i oversiktskart. Valgfritt også funn, og valgfritt bare valgte felt og funn.
 - **Miniatyrkart:** valgfritt oversiktskart i et hjørne som viser hvor utsnittet er hentet fra
   (automatisk område eller Nordsjøen/Skandinavia/Nord-Europa, markert med omriss eller sirkel).
+- **Tegnforklaring:** i et av hjørnene, eller dra den til valgfri plass i kartet («Flyttet manuelt»).
 - **Slide-format:** 16:9, halvside, 4:3, kvadrat, stående eller egendefinert. Rammen viser nøyaktig
   det som eksporteres.
 - **Eksport:** *Kopier* legger en PNG på utklippstavlen (lim inn i PowerPoint med Ctrl+V), *PNG*

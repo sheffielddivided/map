@@ -281,8 +281,10 @@
           <select id="legendPos" style="margin-left:auto">
             <option value="tl">Øverst venstre</option><option value="tr">Øverst høyre</option>
             <option value="bl">Nederst venstre</option><option value="br">Nederst høyre</option>
+            <option value="custom">Flyttet manuelt</option>
           </select>
         </label>
+        <div class="hint">Dra tegnforklaringen i kartet for å flytte den.</div>
         <label class="row"><input type="checkbox" id="showScale" /> Målestokk</label>
         <label class="row"><input type="checkbox" id="showNorth" /> Nordpil</label>
         <label class="row"><input type="checkbox" id="showInset" /> Miniatyrkart
@@ -515,7 +517,7 @@ const EN = {
   'Byer og steder': 'Cities and places', 'Tykkelse': 'Width', 'Tilbake til temaets standard': 'Back to theme default', 'Kvadranter': 'Quadrants', 'Nummer': 'Numbers', 'Vis kvadrantnummer': 'Show quadrant numbers', 'Blokker': 'Blocks',
   // Tittel og tekst
   'Tittel, tegnforklaring og tekst': 'Title, legend and text', 'Tittel': 'Title', 'Undertittel (valgfritt)': 'Subtitle (optional)',
-  'Tegnforklaring': 'Legend', 'Øverst venstre': 'Top left', 'Øverst høyre': 'Top right', 'Nederst venstre': 'Bottom left', 'Nederst høyre': 'Bottom right',
+  'Tegnforklaring': 'Legend', 'Øverst venstre': 'Top left', 'Øverst høyre': 'Top right', 'Nederst venstre': 'Bottom left', 'Nederst høyre': 'Bottom right', 'Flyttet manuelt': 'Moved manually', 'Dra tegnforklaringen i kartet for å flytte den.': 'Drag the legend in the map to move it.',
   'Målestokk': 'Scale bar', 'Nordpil': 'North arrow', 'Kildehenvisning': 'Source credit', 'Tekststørrelse etiketter': 'Label text size',
   'Symbolstørrelse': 'Symbol size', 'Forstørr felt': 'Enlarge fields', 'Også funn': 'Discoveries too', 'Bare valgte felt og funn': 'Only selected fields and discoveries',
   'Hvert felt forstørres rundt sitt eget midtpunkt. Avstanden mellom feltene endres ikke, så store forstørrelser kan gi overlapp.': 'Each field is enlarged around its own centre. The distance between fields does not change, so large factors can cause overlap.', 'Skjul overlappende etiketter': 'Hide overlapping labels', 'Nullstill flyttede/skjulte/redigerte etiketter': 'Reset moved/hidden/edited labels',
@@ -619,7 +621,7 @@ function defaultState() {
     // null = følg temaets rutenettfarge / standard tykkelse.
     quadColor: null, quadWidth: 0.8, blockColor: null, blockWidth: 0.35,
     title: false, titleText: '', subtitleText: '',
-    legend: true, legendPos: 'tr', scale: true, north: true, source: true,
+    legend: true, legendPos: 'tr', legendXY: null, scale: true, north: true, source: true,
     labelSize: 16, symbolSize: 1.2, declutter: true, fieldScale: 1, fieldScaleDsc: false, fieldScaleSel: false,
     tilt: 0, bearing: 0, extrude: 10, extFields: true, extDsc: false, shadow: true, haze: true,
     offsets: {}, hidden: [], labelText: {},
@@ -1881,13 +1883,23 @@ function drawLegend(g, T, topY) {
   if (!LM) return;
   const { E, fs, lh, pad, sw, heading, bw, bh } = LM;
   const m = BOX_MARGIN;
-  const pos = S.legendPos;
+  let pos = S.legendPos;
+  if (pos === 'custom' && S.legendXY) {
+    // Manuelt plassert: øvre venstre hjørne som andel av kartets bredde og høyde, holdt innenfor rammen.
+    const x = Math.max(0, Math.min(W() - bw, S.legendXY[0] * W())), y = Math.max(0, Math.min(H() - bh, S.legendXY[1] * H()));
+    return renderLegend(g, T, LM, x, y);
+  }
+  if (pos === 'custom') pos = 'tr';
   let x = pos.includes('l') ? m : W() - bw - m;
   let y = pos.includes('t') ? (pos === 'tl' ? Math.max(m, topY) : m) : H() - bh - m - (S.source ? 14 : 0);
   if (pos === 'bl' && S.scale && !(insetBox && S.insetPos === 'bl')) y -= 44;
   // Samme hjørne som miniatyrkartet: stable tegnforklaringen innenfor (mot midten av kartet).
   if (insetBox && S.insetPos === pos) y = pos.includes('t') ? insetBox.y + insetBox.h + 12 : insetBox.y - bh - 12;
-  const lg = g.append('g').attr('transform', `translate(${x},${y})`).attr('class', 'legend');
+  renderLegend(g, T, LM, x, y);
+}
+function renderLegend(g, T, LM, x, y) {
+  const { E, fs, lh, pad, sw, heading, bw, bh } = LM;
+  const lg = g.append('g').attr('transform', `translate(${x},${y})`).attr('class', 'legend').datum({ x, y, bw, bh });
   boxFrame(lg, bw, bh, T).attr('fill', T.box).attr('fill-opacity', 0.9);
   let cy = pad + lh / 2 - 2;
   if (heading) { lg.append('text').attr('x', pad).attr('y', cy).attr('dy', fs * 0.35).attr('font-family', FONT).attr('font-size', fs).attr('font-weight', 'bold').attr('fill', T.ink).text(heading); cy += lh + 2; }
@@ -1976,6 +1988,21 @@ function zoomBy(f) {
 }
 
 function attachInteractions() {
+  // Tegnforklaringen kan dras; da blir plasseringen «Flyttet manuelt».
+  d3.select('#goverlay .legend').style('cursor', 'move').call(d3.drag()
+    .on('drag', function (ev) {
+      const b = d3.select(this).datum();
+      b.x = Math.max(0, Math.min(W() - b.bw, b.x + ev.dx)); b.y = Math.max(0, Math.min(H() - b.bh, b.y + ev.dy));
+      b.moved = true;
+      d3.select(this).attr('transform', `translate(${b.x},${b.y})`);
+    })
+    .on('end', function () {
+      const b = d3.select(this).datum();
+      if (!b.moved) return;
+      S.legendPos = 'custom'; S.legendXY = [+(b.x / W()).toFixed(4), +(b.y / H()).toFixed(4)];
+      $('legendPos').value = 'custom';
+      render();
+    }));
   gLabels.selectAll('.lab').call(d3.drag()
     .on('drag', function (ev) {
       const c = d3.select(this).datum();
@@ -2398,7 +2425,12 @@ function syncAllControls() {
   bindValue('titleText', () => S.titleText, v => { S.titleText = v; if (v) { S.title = true; $('showTitle').checked = true; } }, 'input');
   bindValue('subtitleText', () => S.subtitleText, v => { S.subtitleText = v; if (v) { S.title = true; $('showTitle').checked = true; } }, 'input');
   bindCheck('showLegend', () => S.legend, v => S.legend = v);
-  bindValue('legendPos', () => S.legendPos, v => S.legendPos = v);
+  bindValue('legendPos', () => S.legendPos === 'custom' && !S.legendXY ? 'tr' : S.legendPos, v => {
+    S.legendPos = v;
+    // «Flyttet manuelt» uten tidligere flytting: start der tegnforklaringen står nå.
+    const cur = d3.select('#goverlay .legend').datum();
+    if (v === 'custom' && !S.legendXY) S.legendXY = cur ? [cur.x / W(), cur.y / H()] : [0.7, 0.05];
+  });
   bindCheck('showScale', () => S.scale, v => S.scale = v);
   bindCheck('showNorth', () => S.north, v => S.north = v);
   bindCheck('showSource', () => S.source, v => S.source = v);
