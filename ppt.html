@@ -1235,7 +1235,7 @@ function render() {
       const xy = P([lon, lat]);
       if (!xy) continue;
       if (!xy || xy[0] < 0 || xy[1] < 0 || xy[0] > w || xy[1] > h) continue;
-      cg.append('circle').attr('cx', xy[0]).attr('cy', xy[1]).attr('r', 2.6 * k).attr('fill', T.ink).attr('stroke', T.halo).attr('stroke-width', 0.8);
+      cg.append('circle').attr('class', 'citydot').attr('data-city', `city:${name}`).attr('cx', xy[0]).attr('cy', xy[1]).attr('r', 2.6 * k).attr('fill', T.ink).attr('stroke', T.halo).attr('stroke-width', 0.8);
       labels.push({ key: `city:${name}`, text: name, x: xy[0], y: xy[1], anchor: 'right', size: S.labelSize * 0.92, weight: 'normal', italic: true, color: T.ink, priority: 7 });
     }
   }
@@ -1265,6 +1265,9 @@ function render() {
   });
   if (S.sectorLines && S.sectorLabels && BASE.sectors) drawSectorLabels(T, obstacles);
   placeLabels(labels, T, obstacles);
+  // Bysymboler vises bare når etiketten deres faktisk er plassert (ikke skjult eller fjernet av kollisjonssjekken).
+  const placedKeys = new Set(LABEL_STATE.placed.map(c => c.key));
+  g.selectAll('circle.citydot').filter(function () { return !placedKeys.has(this.getAttribute('data-city')); }).remove();
   attachInteractions();
   buildLabelList();
   saveToUrl();
