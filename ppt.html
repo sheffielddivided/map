@@ -33,7 +33,33 @@
   input[type=number] { width: 70px; }
 
   main { flex: 1; display: flex; min-height: 0; }
-  aside { width: 340px; flex: none; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); padding: 4px 0 40px; }
+  aside { width: 340px; flex: none; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); padding: 0 0 40px; }
+  /* Faner øverst i panelet, med søk etter innstillinger. Faner og søk blir stående når panelet scrolles. */
+  .paneltop { position: sticky; top: 0; z-index: 3; background: var(--panel); }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .tabs button { flex: 1 1 auto; border: 0; border-radius: 0; background: none; padding: 10px 2px 8px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+  .tabs button:hover { background: var(--hover); color: var(--ink); }
+  .tabs button.on { color: var(--accent); border-bottom-color: var(--accent); }
+  .finder { position: relative; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+  .finder input { width: 100%; }
+  #settingResults { position: absolute; left: 14px; right: 14px; top: 100%; margin-top: -4px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 6px; box-shadow: 0 6px 18px rgba(20,30,50,.16); max-height: 340px; overflow-y: auto; display: none; }
+  #settingResults.show { display: block; }
+  #settingResults button { display: block; width: 100%; text-align: left; border: 0; border-radius: 0; padding: 6px 10px; background: none; }
+  #settingResults button + button { border-top: 1px solid var(--line); }
+  #settingResults button:hover, #settingResults button.sel { background: var(--hover); }
+  #settingResults .path { display: block; color: var(--muted); font-size: 11px; }
+  #settingResults .none { padding: 8px 10px; color: var(--muted); }
+  .tab { display: none; }
+  .tab.on { display: block; }
+  .flash { animation: flash 1.6s ease-out; border-radius: 4px; }
+  @keyframes flash { 0%, 30% { background: #ffe8a3; box-shadow: 0 0 0 4px #ffe8a3; } 100% { background: transparent; box-shadow: 0 0 0 4px transparent; } }
+  /* «Flere valg»: finjusteringer som sjelden trengs, skjult til de åpnes. */
+  details.more { border: 0; }
+  details.more > summary { padding: 2px 0; font-weight: 500; color: var(--accent); font-size: 12px; justify-content: flex-start; gap: 4px; }
+  details.more > summary::after { content: "▸"; color: var(--accent); }
+  details.more[open] > summary::after { content: "▾"; }
+  details.more > .sec { padding: 4px 0 2px 12px; border-left: 2px solid var(--line); margin-top: 4px; }
   details { border-bottom: 1px solid var(--line); }
   summary { padding: 9px 14px; font-weight: 650; cursor: pointer; user-select: none; list-style: none; display: flex; justify-content: space-between; }
   summary::-webkit-details-marker { display: none; }
@@ -132,13 +158,73 @@
 
 <main>
   <aside id="panel">
+    <div class="paneltop">
+    <nav class="tabs" id="tabs">
+      <button data-tab="content">Innhold</button><button data-tab="map">Kart</button><button data-tab="text">Tekst og pynt</button><button data-tab="save">Lagre</button>
+    </nav>
+    <div class="finder">
+      <input type="search" id="settingSearch" placeholder="Finn innstilling …" autocomplete="off" />
+      <div id="settingResults"></div>
+    </div>
+    </div>
+
+    <!-- ── Innhold: hva som vises ─────────────────────────────────────────── -->
+    <div class="tab" data-tab="content">
     <details open>
-      <summary>Utsnitt</summary>
+      <summary>Kartlag</summary>
+      <div class="sec" id="layerList"></div>
+    </details>
+
+    <details>
+      <summary>Selskap / portefølje</summary>
+      <div class="sec">
+        <div class="seg" id="segSel">
+          <button data-v="company">Selskap</button><button data-v="custom">Egendefinert portefølje</button>
+        </div>
+        <div id="selCompany" class="sec" style="padding:0">
+        <input type="search" id="compSearch" placeholder="Søk etter selskap …" />
+        <div class="complist" id="compList"></div>
+        <div class="chips" id="compChips"></div>
+        <label class="row"><input type="checkbox" id="colorByCompany" /> Farge per selskap (felles felt skraveres)</label>
+        <div class="row"><span>Rolle</span>
+          <div class="seg grow" id="segRole">
+            <button data-v="any">Operatør eller partner</button><button data-v="op">Operatør</button><button data-v="partner">Partner</button>
+          </div>
+        </div>
+        </div>
+        <div id="selCustom" class="sec" style="padding:0">
+          <input type="text" id="portfolioName" placeholder="Navn på porteføljen (vises i tegnforklaringen)" />
+          <input type="search" id="pfSearch" placeholder="Søk etter felt eller funn …" />
+          <div class="complist" id="pfList"></div>
+          <div class="chips" id="pfChips"></div>
+          <div class="hint">Klikk på felt og funn i kartet for å legge dem til eller fjerne dem.</div>
+        </div>
+        <div class="row"><span>Visning</span>
+          <div class="seg grow" id="segMode">
+            <button data-v="highlight">Fremhev</button><button data-v="only">Vis kun valgte</button>
+          </div>
+        </div>
+        <div class="row"><button id="btnFit" class="grow" title="Zoom til valgt selskap, eller til alt som er synlig">Zoom til utvalg</button></div>
+        <details class="more">
+          <summary>Flere valg</summary>
+          <div class="sec">
+            <label class="row" id="splitRoleRow"><input type="checkbox" id="splitRole" /> Skill operatør (mørk) og partner (lys)</label>
+            <label class="row"><input type="checkbox" id="labelsOnlySel" /> Etiketter kun for valgte</label>
+            <label class="row" id="labelShareRow"><input type="checkbox" id="labelShare" /> Vis eierandel i etiketten</label>
+            <div class="row"><span class="grow">Farge for andre selskaper</span><input type="color" id="otherColor" /></div>
+          </div>
+        </details>
+        <div class="hint" id="selHint">Gjelder felt, funn og lisenser.</div>
+      </div>
+    </details>
+    </div>
+
+    <!-- ── Kart: utsnitt, bakgrunn, sektorer, 3D ─────────────────────────── -->
+    <div class="tab" data-tab="map">
+    <details open>
+      <summary>Utsnitt og projeksjon</summary>
       <div class="sec">
         <div class="presets" id="viewPresets"></div>
-        <div class="row">
-          <button id="btnFit" class="grow" title="Zoom til valgt selskap, eller til alt som er synlig">Zoom til utvalg</button>
-        </div>
         <div class="row">
           <label for="proj">Projeksjon</label>
           <select id="proj" class="grow">
@@ -156,85 +242,6 @@
       </div>
     </details>
 
-    <details open>
-      <summary>Sektorer</summary>
-      <div class="sec">
-        <label class="row"><input type="checkbox" id="secNo" /> Norge</label>
-        <label class="row"><input type="checkbox" id="secUk" /> Storbritannia</label>
-        <label class="row"><input type="checkbox" id="secDk" /> Danmark</label>
-        <label class="row"><input type="checkbox" id="secLines" /> Sektorgrenser</label>
-        <div class="sub">
-          <div class="row">Farge <input type="color" id="secColor" /> Tykkelse
-            <input type="number" id="secWidth" min="0.2" max="8" step="0.1" style="width:60px" />
-            <button class="small" id="secReset" title="Tilbake til temaets standard">↺</button></div>
-          <label class="row"><input type="checkbox" id="secDash" /> Stiplet linje</label>
-          <label class="row"><input type="checkbox" id="secLabels" /> Landnavn langs grensen</label>
-          <div class="row"><span class="grow">Plassering langs linjen</span><input type="range" id="secLabelPos" min="5" max="95" step="1" style="width:110px" /></div>
-        </div>
-        <div class="hint">Danske data har ikke funn, felt mangler hydrokarbontype, og brønnene går til 2019.</div>
-      </div>
-    </details>
-
-    <details id="sec3d">
-      <summary>3D-effekt</summary>
-      <div class="sec">
-        <div class="presets" id="tiltPresets"></div>
-        <div class="row"><span class="grow">Vipping</span><input type="range" id="tilt" min="0" max="65" step="1" style="width:130px" /><span id="tiltVal" style="width:30px"></span></div>
-        <div class="row"><span class="grow">Rotasjon</span><input type="range" id="bearing" min="-180" max="180" step="1" style="width:130px" /><span id="bearingVal" style="width:30px"></span></div>
-        <div class="row"><span class="grow">Klosshøyde</span><input type="range" id="extrude" min="0" max="50" step="1" style="width:130px" /><span id="extrudeVal" style="width:30px"></span></div>
-        <label class="row"><input type="checkbox" id="extFields" /> Felt som klosser</label>
-        <label class="row"><input type="checkbox" id="extDsc" /> Funn som klosser</label>
-        <label class="row"><input type="checkbox" id="shadow" /> Skygge</label>
-        <label class="row"><input type="checkbox" id="haze" /> Dis mot horisonten</label>
-        <div class="hint">Klossene vises når kartet er vippet. I perspektiv gjelder målestokken langs linjen den står på (nederst i kartet).</div>
-      </div>
-    </details>
-
-    <details open>
-      <summary>Selskap / portefølje</summary>
-      <div class="sec">
-        <div class="seg" id="segSel">
-          <button data-v="company">Selskap</button><button data-v="custom">Egendefinert portefølje</button>
-        </div>
-        <div id="selCompany" class="sec" style="padding:0">
-        <input type="text" id="companyLegendTitle" placeholder="Overskrift i tegnforklaringen (valgfritt – standard er selskapsnavnene)" />
-        <label class="row"><input type="checkbox" id="hideLegendHeading" /> Skjul overskriften i tegnforklaringen</label>
-        <input type="search" id="compSearch" placeholder="Søk etter selskap …" />
-        <div class="complist" id="compList"></div>
-        <div class="chips" id="compChips"></div>
-        <label class="row"><input type="checkbox" id="colorByCompany" /> Farge per selskap (felles felt skraveres)</label>
-        <div class="row"><span>Rolle</span>
-          <div class="seg grow" id="segRole">
-            <button data-v="any">Operatør eller partner</button><button data-v="op">Operatør</button><button data-v="partner">Partner</button>
-          </div>
-        </div>
-        </div>
-        <div id="selCustom" class="sec" style="padding:0">
-          <input type="text" id="portfolioName" placeholder="Navn på porteføljen (vises i tegnforklaringen)" />
-          <label class="row"><input type="checkbox" id="hideLegendHeading2" /> Skjul overskriften i tegnforklaringen</label>
-          <input type="search" id="pfSearch" placeholder="Søk etter felt eller funn …" />
-          <div class="complist" id="pfList"></div>
-          <div class="chips" id="pfChips"></div>
-          <div class="hint">Klikk på felt og funn i kartet for å legge dem til eller fjerne dem.</div>
-        </div>
-        <div class="row"><span>Visning</span>
-          <div class="seg grow" id="segMode">
-            <button data-v="highlight">Fremhev</button><button data-v="only">Vis kun valgte</button>
-          </div>
-        </div>
-        <label class="row" id="splitRoleRow"><input type="checkbox" id="splitRole" /> Skill operatør (mørk) og partner (lys)</label>
-        <label class="row"><input type="checkbox" id="labelsOnlySel" /> Etiketter kun for valgte</label>
-        <label class="row" id="labelShareRow"><input type="checkbox" id="labelShare" /> Vis eierandel i etiketten</label>
-        <div class="row"><span class="grow">Farge for andre selskaper</span><input type="color" id="otherColor" /></div>
-        <div class="hint" id="selHint">Gjelder felt, funn og lisenser.</div>
-      </div>
-    </details>
-
-    <details open>
-      <summary>Kartlag</summary>
-      <div class="sec" id="layerList"></div>
-    </details>
-
     <details>
       <summary>Bakgrunnskart</summary>
       <div class="sec">
@@ -246,37 +253,108 @@
             <option value="blue">Blå hav</option>
           </select>
         </div>
-        <div class="row"><span class="grow">Hav</span><input type="color" id="seaColor" /></div>
-        <div class="row"><span class="grow">Land</span><input type="color" id="landColor" /></div>
-        <label class="row"><input type="checkbox" id="transparent" /> Transparent bakgrunn (ingen havfarge)</label>
         <label class="row"><input type="checkbox" id="showDepth" /> Dybdekurver (200, 1000, 2000, 3000 m)</label>
+        <label class="row"><input type="checkbox" id="showBorders" /> Landegrenser</label>
+        <label class="row"><input type="checkbox" id="showCities" /> Byer og steder</label>
         <div class="row"><span>Landvalg</span>
           <select id="landMode" class="grow">
             <option value="all">Vis alle land</option><option value="some">Vis kun utvalgte land</option>
           </select>
         </div>
         <div class="sub" id="landList"></div>
-        <label class="row"><input type="checkbox" id="showBorders" /> Landegrenser</label>
-        <label class="row"><input type="checkbox" id="showCities" /> Byer og steder</label>
-        <label class="row"><input type="checkbox" id="showQuads" /> Kvadranter
-          <label class="lbl" style="margin-left:auto" title="Vis kvadrantnummer"><input type="checkbox" id="showQuadLabels" /> Nummer</label>
-        </label>
-        <div class="sub"><div class="row">Farge <input type="color" id="quadColor" /> Tykkelse
-          <input type="number" id="quadWidth" min="0.1" max="6" step="0.1" style="width:60px" />
-          <button class="small" id="quadReset" title="Tilbake til temaets standard">↺</button></div></div>
-        <label class="row"><input type="checkbox" id="showBlocks" /> Blokker</label>
-        <div class="sub"><div class="row">Farge <input type="color" id="blockColor" /> Tykkelse
-          <input type="number" id="blockWidth" min="0.1" max="6" step="0.1" style="width:60px" />
-          <button class="small" id="blockReset" title="Tilbake til temaets standard">↺</button></div></div>
+        <details class="more">
+          <summary>Flere valg</summary>
+          <div class="sec">
+            <div class="row"><span class="grow">Hav</span><input type="color" id="seaColor" /></div>
+            <div class="row"><span class="grow">Land</span><input type="color" id="landColor" /></div>
+            <label class="row"><input type="checkbox" id="transparent" /> Transparent bakgrunn (ingen havfarge)</label>
+          </div>
+        </details>
       </div>
     </details>
 
     <details>
-      <summary>Tittel, tegnforklaring og tekst</summary>
+      <summary>Sektorer og rutenett</summary>
+      <div class="sec">
+        <label class="row"><input type="checkbox" id="secNo" /> Norge</label>
+        <label class="row"><input type="checkbox" id="secUk" /> Storbritannia</label>
+        <label class="row"><input type="checkbox" id="secDk" /> Danmark</label>
+        <label class="row"><input type="checkbox" id="secLines" /> Sektorgrenser</label>
+        <label class="row"><input type="checkbox" id="showQuads" /> Kvadranter
+          <label class="lbl" style="margin-left:auto" title="Vis kvadrantnummer"><input type="checkbox" id="showQuadLabels" /> Nummer</label>
+        </label>
+        <label class="row"><input type="checkbox" id="showBlocks" /> Blokker</label>
+        <details class="more">
+          <summary>Flere valg</summary>
+          <div class="sec">
+            <div class="hint">Sektorgrenser</div>
+            <div class="row">Farge <input type="color" id="secColor" /> Tykkelse
+              <input type="number" id="secWidth" min="0.2" max="8" step="0.1" style="width:60px" />
+              <button class="small" id="secReset" title="Tilbake til temaets standard">↺</button></div>
+            <label class="row"><input type="checkbox" id="secDash" /> Stiplet linje</label>
+            <label class="row"><input type="checkbox" id="secLabels" /> Landnavn langs grensen</label>
+            <div class="row"><span class="grow">Plassering langs linjen</span><input type="range" id="secLabelPos" min="5" max="95" step="1" style="width:110px" /></div>
+            <div class="hint">Kvadranter</div>
+            <div class="row">Farge <input type="color" id="quadColor" /> Tykkelse
+              <input type="number" id="quadWidth" min="0.1" max="6" step="0.1" style="width:60px" />
+              <button class="small" id="quadReset" title="Tilbake til temaets standard">↺</button></div>
+            <div class="hint">Blokker</div>
+            <div class="row">Farge <input type="color" id="blockColor" /> Tykkelse
+              <input type="number" id="blockWidth" min="0.1" max="6" step="0.1" style="width:60px" />
+              <button class="small" id="blockReset" title="Tilbake til temaets standard">↺</button></div>
+          </div>
+        </details>
+        <div class="hint">Danske data har ikke funn, felt mangler hydrokarbontype, og brønnene går til 2019.</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Forstørrede felt</summary>
+      <div class="sec">
+        <div class="row"><span class="grow">Forstørr felt</span><input type="range" id="fieldScale" min="1" max="6" step="0.25" style="width:110px" /><span id="fieldScaleVal" style="width:36px"></span></div>
+        <div id="fieldScaleOpts" class="sub">
+          <label class="row"><input type="checkbox" id="fieldScaleDsc" /> Også funn</label>
+          <label class="row"><input type="checkbox" id="fieldScaleSel" /> Bare valgte felt og funn</label>
+          <div class="hint">Hvert felt forstørres rundt sitt eget midtpunkt. Avstanden mellom feltene endres ikke, så store forstørrelser kan gi overlapp.</div>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>3D-effekt</summary>
+      <div class="sec">
+        <div class="presets" id="tiltPresets"></div>
+        <div class="row"><span class="grow">Vipping</span><input type="range" id="tilt" min="0" max="65" step="1" style="width:130px" /><span id="tiltVal" style="width:30px"></span></div>
+        <div class="row"><span class="grow">Rotasjon</span><input type="range" id="bearing" min="-180" max="180" step="1" style="width:130px" /><span id="bearingVal" style="width:30px"></span></div>
+        <div class="row"><span class="grow">Klosshøyde</span><input type="range" id="extrude" min="0" max="50" step="1" style="width:130px" /><span id="extrudeVal" style="width:30px"></span></div>
+        <label class="row"><input type="checkbox" id="extFields" /> Felt som klosser</label>
+        <label class="row"><input type="checkbox" id="extDsc" /> Funn som klosser</label>
+        <details class="more">
+          <summary>Flere valg</summary>
+          <div class="sec">
+            <label class="row"><input type="checkbox" id="shadow" /> Skygge</label>
+            <label class="row"><input type="checkbox" id="haze" /> Dis mot horisonten</label>
+          </div>
+        </details>
+        <div class="hint">Klossene vises når kartet er vippet. I perspektiv gjelder målestokken langs linjen den står på (nederst i kartet).</div>
+      </div>
+    </details>
+    </div>
+
+    <!-- ── Tekst og pynt: tittel, tegnforklaring, miniatyrkart, etiketter ── -->
+    <div class="tab" data-tab="text">
+    <details open>
+      <summary>Tittel</summary>
       <div class="sec">
         <label class="row"><input type="checkbox" id="showTitle" /> Tittel</label>
         <input type="text" id="titleText" placeholder="Tittel" />
         <input type="text" id="subtitleText" placeholder="Undertittel (valgfritt)" />
+      </div>
+    </details>
+
+    <details>
+      <summary>Tegnforklaring</summary>
+      <div class="sec">
         <label class="row"><input type="checkbox" id="showLegend" /> Tegnforklaring
           <select id="legendPos" style="margin-left:auto">
             <option value="tl">Øverst venstre</option><option value="tr">Øverst høyre</option>
@@ -285,8 +363,15 @@
           </select>
         </label>
         <div class="hint">Dra tegnforklaringen i kartet for å flytte den.</div>
-        <label class="row"><input type="checkbox" id="showScale" /> Målestokk</label>
-        <label class="row"><input type="checkbox" id="showNorth" /> Nordpil</label>
+        <input type="text" id="companyLegendTitle" placeholder="Overskrift i tegnforklaringen (valgfritt – standard er selskapsnavnene)" />
+        <label class="row"><input type="checkbox" id="hideLegendHeading" /> Skjul overskriften i tegnforklaringen</label>
+        <div class="hint">Overskriften er selskapsnavnene eller porteføljens navn. Egen overskrift gjelder selskapsvalg.</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Miniatyrkart</summary>
+      <div class="sec">
         <label class="row"><input type="checkbox" id="showInset" /> Miniatyrkart
           <select id="insetPos" style="margin-left:auto">
             <option value="tl">Øverst venstre</option><option value="tr">Øverst høyre</option>
@@ -304,19 +389,32 @@
           <div class="row">Bredde <select id="insetWidth" class="grow">
             <option value="size">Egen størrelse</option><option value="legend">Samme som tegnforklaringen</option></select></div>
           <div class="row" id="insetSizeRow"><span class="grow">Størrelse</span><input type="range" id="insetSize" min="14" max="45" step="1" style="width:110px" /><span id="insetSizeVal" style="width:30px"></span></div>
-          <div class="row">Land <input type="color" id="insetLand" /> Markering <input type="color" id="insetMarkerColor" />
-            <button class="small" id="insetReset" title="Tilbake til standardfarger">↺</button></div>
-          <label class="row"><input type="checkbox" id="insetLabels" /> Landnavn i miniatyrkartet</label>
+          <details class="more">
+            <summary>Flere valg</summary>
+            <div class="sec">
+              <div class="row">Land <input type="color" id="insetLand" /> Markering <input type="color" id="insetMarkerColor" />
+                <button class="small" id="insetReset" title="Tilbake til standardfarger">↺</button></div>
+              <label class="row"><input type="checkbox" id="insetLabels" /> Landnavn i miniatyrkartet</label>
+            </div>
+          </details>
         </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Målestokk, nordpil og kilde</summary>
+      <div class="sec">
+        <label class="row"><input type="checkbox" id="showScale" /> Målestokk</label>
+        <label class="row"><input type="checkbox" id="showNorth" /> Nordpil</label>
         <label class="row"><input type="checkbox" id="showSource" /> Kildehenvisning</label>
+      </div>
+    </details>
+
+    <details>
+      <summary>Etiketter og symboler</summary>
+      <div class="sec">
         <div class="row"><span class="grow">Tekststørrelse etiketter</span><input type="range" id="labelSize" min="8" max="28" step="1" style="width:110px" /><span id="labelSizeVal" style="width:22px"></span></div>
         <div class="row"><span class="grow">Symbolstørrelse</span><input type="range" id="symbolSize" min="0.5" max="2.5" step="0.1" style="width:110px" /><span id="symbolSizeVal" style="width:22px"></span></div>
-        <div class="row"><span class="grow">Forstørr felt</span><input type="range" id="fieldScale" min="1" max="6" step="0.25" style="width:110px" /><span id="fieldScaleVal" style="width:36px"></span></div>
-        <div id="fieldScaleOpts" class="sub">
-          <label class="row"><input type="checkbox" id="fieldScaleDsc" /> Også funn</label>
-          <label class="row"><input type="checkbox" id="fieldScaleSel" /> Bare valgte felt og funn</label>
-          <div class="hint">Hvert felt forstørres rundt sitt eget midtpunkt. Avstanden mellom feltene endres ikke, så store forstørrelser kan gi overlapp.</div>
-        </div>
         <label class="row"><input type="checkbox" id="declutter" /> Skjul overlappende etiketter</label>
         <div class="row"><button id="btnResetLabels" class="grow">Nullstill flyttede/skjulte/redigerte etiketter</button></div>
       </div>
@@ -332,8 +430,11 @@
         <div class="complist" id="labelList" style="max-height:320px"></div>
       </div>
     </details>
+    </div>
 
-    <details>
+    <!-- ── Lagre ──────────────────────────────────────────────────────────── -->
+    <div class="tab" data-tab="save">
+    <details open>
       <summary>Lagre og del</summary>
       <div class="sec">
         <div class="hint">Hele oppsettet ligger i lenken, så bokmerk eller del den. Maler lagres lokalt i denne nettleseren.</div>
@@ -343,6 +444,7 @@
         <div class="row"><button id="btnReset" class="grow">Tilbakestill alt</button></div>
       </div>
     </details>
+    </div>
   </aside>
 
   <section id="stage">
@@ -462,6 +564,10 @@ const LAYER = Object.fromEntries(LAYERS.map(l => [l.key, l]));
 // {0}, {1} … erstattes med argumentene til t().
 // ════════════════════════════════════════════════════════════════════════════
 const EN = {
+  'Innhold': 'Content', 'Kart': 'Map', 'Tekst og pynt': 'Text & extras', 'Finn innstilling …': 'Find setting …',
+  'Utsnitt og projeksjon': 'View and projection', 'Sektorer og rutenett': 'Sectors and grid', 'Forstørrede felt': 'Enlarged fields',
+  'Målestokk, nordpil og kilde': 'Scale bar, north arrow and source', 'Etiketter og symboler': 'Labels and symbols', 'Flere valg': 'More options',
+  'Overskriften er selskapsnavnene eller porteføljens navn. Egen overskrift gjelder selskapsvalg.': 'The heading is the company names or the portfolio name. A custom heading applies to company selections.',
   // Topplinje
   'PPT-kart': 'PPT Map', 'Språk': 'Language', '16:9 helside': '16:9 full slide', '16:9 halvside (8:9)': '16:9 half slide (8:9)',
   'Kvadrat': 'Square', 'Stående 3:4': 'Portrait 3:4', 'Egendefinert …': 'Custom …', 'Oppløsning': 'Resolution', 'Kopier': 'Copy',
@@ -2174,6 +2280,126 @@ function scaledFeature(f, s) {
   return out;
 }
 
+// ── Panelet: faner, én åpen seksjon om gangen og søk etter innstillinger ──
+// Fane og åpne seksjoner huskes i nettleseren (kun bekvemmelighet, ikke en del av kartets tilstand).
+const PANEL_KEY = 'pptkart.panel';
+function panelPrefs() { try { return JSON.parse(localStorage.getItem(PANEL_KEY)) || {}; } catch { return {}; } }
+function savePanelPrefs() {
+  const tab = document.querySelector('.tab.on'), open = {};
+  document.querySelectorAll('.tab').forEach(tb => {
+    const i = [...tb.children].findIndex(d => d.tagName === 'DETAILS' && d.open);
+    open[tb.dataset.tab] = i;
+  });
+  try { localStorage.setItem(PANEL_KEY, JSON.stringify({ tab: tab && tab.dataset.tab, open })); } catch { /* privat modus */ }
+}
+function showTab(name) {
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  document.querySelectorAll('.tab').forEach(tb => tb.classList.toggle('on', tb.dataset.tab === name));
+  $('panel').scrollTop = 0;
+}
+// Åpner en seksjon og lukker de andre seksjonene i samme fane (gjelder bare hovedseksjonene, ikke «Flere valg»).
+function openSection(d) {
+  const tab = d.closest('.tab');
+  if (tab && d.parentElement === tab) [...tab.children].forEach(x => { if (x !== d && x.tagName === 'DETAILS') x.open = false; });
+  d.open = true;
+}
+function setupPanel() {
+  const prefs = panelPrefs();
+  document.querySelectorAll('.tab').forEach(tb => {
+    const secs = [...tb.children].filter(d => d.tagName === 'DETAILS');
+    const i = prefs.open ? prefs.open[tb.dataset.tab] : undefined;
+    if (i != null) secs.forEach((d, k) => { d.open = k === i; });
+    secs.forEach(d => d.querySelector(':scope > summary').addEventListener('click', ev => {
+      ev.preventDefault();
+      if (d.open) d.open = false; else openSection(d);
+      savePanelPrefs();
+    }));
+  });
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { showTab(b.dataset.tab); savePanelPrefs(); });
+  showTab(document.querySelector(`.tab[data-tab="${prefs.tab}"]`) ? prefs.tab : 'content');
+  setupFinder();
+}
+
+// Søk etter innstillinger: treffer tekst på begge språk, viser fane og seksjon, og markerer valget.
+function settingText(el) {
+  let out = '';
+  const walk = n => {
+    for (const c of n.childNodes) {
+      if (c.nodeType === 3) out += c.nodeValue + ' ';
+      else if (c.nodeType === 1 && !['SELECT', 'OPTION', 'SCRIPT'].includes(c.tagName) && !c.classList.contains('complist')) walk(c);
+    }
+  };
+  walk(el);
+  if (el.matches('input')) out += ' ' + (el.getAttribute('placeholder') || '');
+  return out.replace(/\s+/g, ' ').trim();
+}
+const EN_REV = Object.fromEntries(Object.entries(EN).map(([k, v]) => [v, k]));
+function settingIndex() {
+  const items = [];
+  for (const tab of document.querySelectorAll('.tab')) {
+    const tabName = document.querySelector(`#tabs button[data-tab="${tab.dataset.tab}"]`).textContent;
+    for (const el of tab.querySelectorAll('summary, .row, .lyr, .sub > label, input[placeholder]')) {
+      if (el.closest('.complist, #presetList')) continue;
+      const text = settingText(el);
+      if (!text || text.length > 90) continue;
+      const sec = el.closest('.tab > details');
+      const secName = sec ? settingText(sec.querySelector(':scope > summary')) : '';
+      const other = [text, ...text.split(' ')].map(x => EN[x] || EN_REV[x] || '').join(' ');
+      items.push({ el, text, tabName, secName, summary: el.tagName === 'SUMMARY', hay: (text + ' ' + other).toLowerCase() });
+    }
+  }
+  return items;
+}
+function revealSetting(el) {
+  const tab = el.closest('.tab');
+  if (tab) showTab(tab.dataset.tab);
+  for (let d = el.closest('details'); d; d = d.parentElement.closest('details')) openSection(d);
+  if (el.tagName === 'SUMMARY') openSection(el.parentElement);
+  savePanelPrefs();
+  requestAnimationFrame(() => {
+    el.scrollIntoView({ block: 'center' });
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+    const input = el.matches('input, select') ? el : el.querySelector('input, select');
+    if (input && !el.matches('summary')) input.focus({ preventScroll: true });
+  });
+}
+function setupFinder() {
+  const inp = $('settingSearch'), box = $('settingResults');
+  let hits = [], sel = 0;
+  const close = () => { box.classList.remove('show'); box.innerHTML = ''; hits = []; };
+  const pick = h => { close(); inp.value = ''; revealSetting(h.el); };
+  const draw = () => {
+    box.innerHTML = hits.length ? hits.map((h, i) => `<button type="button" data-i="${i}" class="${i === sel ? 'sel' : ''}"><span class="path">${esc(h.tabName)}${h.secName && h.secName !== h.text ? ' › ' + esc(h.secName) : ''}</span>${esc(h.text)}</button>`).join('')
+      : `<div class="none">${esc(t('Ingen treff'))}</div>`;
+    box.querySelectorAll('button').forEach(b => b.onmousedown = ev => { ev.preventDefault(); pick(hits[+b.dataset.i]); });
+    box.classList.add('show');
+  };
+  inp.oninput = () => {
+    const words = inp.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return close();
+    const seen = new Set(), seenText = new Set();
+    // Treff som begynner med søkeordet først, og kontroller foran seksjonsoverskrifter.
+    const score = it => (it.hay.startsWith(words[0]) ? 0 : (' ' + it.hay).includes(' ' + words[0]) ? 1 : 3) + (it.summary ? 0.5 : 0) + it.text.length / 1000;
+    hits = settingIndex().filter(it => words.every(w => it.hay.includes(w)))
+      .sort((a, b) => score(a) - score(b))
+      // Én rad per kontroll: dropp treff som ligger inne i et annet treff, og like tekster i samme seksjon.
+      .filter(it => {
+        const tk = it.tabName + '|' + it.secName + '|' + it.text;
+        if ([...seen].some(e => e.contains(it.el)) || seenText.has(tk)) return false;
+        seen.add(it.el); seenText.add(tk); return true;
+      })
+      .slice(0, 12);
+    sel = 0; draw();
+  };
+  inp.onkeydown = ev => {
+    if (ev.key === 'Escape') { inp.value = ''; close(); }
+    else if (ev.key === 'ArrowDown' && hits.length) { sel = (sel + 1) % hits.length; draw(); ev.preventDefault(); }
+    else if (ev.key === 'ArrowUp' && hits.length) { sel = (sel - 1 + hits.length) % hits.length; draw(); ev.preventDefault(); }
+    else if (ev.key === 'Enter' && hits[sel]) { pick(hits[sel]); ev.preventDefault(); }
+  };
+  inp.onblur = () => setTimeout(close, 150);
+}
+
 function bindValue(id, get, set, ev = 'change') { const el = $(id); el.value = get(); el['on' + ev] = () => { set(el.value); ev === 'input' ? scheduleRender() : render(); }; }
 
 function buildLayerList() {
@@ -2406,8 +2632,7 @@ function syncAllControls() {
   bindSeg('segSel', () => S.selMode, v => { S.selMode = v; syncSelMode(); });
   bindValue('portfolioName', () => S.portfolioName, v => S.portfolioName = v, 'input');
   // Samme valg i begge modusene (selskap og egendefinert portefølje).
-  for (const id of ['hideLegendHeading', 'hideLegendHeading2'])
-    bindCheck(id, () => S.hideLegendHeading, v => { S.hideLegendHeading = v; $('hideLegendHeading').checked = $('hideLegendHeading2').checked = v; });
+  bindCheck('hideLegendHeading', () => S.hideLegendHeading, v => S.hideLegendHeading = v);
   bindValue('companyLegendTitle', () => S.companyLegendTitle, v => S.companyLegendTitle = v, 'input');
   $('pfSearch').oninput = buildPortfolioUI;
   syncSelMode();
@@ -2546,6 +2771,7 @@ function initStaticControls() {
   };
   $('btnResetLabels').onclick = () => { S.offsets = {}; S.hidden = []; S.labelText = {}; render(); };
   $('labelPanel').addEventListener('toggle', buildLabelList);
+  setupPanel();
   $('labelSearch').oninput = buildLabelList;
   $('labelsAllOn').onclick = () => {
     // Slå på alle skjulte som er i listen (søket respekteres).
