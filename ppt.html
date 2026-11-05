@@ -100,7 +100,8 @@
     background-size: 16px 16px; background-position: 0 0,0 8px,8px -8px,-8px 0; }
   #map { display: block; width: 100%; height: 100%; cursor: grab; }
   #map:active { cursor: grabbing; }
-  #map .lab { cursor: move; }
+  #map .lab, #map .mk text, #map .mk circle { cursor: move; }
+  #map.adding, #map.adding * { cursor: crosshair !important; }
   #zoomctl { position: absolute; right: 26px; top: 26px; display: flex; flex-direction: column; gap: 4px; z-index: 2; }
   #zoomctl button { width: 30px; height: 30px; padding: 0; font-size: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
   #tip { position: fixed; pointer-events: none; background: rgba(25,32,44,.94); color: #fff; padding: 7px 9px; border-radius: 6px; font-size: 12px; max-width: 300px; display: none; z-index: 10; }
@@ -252,6 +253,8 @@
             <option value="grey">Grå / nøytral</option>
             <option value="dark">Mørk</option>
             <option value="blue">Blå hav</option>
+            <option value="abpLight">Profil – lyst kart</option>
+            <option value="abpDark">Profil – mørkt kart</option>
           </select>
         </div>
         <label class="row"><input type="checkbox" id="showDepth" /> Dybdekurver (200, 1000, 2000, 3000 m)</label>
@@ -350,6 +353,19 @@
         <label class="row"><input type="checkbox" id="showTitle" /> Tittel</label>
         <input type="text" id="titleText" placeholder="Tittel" />
         <input type="text" id="subtitleText" placeholder="Undertittel (valgfritt)" />
+      </div>
+    </details>
+
+    <details>
+      <summary>Markører</summary>
+      <div class="sec">
+        <div class="hint">Et punkt med strek til en tekst, f.eks. for å vise et sted. Dra teksten for å flytte den, dra punktet for å flytte markøren, høyreklikk teksten for å endre den.</div>
+        <div class="row"><button id="btnAddMarker" class="grow">＋ Legg til markør (klikk i kartet)</button></div>
+        <div id="markerList" class="sec" style="padding:0"></div>
+        <div class="row"><span class="grow">Farge</span><input type="color" id="markerColor" />
+          <button class="small" id="markerReset" title="Tilbake til temaets standard">↺</button></div>
+        <div class="row"><span class="grow">Tekststørrelse</span><input type="range" id="markerTextSize" min="12" max="48" step="1" style="width:110px" /><span id="markerTextSizeVal" style="width:22px"></span></div>
+        <div class="row"><span class="grow">Punktstørrelse</span><input type="range" id="markerDot" min="0.5" max="3" step="0.1" style="width:110px" /><span id="markerDotVal" style="width:22px"></span></div>
       </div>
     </details>
 
@@ -495,7 +511,11 @@ const PAL = { magenta: '#CE0F69', magenta50: '#E787B4', darkMagenta: '#7D2248', 
 const THEMES = {
   light: { sea: '#e8f0f6', land: '#f4f2ee', coast: '#b9c2cb', depth: '#d6e3ee', border: '#a9b0b8', ink: '#2F2F2F', halo: '#ffffff', grid: '#8a9bb0', box: '#ffffff', other: '#c3c8cf' },
   grey:  { sea: '#ffffff', land: '#e9e9e9', coast: '#bdbdbd', depth: '#F1F1F1', border: '#a6a6a6', ink: '#2F2F2F', halo: '#ffffff', grid: '#9a9a9a', box: '#ffffff', other: '#c9c9c9' },
-  dark:  { sea: '#10202f', land: '#25384b', coast: '#3d5368', depth: '#0c1a27', border: '#56708a', ink: '#e8eef5', halo: '#10202f', grid: '#4b6580', box: '#16293b', other: '#53687e' },
+  dark:  { sea: '#10202f', land: '#25384b', coast: '#3d5368', depth: '#0c1a27', border: '#56708a', ink: '#e8eef5', halo: '#10202f', grid: '#4b6580', box: '#16293b', other: '#53687e', marker: '#D53380', dark: true },
+  // Profilens kartfarger (lyse og mørke kart). Grå 10 % og magenta er fra paletten; t25, t65 og t85 er ikke i
+  // paletten og er målt fra profilens eksempelkart.
+  abpLight: { sea: '#E4E4E4', land: '#BEBEBE', coast: '#B0B0B0', depth: '#D9D9D9', border: '#9A9A9A', ink: '#2F2F2F', halo: '#E4E4E4', grid: '#A3A3A3', box: '#F1F1F1', other: '#CFCFCF', marker: PAL.magenta },
+  abpDark:  { sea: '#3E3E3E', land: '#646464', coast: '#707070', depth: '#363636', border: '#8A8A8A', ink: '#FFFFFF', halo: '#3E3E3E', grid: '#7A7A7A', box: '#444444', other: '#595959', marker: '#D53380', dark: true },
   blue:  { sea: '#cfe2f1', land: '#f7f6f2', coast: '#9fb6c9', depth: '#bcd4e8', border: '#9aa6b1', ink: '#1f2a37', halo: '#ffffff', grid: '#7f97ad', box: '#ffffff', other: '#aeb9c4' },
 };
 
@@ -645,7 +665,10 @@ const EN = {
   // Lagre og del
   'Lagre og del': 'Save and share',
   'Hele oppsettet ligger i lenken, så bokmerk eller del den. Maler lagres lokalt i denne nettleseren.': 'The whole setup is stored in the link, so bookmark or share it. Templates are saved locally in this browser.',
-  'Kopier lenke til dette kartet': 'Copy link to this map', 'Navn på mal': 'Template name', 'Lagre': 'Save', 'Tilbakestill alt': 'Reset everything', 'Tilbakestill farger til standardpaletten': 'Reset colours to the standard palette', 'Setter alle lag-, selskaps- og rutenettfarger tilbake til standardpaletten': 'Sets all layer, company and grid colours back to the standard palette', 'Slett': 'Delete',
+  'Kopier lenke til dette kartet': 'Copy link to this map', 'Navn på mal': 'Template name', 'Lagre': 'Save', 'Tilbakestill alt': 'Reset everything', 'Profil – lyst kart': 'Brand – light map', 'Profil – mørkt kart': 'Brand – dark map', 'Markører': 'Markers',
+  'Et punkt med strek til en tekst, f.eks. for å vise et sted. Dra teksten for å flytte den, dra punktet for å flytte markøren, høyreklikk teksten for å endre den.': 'A dot with a line to a text, e.g. to point out a place. Drag the text to move it, drag the dot to move the marker, right-click the text to edit it.',
+  '＋ Legg til markør (klikk i kartet)': '＋ Add marker (click in the map)', 'Klikk i kartet … (Esc avbryter)': 'Click in the map … (Esc cancels)', 'Nytt sted': 'New place',
+  'Tekst': 'Text', 'Fjern markøren': 'Remove marker', 'Ingen markører ennå.': 'No markers yet.', 'Punktstørrelse': 'Dot size', 'Tekststørrelse': 'Text size', 'Tilbakestill farger til standardpaletten': 'Reset colours to the standard palette', 'Setter alle lag-, selskaps- og rutenettfarger tilbake til standardpaletten': 'Sets all layer, company and grid colours back to the standard palette', 'Slett': 'Delete',
   // Verktøytips
   'Status': 'Status', 'Type': 'Type', 'Funnår': 'Discovery year', 'Formål': 'Purpose', 'Resultat': 'Result', 'Medium': 'Medium',
   'Dimensjon': 'Diameter', 'Fra – til': 'From – to', 'Tilhører': 'Belongs to', '+ {0} til': '+ {0} more',
@@ -746,6 +769,7 @@ function defaultState() {
     labelSize: 16, symbolSize: 1.2, declutter: true, fieldScale: 1, fieldScaleDsc: false, fieldScaleSel: false,
     tilt: 0, bearing: 0, extrude: 10, extFields: true, extDsc: false, shadow: true, haze: true,
     offsets: {}, hidden: [], labelText: {},
+    markers: [], markerColor: null, markerTextSize: 26, markerDot: 1,
     lang: storedLang() === 'en' ? 'en' : 'no',
   };
 }
@@ -1125,6 +1149,8 @@ let drewOther = false;          // om noe er tegnet i «andre selskaper»-farge
 const measureCtx = document.createElement('canvas').getContext('2d');
 
 function theme() { return THEMES[S.theme] || THEMES.light; }
+const isDarkTheme = () => !!theme().dark;
+const markerColor = () => S.markerColor || theme().marker || PAL.magenta;
 
 function lighten(hex, t) {
   const c = d3.color(hex); if (!c) return hex;
@@ -1374,10 +1400,11 @@ function render() {
   }
 
   gLabels = gRoot.append('g').attr('id', 'glabels');
+  const gMarkers = gRoot.append('g').attr('id', 'gmarkers');
   gOverlay = svg.append('g').attr('id', 'goverlay');
   drawOverlay(T);
-  // Tittel, tegnforklaring, målestokk osv. er hindringer for etikettene.
-  const obstacles = [];
+  // Tittel, tegnforklaring, målestokk osv. er hindringer for etikettene, og det samme er markørene.
+  const obstacles = drawMarkers(gMarkers, T);
   gOverlay.selectChildren().each(function () {
     const b = this.getBBox(), t = this.transform && this.transform.baseVal.consolidate();
     if (!b.width) return;
@@ -1409,7 +1436,7 @@ function resetColours() {
   const d = defaultState();
   for (const k of Object.keys(S.layers)) S.layers[k].color = d.layers[k].color;
   Object.assign(S, { companyColors: {}, otherColor: d.otherColor, insetMarkerColor: d.insetMarkerColor, insetLand: null,
-    sectorColor: null, quadColor: null, blockColor: null, sea: THEMES[S.theme].sea, land: THEMES[S.theme].land });
+    sectorColor: null, quadColor: null, blockColor: null, markerColor: null, sea: THEMES[S.theme].sea, land: THEMES[S.theme].land });
   applyState();
 }
 
@@ -1623,7 +1650,7 @@ function setLabelText(key, value, orig) {
   render();
 }
 // Redigering direkte i kartet: tekstfelt oppå etiketten.
-function editLabelInMap(node, c) {
+function editLabelInMap(node, c, onSave) {
   const old = document.getElementById('labelEditor');
   if (old) old.remove();
   const frame = $('frame'), fr = frame.getBoundingClientRect(), r = node.getBoundingClientRect();
@@ -1636,9 +1663,86 @@ function editLabelInMap(node, c) {
   inp.style.top = Math.max(0, r.top - fr.top + r.height / 2 - 14) + 'px';
   inp.focus(); inp.select();
   let done = false;
-  const finish = save => { if (done) return; done = true; inp.remove(); if (save) setLabelText(c.key, inp.value, c.orig ?? c.text); };
+  const finish = save => { if (done) return; done = true; inp.remove(); if (save) (onSave ? onSave(inp.value) : setLabelText(c.key, inp.value, c.orig ?? c.text)); };
   inp.onkeydown = e => { if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); e.stopPropagation(); };
   inp.onblur = () => finish(true);
+}
+
+// ── Markører: punkt med strek til en tekst ──────────────────────────────────
+// Teksten står forskjøvet (dx, dy) fra punktet; streken går fra tekstens kant til punktet.
+const MARKER_GAP = 8;
+function markerGeom(m) {
+  const xy = P([m.lon, m.lat]);
+  if (!xy) return null;
+  const fs = S.markerTextSize, r = 4.5 * S.markerDot;
+  const lx = xy[0] + m.dx, ly = xy[1] + m.dy, end = m.dx < 0;
+  const tw = textWidth(m.text || ' ', fs, '300');
+  const sx = lx + (end ? MARKER_GAP : -MARKER_GAP), sy = ly;
+  const len = Math.hypot(xy[0] - sx, xy[1] - sy);
+  const line = len > r + 4 ? [sx, sy, xy[0] - (xy[0] - sx) / len * r, xy[1] - (xy[1] - sy) / len * r] : null;
+  return { xy, fs, r, lx, ly, end, tw, line };
+}
+function drawMarkers(g, T) {
+  const boxes = [], col = markerColor();
+  S.markers.forEach((m, i) => {
+    const G = markerGeom(m);
+    if (!G) return;
+    const mg = g.append('g').attr('class', 'mk').attr('data-mi', i);
+    if (G.line) mg.append('line').attr('x1', G.line[0]).attr('y1', G.line[1]).attr('x2', G.line[2]).attr('y2', G.line[3])
+      .attr('stroke', col).attr('stroke-width', 1.6 * Math.max(0.8, S.markerDot * 0.9)).attr('stroke-linecap', 'round');
+    mg.append('circle').attr('cx', G.xy[0]).attr('cy', G.xy[1]).attr('r', G.r).attr('fill', col);
+    const txt = sel => sel.attr('x', G.lx).attr('y', G.ly).attr('dy', (G.fs * 0.35).toFixed(1)).attr('text-anchor', G.end ? 'end' : 'start')
+      .attr('font-family', FONT).attr('font-size', G.fs).attr('font-weight', 300).text(m.text);
+    // Glorie i temaets bakgrunnsfarge (usynlig mot havet, men gir lesbarhet over felt og lisenser).
+    txt(mg.append('text')).attr('fill', 'none').attr('stroke', T.halo).attr('stroke-width', Math.max(2.5, G.fs * 0.16)).attr('stroke-linejoin', 'round').attr('stroke-opacity', 0.85);
+    txt(mg.append('text')).attr('class', 'mktext').attr('fill', T.ink);
+    const x0 = G.end ? G.lx - G.tw : G.lx;
+    boxes.push({ x0: x0 - 3, x1: x0 + G.tw + 3, y0: G.ly - G.fs * 0.6, y1: G.ly + G.fs * 0.6 });
+    boxes.push({ x0: G.xy[0] - G.r - 2, x1: G.xy[0] + G.r + 2, y0: G.xy[1] - G.r - 2, y1: G.xy[1] + G.r + 2 });
+  });
+  return boxes;
+}
+// Oppdaterer én markør på plass mens den dras (full tegning skjer når den slippes).
+function updateMarkerDom(grp, m) {
+  const G = markerGeom(m);
+  if (!G) return;
+  grp.selectAll('text').attr('x', G.lx).attr('y', G.ly).attr('text-anchor', G.end ? 'end' : 'start');
+  grp.select('circle').attr('cx', G.xy[0]).attr('cy', G.xy[1]);
+  let ln = grp.select('line');
+  if (!G.line) { ln.remove(); return; }
+  if (ln.empty()) ln = grp.insert('line', ':first-child').attr('stroke', markerColor()).attr('stroke-width', 1.6 * Math.max(0.8, S.markerDot * 0.9)).attr('stroke-linecap', 'round');
+  ln.attr('x1', G.line[0]).attr('y1', G.line[1]).attr('x2', G.line[2]).attr('y2', G.line[3]);
+}
+let MARKER_ADD = false;
+function setMarkerAdd(on) {
+  MARKER_ADD = on;
+  $('map').classList.toggle('adding', on);
+  $('btnAddMarker').classList.toggle('primary', on);
+  $('btnAddMarker').textContent = on ? t('Klikk i kartet … (Esc avbryter)') : t('＋ Legg til markør (klikk i kartet)');
+}
+function placeMarker(ev) {
+  const [x, y] = d3.pointer(ev, svg.node());
+  const geo = Pinv([x, y]);
+  setMarkerAdd(false);
+  if (!geo) return;
+  // Teksten til venstre for punktet som standard, eller til høyre når punktet ligger i venstre del av kartet.
+  S.markers.push({ lon: +geo[0].toFixed(5), lat: +geo[1].toFixed(5), text: t('Nytt sted'), dx: x > W() * 0.35 ? -140 : 140, dy: 0 });
+  buildMarkerList(); render();
+  const inputs = document.querySelectorAll('#markerList input');
+  if (inputs.length) { inputs[inputs.length - 1].focus(); inputs[inputs.length - 1].select(); }
+}
+function buildMarkerList() {
+  const box = $('markerList');
+  box.innerHTML = S.markers.map((m, i) => `<div class="row"><input type="text" class="grow" data-mi="${i}" value="${esc(m.text)}" placeholder="${esc(t('Tekst'))}" />`
+    + `<button class="small" data-del="${i}" title="${esc(t('Fjern markøren'))}">×</button></div>`).join('')
+    || `<div class="hint">${t('Ingen markører ennå.')}</div>`;
+  box.querySelectorAll('input[data-mi]').forEach(inp => inp.oninput = () => { S.markers[+inp.dataset.mi].text = inp.value; scheduleRender(); });
+  box.querySelectorAll('button[data-del]').forEach(b => b.onclick = () => { S.markers.splice(+b.dataset.del, 1); buildMarkerList(); render(); });
+}
+function syncMarkerControls() {
+  $('markerColor').value = markerColor();
+  $('markerTextSizeVal').textContent = S.markerTextSize;
+  $('markerDotVal').textContent = (+S.markerDot).toFixed(1);
 }
 
 function placeLabels(cands, T, obstacles = []) {
@@ -1829,9 +1933,9 @@ function drawInset(g, T) {
   const { x, y, w, h, ip, ring } = insetBox;
   const id = 'insetclip';
   svg.select('defs').append('clipPath').attr('id', id).append('rect').attr('width', w).attr('height', h).attr('rx', 4);
-  const landCol = S.insetLand || (S.theme === 'dark' ? '#8fb3e8' : PAL.grey80);
+  const landCol = S.insetLand || (isDarkTheme() ? '#8fb3e8' : PAL.grey80);
   const ig = g.append('g').attr('transform', `translate(${x},${y})`).attr('class', 'inset').datum({ x, y, bw: w, bh: h });
-  boxFrame(ig, w, h, T).attr('fill', S.theme === 'dark' ? T.box : '#ffffff').attr('stroke', 'none');
+  boxFrame(ig, w, h, T).attr('fill', isDarkTheme() ? T.box : '#ffffff').attr('stroke', 'none');
   const cg = ig.append('g').attr('clip-path', `url(#${id})`);
   const ipath = d3.geoPath(ip.clipExtent([[-5, -5], [w + 5, h + 5]]));
   cg.append('path').attr('d', ipath(landToDraw())).attr('fill', landCol).attr('stroke', 'none');
@@ -2148,6 +2252,24 @@ function attachInteractions() {
       $(posKey).value = 'custom';
       render();
     }));
+  // Markører: dra teksten (forskyvning) eller punktet (posisjon); høyreklikk på teksten redigerer den.
+  d3.selectAll('#gmarkers .mk').each(function () {
+    const i = +this.getAttribute('data-mi'), m = S.markers[i], grp = d3.select(this);
+    if (!m) return;
+    grp.selectAll('text').call(d3.drag()
+      .on('drag', ev => { m.dx += ev.dx; m.dy += ev.dy; m._moved = true; updateMarkerDom(grp, m); })
+      .on('end', () => { if (m._moved) { delete m._moved; m.dx = Math.round(m.dx); m.dy = Math.round(m.dy); render(); } }))
+      .on('contextmenu', function (ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        editLabelInMap(this, { text: m.text }, v => { m.text = v.trim() || m.text; buildMarkerList(); render(); });
+      });
+    grp.select('circle').call(d3.drag()
+      .on('drag', ev => {
+        const xy = P([m.lon, m.lat]), geo = xy && Pinv([xy[0] + ev.dx, xy[1] + ev.dy]);
+        if (geo) { m.lon = +geo[0].toFixed(5); m.lat = +geo[1].toFixed(5); m._moved = true; updateMarkerDom(grp, m); }
+      })
+      .on('end', () => { if (m._moved) { delete m._moved; render(); } }));
+  });
   gLabels.selectAll('.lab').call(d3.drag()
     .on('drag', function (ev) {
       const c = d3.select(this).datum();
@@ -2605,6 +2727,7 @@ function syncSelMode() {
 }
 // Klikk i kartet legger felt/funn til eller fjerner dem fra porteføljen (bare i porteføljemodus).
 svg.on('click', ev => {
+  if (MARKER_ADD) { placeMarker(ev); return; }
   if (S.selMode !== 'custom') return;
   // Klikk på selve feltet eller på navnet dets (etiketten ligger ofte midt i feltet).
   const el = ev.target.closest && (ev.target.closest('[data-k]') || ev.target.closest('[data-lk]'));
@@ -2739,7 +2862,7 @@ function syncAllControls() {
   bindCheck('insetLabels', () => S.insetLabels, v => S.insetLabels = v);
   {
     const land = $('insetLand'), mk = $('insetMarkerColor');
-    const sync = () => { land.value = S.insetLand || (S.theme === 'dark' ? '#8fb3e8' : PAL.grey80); mk.value = S.insetMarkerColor; };
+    const sync = () => { land.value = S.insetLand || (isDarkTheme() ? '#8fb3e8' : PAL.grey80); mk.value = S.insetMarkerColor; };
     sync();
     land.oninput = () => { S.insetLand = land.value; scheduleRender(); };
     mk.oninput = () => { S.insetMarkerColor = mk.value; scheduleRender(); };
@@ -2752,6 +2875,10 @@ function syncAllControls() {
   $('labelSizeVal').textContent = S.labelSize;
   $('symbolSizeVal').textContent = (+S.symbolSize).toFixed(1);
   syncFieldScale();
+  bindValue('markerTextSize', () => S.markerTextSize, v => { S.markerTextSize = +v; syncMarkerControls(); }, 'input');
+  bindValue('markerDot', () => S.markerDot, v => { S.markerDot = +v; syncMarkerControls(); }, 'input');
+  syncMarkerControls();
+  buildMarkerList();
   buildLayerList();
   buildCompanyUI();
 }
@@ -2795,11 +2922,16 @@ function initStaticControls() {
     $('seaColor').value = S.sea; $('landColor').value = S.land; $('otherColor').value = S.otherColor;
     if (!S.quadColor) $('quadColor').value = T.grid;
     if (!S.blockColor) $('blockColor').value = T.grid;
+    syncMarkerControls();
     render();
   };
   $('btnResetLabels').onclick = () => { S.offsets = {}; S.hidden = []; S.labelText = {}; render(); };
   $('labelPanel').addEventListener('toggle', buildLabelList);
   $('btnPalette').onclick = resetColours;
+  $('btnAddMarker').onclick = () => setMarkerAdd(!MARKER_ADD);
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && MARKER_ADD) setMarkerAdd(false); });
+  $('markerColor').oninput = () => { S.markerColor = $('markerColor').value; scheduleRender(); };
+  $('markerReset').onclick = () => { S.markerColor = null; syncMarkerControls(); render(); };
   setupPanel();
   $('labelSearch').oninput = buildLabelList;
   $('labelsAllOn').onclick = () => {
@@ -2863,6 +2995,8 @@ function updateStatus() { $('status').textContent = META.updated ? t('Data oppda
 function applyLanguage() {
   $('lang').value = S.lang;
   applyStaticText();
+  setMarkerAdd(MARKER_ADD);
+  buildMarkerList();
   buildPresetButtons();
   syncSelMode();
   buildLandList();

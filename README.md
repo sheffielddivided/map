@@ -31,6 +31,11 @@ målestokk, etiketter) og **Lagre**. Én seksjon er åpen om gangen, sjeldne fin
   blir synlige i oversiktskart. Valgfritt også funn, og valgfritt bare valgte felt og funn.
 - **Miniatyrkart:** valgfritt oversiktskart i et hjørne (eller dratt til valgfri plass) som viser hvor utsnittet er hentet fra
   (automatisk område eller Nordsjøen/Skandinavia/Nord-Europa, markert med omriss eller sirkel).
+- **Profiltemaer:** «Profil – lyst kart» og «Profil – mørkt kart» følger profilens kartfarger (bakgrunn,
+  kart, tekst og markør).
+- **Markører:** punkt med strek til en tekst, f.eks. for å vise et sted. Klikk i kartet for å plassere,
+  dra teksten eller punktet for å flytte, og høyreklikk teksten for å endre den. Farge, tekst- og
+  punktstørrelse kan justeres; standardfargen følger temaet.
 - **Tegnforklaring:** i et av hjørnene, eller dra den til valgfri plass i kartet («Flyttet manuelt»).
 - **Slide-format:** 16:9, halvside, 4:3, kvadrat, stående eller egendefinert. Rammen viser nøyaktig
   det som eksporteres.
