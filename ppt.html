@@ -291,9 +291,11 @@
           <select id="insetPos" style="margin-left:auto">
             <option value="tl">Øverst venstre</option><option value="tr">Øverst høyre</option>
             <option value="bl">Nederst venstre</option><option value="br">Nederst høyre</option>
+            <option value="custom">Flyttet manuelt</option>
           </select>
         </label>
         <div class="sub" id="insetOpts">
+          <div class="hint">Dra miniatyrkartet i kartet for å flytte det.</div>
           <div class="row">Område <select id="insetArea" class="grow">
             <option value="auto">Automatisk rundt utsnittet</option><option value="northsea">Nordsjøen</option>
             <option value="scandinavia">Skandinavia</option><option value="europe">Nord-Europa</option></select></div>
@@ -517,7 +519,7 @@ const EN = {
   'Byer og steder': 'Cities and places', 'Tykkelse': 'Width', 'Tilbake til temaets standard': 'Back to theme default', 'Kvadranter': 'Quadrants', 'Nummer': 'Numbers', 'Vis kvadrantnummer': 'Show quadrant numbers', 'Blokker': 'Blocks',
   // Tittel og tekst
   'Tittel, tegnforklaring og tekst': 'Title, legend and text', 'Tittel': 'Title', 'Undertittel (valgfritt)': 'Subtitle (optional)',
-  'Tegnforklaring': 'Legend', 'Øverst venstre': 'Top left', 'Øverst høyre': 'Top right', 'Nederst venstre': 'Bottom left', 'Nederst høyre': 'Bottom right', 'Flyttet manuelt': 'Moved manually', 'Dra tegnforklaringen i kartet for å flytte den.': 'Drag the legend in the map to move it.',
+  'Tegnforklaring': 'Legend', 'Øverst venstre': 'Top left', 'Øverst høyre': 'Top right', 'Nederst venstre': 'Bottom left', 'Nederst høyre': 'Bottom right', 'Flyttet manuelt': 'Moved manually', 'Dra tegnforklaringen i kartet for å flytte den.': 'Drag the legend in the map to move it.', 'Dra miniatyrkartet i kartet for å flytte det.': 'Drag the inset map to move it.',
   'Målestokk': 'Scale bar', 'Nordpil': 'North arrow', 'Kildehenvisning': 'Source credit', 'Tekststørrelse etiketter': 'Label text size',
   'Symbolstørrelse': 'Symbol size', 'Forstørr felt': 'Enlarge fields', 'Også funn': 'Discoveries too', 'Bare valgte felt og funn': 'Only selected fields and discoveries',
   'Hvert felt forstørres rundt sitt eget midtpunkt. Avstanden mellom feltene endres ikke, så store forstørrelser kan gi overlapp.': 'Each field is enlarged around its own centre. The distance between fields does not change, so large factors can cause overlap.', 'Skjul overlappende etiketter': 'Hide overlapping labels', 'Nullstill flyttede/skjulte/redigerte etiketter': 'Reset moved/hidden/edited labels',
@@ -610,7 +612,7 @@ function defaultState() {
     dscStatus: ['Production in clarification phase', 'Production likely but unclarified', 'Production not evaluated', 'Undeveloped'],
     sectors: { no: true, uk: true, dk: true }, sectorLines: true,
     sectorColor: null, sectorWidth: 1.4, sectorDash: true, sectorLabels: false, sectorLabelPos: 50,
-    inset: false, insetPos: 'bl', insetArea: 'auto', insetMarker: 'rect', insetSize: 24, insetWidth: 'size', insetLand: null, insetMarkerColor: '#e8590c', insetLabels: true,
+    inset: false, insetPos: 'bl', insetXY: null, insetArea: 'auto', insetMarker: 'rect', insetSize: 24, insetWidth: 'size', insetLand: null, insetMarkerColor: '#e8590c', insetLabels: true,
     wells: { wildcat: true, appraisal: true, from: CURRENT_YEAR - 10, to: CURRENT_YEAR, classes: Object.keys(WELL_CLASSES), colorByContent: true },
     pipes: { byMedium: false, byDim: true, media: ['Gas', 'Oil', 'Condensate', 'Mixed', 'Co2 injection', 'other'], related: false },
     fac: { surface: true, subsea: false, onshore: true },
@@ -1676,7 +1678,15 @@ function layoutInset() {
 }
 function placeInset(topY) {
   if (!insetBox) return;
-  const m = BOX_MARGIN, pos = S.insetPos;
+  const m = BOX_MARGIN;
+  let pos = S.insetPos;
+  if (pos === 'custom' && S.insetXY) {
+    // Manuelt plassert (andel av kartets bredde/høyde), holdt innenfor rammen.
+    insetBox.x = Math.max(0, Math.min(W() - insetBox.w, S.insetXY[0] * W()));
+    insetBox.y = Math.max(0, Math.min(H() - insetBox.h, S.insetXY[1] * H()));
+    return;
+  }
+  if (pos === 'custom') pos = 'bl';
   insetBox.x = pos.includes('l') ? m : W() - insetBox.w - m;
   insetBox.y = pos.includes('t') ? (pos === 'tl' ? Math.max(m, topY) : m) : H() - insetBox.h - m - (S.source ? 14 : 0);
 }
@@ -1686,7 +1696,7 @@ function drawInset(g, T) {
   const id = 'insetclip';
   svg.select('defs').append('clipPath').attr('id', id).append('rect').attr('width', w).attr('height', h).attr('rx', 4);
   const landCol = S.insetLand || (S.theme === 'dark' ? '#8fb3e8' : '#1f3b73');
-  const ig = g.append('g').attr('transform', `translate(${x},${y})`).attr('class', 'inset');
+  const ig = g.append('g').attr('transform', `translate(${x},${y})`).attr('class', 'inset').datum({ x, y, bw: w, bh: h });
   boxFrame(ig, w, h, T).attr('fill', S.theme === 'dark' ? T.box : '#ffffff').attr('stroke', 'none');
   const cg = ig.append('g').attr('clip-path', `url(#${id})`);
   const ipath = d3.geoPath(ip.clipExtent([[-5, -5], [w + 5, h + 5]]));
@@ -1988,8 +1998,9 @@ function zoomBy(f) {
 }
 
 function attachInteractions() {
-  // Tegnforklaringen kan dras; da blir plasseringen «Flyttet manuelt».
-  d3.select('#goverlay .legend').style('cursor', 'move').call(d3.drag()
+  // Tegnforklaringen og miniatyrkartet kan dras; da blir plasseringen «Flyttet manuelt».
+  for (const [sel, posKey, xyKey] of [['.legend', 'legendPos', 'legendXY'], ['.inset', 'insetPos', 'insetXY']])
+  d3.select('#goverlay ' + sel).style('cursor', 'move').call(d3.drag()
     .on('drag', function (ev) {
       const b = d3.select(this).datum();
       b.x = Math.max(0, Math.min(W() - b.bw, b.x + ev.dx)); b.y = Math.max(0, Math.min(H() - b.bh, b.y + ev.dy));
@@ -1999,8 +2010,8 @@ function attachInteractions() {
     .on('end', function () {
       const b = d3.select(this).datum();
       if (!b.moved) return;
-      S.legendPos = 'custom'; S.legendXY = [+(b.x / W()).toFixed(4), +(b.y / H()).toFixed(4)];
-      $('legendPos').value = 'custom';
+      S[posKey] = 'custom'; S[xyKey] = [+(b.x / W()).toFixed(4), +(b.y / H()).toFixed(4)];
+      $(posKey).value = 'custom';
       render();
     }));
   gLabels.selectAll('.lab').call(d3.drag()
@@ -2462,7 +2473,10 @@ function syncAllControls() {
   }
   bindCheck('showInset', () => S.inset, v => { S.inset = v; $('insetOpts').style.display = v ? '' : 'none'; });
   $('insetOpts').style.display = S.inset ? '' : 'none';
-  bindValue('insetPos', () => S.insetPos, v => S.insetPos = v);
+  bindValue('insetPos', () => S.insetPos === 'custom' && !S.insetXY ? 'bl' : S.insetPos, v => {
+    S.insetPos = v;
+    if (v === 'custom' && !S.insetXY) S.insetXY = insetBox ? [insetBox.x / W(), insetBox.y / H()] : [0.02, 0.7];
+  });
   bindValue('insetArea', () => S.insetArea, v => S.insetArea = v);
   bindValue('insetMarker', () => S.insetMarker, v => S.insetMarker = v);
   bindValue('insetSize', () => S.insetSize, v => { S.insetSize = +v; $('insetSizeVal').textContent = v + ' %'; }, 'input');

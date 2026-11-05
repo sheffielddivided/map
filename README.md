@@ -21,7 +21,7 @@ Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-pres
   Fire fargetemaer pluss egne farger, og transparent bakgrunn.
 - **Forstørrede felt:** felt kan forstørres opptil seks ganger rundt sitt eget midtpunkt, slik at små felt
   blir synlige i oversiktskart. Valgfritt også funn, og valgfritt bare valgte felt og funn.
-- **Miniatyrkart:** valgfritt oversiktskart i et hjørne som viser hvor utsnittet er hentet fra
+- **Miniatyrkart:** valgfritt oversiktskart i et hjørne (eller dratt til valgfri plass) som viser hvor utsnittet er hentet fra
   (automatisk område eller Nordsjøen/Skandinavia/Nord-Europa, markert med omriss eller sirkel).
 - **Tegnforklaring:** i et av hjørnene, eller dra den til valgfri plass i kartet («Flyttet manuelt»).
 - **Slide-format:** 16:9, halvside, 4:3, kvadrat, stående eller egendefinert. Rammen viser nøyaktig
