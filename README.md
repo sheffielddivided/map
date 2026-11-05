@@ -22,12 +22,20 @@ målestokk, etiketter) og **Lagre**. Én seksjon er åpen om gangen, sjeldne fin
 - **Egendefinert portefølje:** alternativ til selskapsfilteret. Velg enkeltfelt og -funn ved å søke
   eller klikke i kartet, og gi porteføljen et navn som vises i tegnforklaringen. Fremhev/vis kun
   valgte og «Zoom til utvalg» virker som for selskaper.
+- **Farger:** standardfargene følger en fast palett (magenta, oransje, grønn, blå, rød, gul og gråtoner).
+  Paletten tilbys som forslag i alle fargevelgere, og «Tilbakestill farger til standardpaletten» under
+  Kartlag setter alle farger tilbake uten å endre andre innstillinger.
 - **Bakgrunn:** vektorkart med kystlinje, dybdekurver, landegrenser, valg av hvilke land som vises (f.eks. bare Norge og Danmark), byer og kvadrant-/blokknett (kvadranter med eller uten nummer, valgfri farge og linjetykkelse).
   Fire fargetemaer pluss egne farger, og transparent bakgrunn.
 - **Forstørrede felt:** felt kan forstørres opptil seks ganger rundt sitt eget midtpunkt, slik at små felt
   blir synlige i oversiktskart. Valgfritt også funn, og valgfritt bare valgte felt og funn.
 - **Miniatyrkart:** valgfritt oversiktskart i et hjørne (eller dratt til valgfri plass) som viser hvor utsnittet er hentet fra
   (automatisk område eller Nordsjøen/Skandinavia/Nord-Europa, markert med omriss eller sirkel).
+- **Profiltemaer:** «Profil – lyst kart» og «Profil – mørkt kart» følger profilens kartfarger (bakgrunn,
+  kart, tekst og markør).
+- **Markører:** punkt med strek til en tekst, f.eks. for å vise et sted. Klikk i kartet for å plassere,
+  dra teksten eller punktet for å flytte, og høyreklikk teksten for å endre den. Farge, tekst- og
+  punktstørrelse kan justeres; standardfargen følger temaet.
 - **Tegnforklaring:** i et av hjørnene, eller dra den til valgfri plass i kartet («Flyttet manuelt»).
 - **Slide-format:** 16:9, halvside, 4:3, kvadrat, stående eller egendefinert. Rammen viser nøyaktig
   det som eksporteres.
