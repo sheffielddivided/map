@@ -357,15 +357,18 @@
     </details>
 
     <details>
-      <summary>Markører</summary>
+      <summary>Markører og ledelinjer</summary>
       <div class="sec">
         <div class="hint">Et punkt med strek til en tekst, f.eks. for å vise et sted. Dra teksten for å flytte den, dra punktet for å flytte markøren, høyreklikk teksten for å endre den.</div>
+        <div class="hint">Etiketter som dras bort fra objektet sitt får samme strek og punkt.</div>
         <div class="row"><button id="btnAddMarker" class="grow">＋ Legg til markør (klikk i kartet)</button></div>
         <div id="markerList" class="sec" style="padding:0"></div>
         <div class="row"><span class="grow">Farge</span><input type="color" id="markerColor" />
           <button class="small" id="markerReset" title="Tilbake til temaets standard">↺</button></div>
         <div class="row"><span class="grow">Tekststørrelse</span><input type="range" id="markerTextSize" min="12" max="48" step="1" style="width:110px" /><span id="markerTextSizeVal" style="width:22px"></span></div>
         <div class="row"><span class="grow">Punktstørrelse</span><input type="range" id="markerDot" min="0.5" max="3" step="0.1" style="width:110px" /><span id="markerDotVal" style="width:22px"></span></div>
+        <label class="row"><input type="checkbox" id="leaderLevel" /> Hold teksten vannrett med målet</label>
+        <div class="hint">Gjelder markører og flyttede etiketter: teksten står i samme høyde som punktet og kan bare dras sideveis.</div>
       </div>
     </details>
 
@@ -665,7 +668,7 @@ const EN = {
   // Lagre og del
   'Lagre og del': 'Save and share',
   'Hele oppsettet ligger i lenken, så bokmerk eller del den. Maler lagres lokalt i denne nettleseren.': 'The whole setup is stored in the link, so bookmark or share it. Templates are saved locally in this browser.',
-  'Kopier lenke til dette kartet': 'Copy link to this map', 'Navn på mal': 'Template name', 'Lagre': 'Save', 'Tilbakestill alt': 'Reset everything', 'Profil – lyst kart': 'Brand – light map', 'Profil – mørkt kart': 'Brand – dark map', 'Markører': 'Markers',
+  'Kopier lenke til dette kartet': 'Copy link to this map', 'Navn på mal': 'Template name', 'Lagre': 'Save', 'Tilbakestill alt': 'Reset everything', 'Profil – lyst kart': 'Brand – light map', 'Profil – mørkt kart': 'Brand – dark map', 'Markører': 'Markers', 'Markører og ledelinjer': 'Markers and leader lines', 'Etiketter som dras bort fra objektet sitt får samme strek og punkt.': 'Labels dragged away from their object get the same line and dot.', 'Hold teksten vannrett med målet': 'Keep the text level with the target', 'Gjelder markører og flyttede etiketter: teksten står i samme høyde som punktet og kan bare dras sideveis.': 'Applies to markers and moved labels: the text sits at the same height as the dot and can only be dragged sideways.',
   'Et punkt med strek til en tekst, f.eks. for å vise et sted. Dra teksten for å flytte den, dra punktet for å flytte markøren, høyreklikk teksten for å endre den.': 'A dot with a line to a text, e.g. to point out a place. Drag the text to move it, drag the dot to move the marker, right-click the text to edit it.',
   '＋ Legg til markør (klikk i kartet)': '＋ Add marker (click in the map)', 'Klikk i kartet … (Esc avbryter)': 'Click in the map … (Esc cancels)', 'Nytt sted': 'New place',
   'Tekst': 'Text', 'Fjern markøren': 'Remove marker', 'Ingen markører ennå.': 'No markers yet.', 'Punktstørrelse': 'Dot size', 'Tekststørrelse': 'Text size', 'Tilbakestill farger til standardpaletten': 'Reset colours to the standard palette', 'Setter alle lag-, selskaps- og rutenettfarger tilbake til standardpaletten': 'Sets all layer, company and grid colours back to the standard palette', 'Slett': 'Delete',
@@ -769,7 +772,7 @@ function defaultState() {
     labelSize: 16, symbolSize: 1.2, declutter: true, fieldScale: 1, fieldScaleDsc: false, fieldScaleSel: false,
     tilt: 0, bearing: 0, extrude: 10, extFields: true, extDsc: false, shadow: true, haze: true,
     offsets: {}, hidden: [], labelText: {},
-    markers: [], markerColor: null, markerTextSize: 26, markerDot: 1,
+    markers: [], markerColor: null, markerTextSize: 26, markerDot: 1, leaderLevel: false,
     lang: storedLang() === 'en' ? 'en' : 'no',
   };
 }
@@ -1675,12 +1678,20 @@ function markerGeom(m) {
   const xy = P([m.lon, m.lat]);
   if (!xy) return null;
   const fs = S.markerTextSize, r = 4.5 * S.markerDot;
-  const lx = xy[0] + m.dx, ly = xy[1] + m.dy, end = m.dx < 0;
+  const lx = xy[0] + m.dx, ly = xy[1] + (S.leaderLevel ? 0 : m.dy), end = m.dx < 0;
   const tw = textWidth(m.text || ' ', fs, '300');
   const sx = lx + (end ? MARKER_GAP : -MARKER_GAP), sy = ly;
   const len = Math.hypot(xy[0] - sx, xy[1] - sy);
   const line = len > r + 4 ? [sx, sy, xy[0] - (xy[0] - sx) / len * r, xy[1] - (xy[1] - sy) / len * r] : null;
   return { xy, fs, r, lx, ly, end, tw, line };
+}
+// Strek fra (ex, ey) til målet (x, y), som slutter ved punktet på målet. Brukes av markører og flyttede etiketter.
+function leaderWidth() { return 1.6 * Math.max(0.8, S.markerDot * 0.9); }
+function drawLeader(g, ex, ey, x, y) {
+  const col = markerColor(), r = 4.5 * S.markerDot, len = Math.hypot(x - ex, y - ey);
+  if (len > r + 4) g.append('line').attr('x1', ex).attr('y1', ey).attr('x2', x - (x - ex) / len * r).attr('y2', y - (y - ey) / len * r)
+    .attr('stroke', col).attr('stroke-width', leaderWidth()).attr('stroke-linecap', 'round');
+  g.append('circle').attr('cx', x).attr('cy', y).attr('r', r).attr('fill', col);
 }
 function drawMarkers(g, T) {
   const boxes = [], col = markerColor();
@@ -1689,7 +1700,7 @@ function drawMarkers(g, T) {
     if (!G) return;
     const mg = g.append('g').attr('class', 'mk').attr('data-mi', i);
     if (G.line) mg.append('line').attr('x1', G.line[0]).attr('y1', G.line[1]).attr('x2', G.line[2]).attr('y2', G.line[3])
-      .attr('stroke', col).attr('stroke-width', 1.6 * Math.max(0.8, S.markerDot * 0.9)).attr('stroke-linecap', 'round');
+      .attr('stroke', col).attr('stroke-width', leaderWidth()).attr('stroke-linecap', 'round');
     mg.append('circle').attr('cx', G.xy[0]).attr('cy', G.xy[1]).attr('r', G.r).attr('fill', col);
     const txt = sel => sel.attr('x', G.lx).attr('y', G.ly).attr('dy', (G.fs * 0.35).toFixed(1)).attr('text-anchor', G.end ? 'end' : 'start')
       .attr('font-family', FONT).attr('font-size', G.fs).attr('font-weight', 300).text(m.text);
@@ -1710,7 +1721,7 @@ function updateMarkerDom(grp, m) {
   grp.select('circle').attr('cx', G.xy[0]).attr('cy', G.xy[1]);
   let ln = grp.select('line');
   if (!G.line) { ln.remove(); return; }
-  if (ln.empty()) ln = grp.insert('line', ':first-child').attr('stroke', markerColor()).attr('stroke-width', 1.6 * Math.max(0.8, S.markerDot * 0.9)).attr('stroke-linecap', 'round');
+  if (ln.empty()) ln = grp.insert('line', ':first-child').attr('stroke', markerColor()).attr('stroke-width', leaderWidth()).attr('stroke-linecap', 'round');
   ln.attr('x1', G.line[0]).attr('y1', G.line[1]).attr('x2', G.line[2]).attr('y2', G.line[3]);
 }
 let MARKER_ADD = false;
@@ -1764,7 +1775,7 @@ function placeLabels(cands, T, obstacles = []) {
     let tx, ty, ta;
     if (c.anchor === 'right') { tx = c.x + 5 * S.symbolSize + 1; ty = c.y; ta = 'start'; }
     else { tx = c.x; ty = c.y; ta = 'middle'; }
-    tx += off[0]; ty += off[1];
+    tx += off[0]; ty += S.leaderLevel ? 0 : off[1];
     const x0 = ta === 'start' ? tx : tx - tw / 2;
     let b = { x0: x0 - 2, x1: x0 + tw + 2, y0: ty - c.size * 0.6, y1: ty + c.size * 0.6 };
     if (c.rot) {
@@ -1783,10 +1794,14 @@ function placeLabels(cands, T, obstacles = []) {
   for (const c of placed) {
     const grp = gLabels.append('g').attr('class', 'lab').attr('data-lk', c.key).datum(c);
     const moved = S.offsets[c.key];
-    if (moved && Math.hypot(moved[0], moved[1]) > 14) {
-      // Ledelinje fra objektet til den flyttede etiketten.
-      const ex = c.ta === 'start' ? c.tx - 2 : c.tx, ey = c.ty;
-      grp.append('line').attr('x1', c.x).attr('y1', c.y).attr('x2', ex).attr('y2', ey).attr('stroke', c.color).attr('stroke-width', 0.7).attr('stroke-opacity', 0.8);
+    if (moved && Math.hypot(moved[0], S.leaderLevel ? 0 : moved[1]) > 14) {
+      // Ledelinje fra tekstens kant til objektet, med punkt på objektet (samme stil som markørene).
+      const x0 = c.ta === 'start' ? c.tx : c.tx - c.tw / 2, x1 = x0 + c.tw, gap = MARKER_GAP;
+      let ex, ey;
+      if (c.x < x0 - gap) { ex = x0 - gap; ey = c.ty; }
+      else if (c.x > x1 + gap) { ex = x1 + gap; ey = c.ty; }
+      else { ex = Math.max(x0, Math.min(x1, c.x)); ey = c.ty + (c.y > c.ty ? 1 : -1) * (c.size * 0.6 + 3); }
+      drawLeader(grp, ex, ey, c.x, c.y);
     }
     const attrs = t => t.attr('x', c.tx).attr('y', c.ty).attr('text-anchor', c.ta).attr('dy', (c.size * 0.35).toFixed(1))
       .attr('font-family', FONT).attr('font-size', c.size.toFixed(1)).attr('font-weight', c.weight)
@@ -2257,7 +2272,7 @@ function attachInteractions() {
     const i = +this.getAttribute('data-mi'), m = S.markers[i], grp = d3.select(this);
     if (!m) return;
     grp.selectAll('text').call(d3.drag()
-      .on('drag', ev => { m.dx += ev.dx; m.dy += ev.dy; m._moved = true; updateMarkerDom(grp, m); })
+      .on('drag', ev => { m.dx += ev.dx; if (!S.leaderLevel) m.dy += ev.dy; m._moved = true; updateMarkerDom(grp, m); })
       .on('end', () => { if (m._moved) { delete m._moved; m.dx = Math.round(m.dx); m.dy = Math.round(m.dy); render(); } }))
       .on('contextmenu', function (ev) {
         ev.preventDefault(); ev.stopPropagation();
@@ -2275,7 +2290,7 @@ function attachInteractions() {
       const c = d3.select(this).datum();
       // Løft etiketten først når den faktisk flyttes; å flytte noden ved mousedown hindrer klikk på den.
       if (!c._dx && !c._dy) d3.select(this).raise();
-      c._dx = (c._dx || 0) + ev.dx; c._dy = (c._dy || 0) + ev.dy;
+      c._dx = (c._dx || 0) + ev.dx; c._dy = S.leaderLevel ? 0 : (c._dy || 0) + ev.dy;
       d3.select(this).attr('transform', `translate(${c._dx},${c._dy})`);
     })
     .on('end', function () {
@@ -2877,6 +2892,7 @@ function syncAllControls() {
   syncFieldScale();
   bindValue('markerTextSize', () => S.markerTextSize, v => { S.markerTextSize = +v; syncMarkerControls(); }, 'input');
   bindValue('markerDot', () => S.markerDot, v => { S.markerDot = +v; syncMarkerControls(); }, 'input');
+  bindCheck('leaderLevel', () => S.leaderLevel, v => S.leaderLevel = v);
   syncMarkerControls();
   buildMarkerList();
   buildLayerList();
