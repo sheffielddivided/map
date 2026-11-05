@@ -35,7 +35,8 @@ målestokk, etiketter) og **Lagre**. Én seksjon er åpen om gangen, sjeldne fin
   kart, tekst og markør).
 - **Markører:** punkt med strek til en tekst, f.eks. for å vise et sted. Klikk i kartet for å plassere,
   dra teksten eller punktet for å flytte, og høyreklikk teksten for å endre den. Flyttede etiketter får
-  samme strek og punkt, og teksten kan låses vannrett med målet. Farge, tekst- og
+  samme strek og punkt. Streken kan være fri, vannrett med målet eller knekt (vannrett ut fra målet,
+  så skrå i valgfri vinkel). Farge, tekst- og
   punktstørrelse kan justeres; standardfargen følger temaet.
 - **Tegnforklaring:** i et av hjørnene, eller dra den til valgfri plass i kartet («Flyttet manuelt»).
 - **Slide-format:** 16:9, halvside, 4:3, kvadrat, stående eller egendefinert. Rammen viser nøyaktig
