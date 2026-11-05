@@ -173,6 +173,7 @@
     <details open>
       <summary>Kartlag</summary>
       <div class="sec" id="layerList"></div>
+      <div class="sec"><button class="small" id="btnPalette" title="Setter alle lag-, selskaps- og rutenettfarger tilbake til standardpaletten">Tilbakestill farger til standardpaletten</button></div>
     </details>
 
     <details>
@@ -456,6 +457,7 @@
   </section>
 </main>
 <div id="tip"></div>
+<datalist id="brandPalette"></datalist>
 <div id="toast"></div>
 
 <script>
@@ -479,19 +481,30 @@ const COUNTRIES = {
 const COUNTRY_PARENT = { ALD: 'FIN', GGY: 'GBR', JEY: 'GBR', IMN: 'GBR' };
 const countryOf = c => COUNTRY_PARENT[c] || c;
 
+// Standard fargepalett. Brukes som standardfarger for lag, hydrokarboner, rør, brønner og selskaper,
+// og tilbys som forslag i alle fargevelgere.
+const PALETTE = [
+  ['#CE0F69', 'Magenta'], ['#D53380', 'Magenta 85%'], ['#DD5796', 'Magenta 70%'], ['#E787B4', 'Magenta 50%'], ['#EEABCB', 'Magenta 35%'], ['#F5CFE1', 'Magenta 20%'],
+  ['#7D2248', 'Mørk magenta'], ['#F68D2E', 'Oransje'], ['#F9AF6D', 'Oransje 70%'], ['#00B373', 'Grønn'], ['#4DCA9D', 'Grønn 70%'],
+  ['#2F2F2F', 'Sort/mørk grå'], ['#444444', 'Grå 90%'], ['#595959', 'Grå 80%'], ['#828282', 'Grå 60%'], ['#D5D5D5', 'Grå 20%'], ['#E4E4E4', 'Grå 10%'], ['#F1F1F1', 'Grå 5%'],
+  ['#000000', 'Mengdetekst skjerm'], ['#4993B4', 'Blå'], ['#D14F4E', 'Rød'], ['#E8C942', 'Gul'],
+];
+const PAL = { magenta: '#CE0F69', magenta50: '#E787B4', darkMagenta: '#7D2248', orange: '#F68D2E', orange70: '#F9AF6D', green: '#00B373', green70: '#4DCA9D',
+  black: '#2F2F2F', grey90: '#444444', grey80: '#595959', grey60: '#828282', grey20: '#D5D5D5', blue: '#4993B4', red: '#D14F4E', yellow: '#E8C942' };
+
 const THEMES = {
-  light: { sea: '#e8f0f6', land: '#f4f2ee', coast: '#b9c2cb', depth: '#d6e3ee', border: '#a9b0b8', ink: '#2b3440', halo: '#ffffff', grid: '#8a9bb0', box: '#ffffff', other: '#c3c8cf' },
-  grey:  { sea: '#ffffff', land: '#e9e9e9', coast: '#bdbdbd', depth: '#f1f3f5', border: '#a6a6a6', ink: '#2d2d2d', halo: '#ffffff', grid: '#9a9a9a', box: '#ffffff', other: '#c9c9c9' },
+  light: { sea: '#e8f0f6', land: '#f4f2ee', coast: '#b9c2cb', depth: '#d6e3ee', border: '#a9b0b8', ink: '#2F2F2F', halo: '#ffffff', grid: '#8a9bb0', box: '#ffffff', other: '#c3c8cf' },
+  grey:  { sea: '#ffffff', land: '#e9e9e9', coast: '#bdbdbd', depth: '#F1F1F1', border: '#a6a6a6', ink: '#2F2F2F', halo: '#ffffff', grid: '#9a9a9a', box: '#ffffff', other: '#c9c9c9' },
   dark:  { sea: '#10202f', land: '#25384b', coast: '#3d5368', depth: '#0c1a27', border: '#56708a', ink: '#e8eef5', halo: '#10202f', grid: '#4b6580', box: '#16293b', other: '#53687e' },
   blue:  { sea: '#cfe2f1', land: '#f7f6f2', coast: '#9fb6c9', depth: '#bcd4e8', border: '#9aa6b1', ink: '#1f2a37', halo: '#ffffff', grid: '#7f97ad', box: '#ffffff', other: '#aeb9c4' },
 };
 
 const HC = {
-  'OIL': { name: 'Olje', color: '#2f9e44' },
-  'OIL/GAS': { name: 'Olje/gass', color: '#a9a31e' },
-  'OIL/CONDENSATE': { name: 'Olje/kondensat', color: '#5c940d' },
-  'GAS/CONDENSATE': { name: 'Gass/kondensat', color: '#e8590c' },
-  'GAS': { name: 'Gass', color: '#d6336c' },
+  'OIL': { name: 'Olje', color: PAL.green },
+  'OIL/GAS': { name: 'Olje/gass', color: PAL.yellow },
+  'OIL/CONDENSATE': { name: 'Olje/kondensat', color: PAL.green70 },
+  'GAS/CONDENSATE': { name: 'Gass/kondensat', color: PAL.orange },
+  'GAS': { name: 'Gass', color: PAL.red },
 };
 const HC_ORDER = ['OIL', 'OIL/CONDENSATE', 'OIL/GAS', 'GAS/CONDENSATE', 'GAS'];
 
@@ -506,18 +519,18 @@ const FLD_STATUS = { 'Producing': 'I produksjon', 'Shut down': 'Nedstengt', 'App
 
 // Brønninnhold gruppert i symbolklasser.
 const WELL_CLASSES = {
-  oil:    { name: 'Olje', color: '#2f9e44', match: ['OIL', 'OIL/CONDENSATE'] },
-  oilgas: { name: 'Olje og gass', color: '#a9a31e', match: ['OIL/GAS', 'OIL/GAS/CONDENSATE'] },
-  gas:    { name: 'Gass', color: '#d6336c', match: ['GAS', 'GAS/CONDENSATE', 'WATER/GAS'] },
-  shows:  { name: 'Spor av hydrokarboner', color: '#f08c00', match: ['SHOWS', 'OIL SHOWS', 'GAS SHOWS', 'OIL/GAS SHOWS'] },
-  dry:    { name: 'Tørr', color: '#868e96', match: ['DRY', 'WATER'] },
-  other:  { name: 'Annet / ukjent', color: '#adb5bd', match: [] },
+  oil:    { name: 'Olje', color: PAL.green, match: ['OIL', 'OIL/CONDENSATE'] },
+  oilgas: { name: 'Olje og gass', color: PAL.yellow, match: ['OIL/GAS', 'OIL/GAS/CONDENSATE'] },
+  gas:    { name: 'Gass', color: PAL.red, match: ['GAS', 'GAS/CONDENSATE', 'WATER/GAS'] },
+  shows:  { name: 'Spor av hydrokarboner', color: PAL.orange, match: ['SHOWS', 'OIL SHOWS', 'GAS SHOWS', 'OIL/GAS SHOWS'] },
+  dry:    { name: 'Tørr', color: PAL.grey60, match: ['DRY', 'WATER'] },
+  other:  { name: 'Annet / ukjent', color: PAL.grey20, match: [] },
 };
 function wellClass(content) {
   for (const [k, c] of Object.entries(WELL_CLASSES)) if (c.match.includes(content)) return k;
   return 'other';
 }
-const PIPE_MEDIUM = { 'Gas': { name: 'Gass', color: '#d6336c' }, 'Oil': { name: 'Olje', color: '#2f9e44' }, 'Condensate': { name: 'Kondensat', color: '#e8590c' }, 'Co2 injection': { name: 'CO₂', color: '#7048e8' }, 'Mixed': { name: 'Flerfase', color: '#9c36b5' } };
+const PIPE_MEDIUM = { 'Gas': { name: 'Gass', color: PAL.red }, 'Oil': { name: 'Olje', color: PAL.green }, 'Condensate': { name: 'Kondensat', color: PAL.orange }, 'Co2 injection': { name: 'CO₂', color: PAL.darkMagenta }, 'Mixed': { name: 'Flerfase', color: PAL.blue } };
 
 const CITIES = [
   ['Oslo', 10.75, 59.91, 'NOR'], ['Stavanger', 5.73, 58.97, 'NOR'], ['Bergen', 5.32, 60.39, 'NOR'], ['Florø', 5.03, 61.60, 'NOR'],
@@ -541,21 +554,21 @@ const VIEW_PRESETS = [
 // Lagdefinisjoner. "company" = lag som påvirkes av selskapsfilteret.
 const LAYERS = [
   { key: 'licences', name: 'Lisenser (aktive)', legend: 'Lisens', kind: 'poly', src: 'licences', company: true,
-    def: { on: false, color: '#5c7cfa', labels: false, fill: 0.10 } },
+    def: { on: false, color: PAL.magenta, labels: false, fill: 0.10 } },
   { key: 'discoveries', name: 'Funn', legend: 'Funn', kind: 'poly', src: 'discoveries', company: true, hc: true,
-    def: { on: true, color: '#f59f00', labels: false, fill: 0.55 } },
+    def: { on: true, color: PAL.orange, labels: false, fill: 0.55 } },
   { key: 'shutdown', name: 'Nedstengte felt', legend: 'Nedstengt felt', kind: 'poly', src: 'fields', company: true,
-    filter: p => p.status === 'Shut down', def: { on: false, color: '#9aa1a9', labels: false, fill: 0.45, dash: true } },
+    filter: p => p.status === 'Shut down', def: { on: false, color: PAL.grey60, labels: false, fill: 0.45, dash: true } },
   { key: 'approved', name: 'Felt godkjent for utbygging', legend: 'Felt under utbygging', kind: 'poly', src: 'fields', company: true, hc: true,
-    filter: p => p.status === 'Approved for production', def: { on: true, color: '#4c6ef5', labels: true, fill: 0.8 } },
+    filter: p => p.status === 'Approved for production', def: { on: true, color: PAL.blue, labels: true, fill: 0.8 } },
   { key: 'producing', name: 'Felt i produksjon', legend: 'Felt i produksjon', kind: 'poly', src: 'fields', company: true, hc: true,
-    filter: p => p.status === 'Producing', def: { on: true, color: '#1c7c54', labels: true, fill: 0.85 } },
+    filter: p => p.status === 'Producing', def: { on: true, color: PAL.green, labels: true, fill: 0.85 } },
   { key: 'pipelines', name: 'Rørledninger (transport)', legend: 'Rørledning', kind: 'line', src: 'pipelines',
-    def: { on: true, color: '#7b8794', labels: false } },
+    def: { on: true, color: PAL.grey80, labels: false } },
   { key: 'facilities', name: 'Innretninger', legend: 'Innretning', kind: 'point', src: 'facilities',
-    def: { on: false, color: '#343a40', labels: false } },
+    def: { on: false, color: PAL.black, labels: false } },
   { key: 'wells', name: 'Letebrønner', legend: 'Letebrønn', kind: 'point', src: 'wells',
-    def: { on: false, color: '#343a40', labels: false } },
+    def: { on: false, color: PAL.black, labels: false } },
 ];
 const LAYER = Object.fromEntries(LAYERS.map(l => [l.key, l]));
 
@@ -632,7 +645,7 @@ const EN = {
   // Lagre og del
   'Lagre og del': 'Save and share',
   'Hele oppsettet ligger i lenken, så bokmerk eller del den. Maler lagres lokalt i denne nettleseren.': 'The whole setup is stored in the link, so bookmark or share it. Templates are saved locally in this browser.',
-  'Kopier lenke til dette kartet': 'Copy link to this map', 'Navn på mal': 'Template name', 'Lagre': 'Save', 'Tilbakestill alt': 'Reset everything', 'Slett': 'Delete',
+  'Kopier lenke til dette kartet': 'Copy link to this map', 'Navn på mal': 'Template name', 'Lagre': 'Save', 'Tilbakestill alt': 'Reset everything', 'Tilbakestill farger til standardpaletten': 'Reset colours to the standard palette', 'Setter alle lag-, selskaps- og rutenettfarger tilbake til standardpaletten': 'Sets all layer, company and grid colours back to the standard palette', 'Slett': 'Delete',
   // Verktøytips
   'Status': 'Status', 'Type': 'Type', 'Funnår': 'Discovery year', 'Formål': 'Purpose', 'Resultat': 'Result', 'Medium': 'Medium',
   'Dimensjon': 'Diameter', 'Fra – til': 'From – to', 'Tilhører': 'Belongs to', '+ {0} til': '+ {0} more',
@@ -718,12 +731,12 @@ function defaultState() {
     dscStatus: ['Production in clarification phase', 'Production likely but unclarified', 'Production not evaluated', 'Undeveloped'],
     sectors: { no: true, uk: true, dk: true }, sectorLines: true,
     sectorColor: null, sectorWidth: 1.4, sectorDash: true, sectorLabels: false, sectorLabelPos: 50,
-    inset: false, insetPos: 'bl', insetXY: null, insetArea: 'auto', insetMarker: 'rect', insetSize: 24, insetWidth: 'size', insetLand: null, insetMarkerColor: '#e8590c', insetLabels: true,
+    inset: false, insetPos: 'bl', insetXY: null, insetArea: 'auto', insetMarker: 'rect', insetSize: 24, insetWidth: 'size', insetLand: null, insetMarkerColor: PAL.magenta, insetLabels: true,
     wells: { wildcat: true, appraisal: true, from: CURRENT_YEAR - 10, to: CURRENT_YEAR, classes: Object.keys(WELL_CLASSES), colorByContent: true },
     pipes: { byMedium: false, byDim: true, media: ['Gas', 'Oil', 'Condensate', 'Mixed', 'Co2 injection', 'other'], related: false },
     fac: { surface: true, subsea: false, onshore: true },
     selMode: 'company', portfolio: [], portfolioName: '', companyLegendTitle: '', hideLegendHeading: false,
-    companies: [], role: 'any', colorByCompany: false, companyColors: {}, mode: 'highlight', splitRole: false, labelsOnlySel: true, labelShare: false, otherColor: '#c3c8cf',
+    companies: [], role: 'any', colorByCompany: false, companyColors: {}, mode: 'highlight', splitRole: false, labelsOnlySel: true, labelShare: false, otherColor: PAL.grey20,
     theme: 'light', sea: THEMES.light.sea, land: THEMES.light.land, transparent: false,
     depth: true, borders: true, landMode: 'all', landCountries: ['NOR'], cities: true, quads: false, quadLabels: true, blocks: false,
     // null = følg temaets rutenettfarge / standard tykkelse.
@@ -903,7 +916,7 @@ function companyMatch(p, src) {
 }
 
 // ── Farge per selskap ──────────────────────────────────────────────────────
-const COMPANY_PALETTE = ['#2f6fdf', '#e8590c', '#2f9e44', '#ae3ec9', '#f2b705', '#0ca678', '#d6336c', '#5c3d2e', '#495057'];
+const COMPANY_PALETTE = [PAL.magenta, PAL.orange, PAL.green, PAL.blue, PAL.darkMagenta, PAL.yellow, PAL.red, PAL.black, PAL.magenta50, PAL.green70, PAL.grey60];
 function companyColor(name) {
   if (!S.companyColors[name]) {
     const used = new Set(Object.values(S.companyColors));
@@ -1382,7 +1395,22 @@ function render() {
   g.selectAll('circle.citydot').filter(function () { return !placedKeys.has(this.getAttribute('data-city')); }).remove();
   attachInteractions();
   buildLabelList();
+  usePaletteInPickers();
   saveToUrl();
+}
+// Standardpaletten som forslag i alle fargevelgere (også de som bygges dynamisk).
+function usePaletteInPickers() {
+  const dl = $('brandPalette');
+  if (!dl.options.length) dl.innerHTML = PALETTE.map(([c, n]) => `<option value="${c.toLowerCase()}" label="${esc(n)}"></option>`).join('');
+  document.querySelectorAll('input[type=color]:not([list])').forEach(i => i.setAttribute('list', 'brandPalette'));
+}
+// Alle farger tilbake til standardpaletten; andre innstillinger beholdes.
+function resetColours() {
+  const d = defaultState();
+  for (const k of Object.keys(S.layers)) S.layers[k].color = d.layers[k].color;
+  Object.assign(S, { companyColors: {}, otherColor: d.otherColor, insetMarkerColor: d.insetMarkerColor, insetLand: null,
+    sectorColor: null, quadColor: null, blockColor: null, sea: THEMES[S.theme].sea, land: THEMES[S.theme].land });
+  applyState();
 }
 
 function drawPointSymbol(g, key, it, [x, y], k, T) {
@@ -1801,7 +1829,7 @@ function drawInset(g, T) {
   const { x, y, w, h, ip, ring } = insetBox;
   const id = 'insetclip';
   svg.select('defs').append('clipPath').attr('id', id).append('rect').attr('width', w).attr('height', h).attr('rx', 4);
-  const landCol = S.insetLand || (S.theme === 'dark' ? '#8fb3e8' : '#1f3b73');
+  const landCol = S.insetLand || (S.theme === 'dark' ? '#8fb3e8' : PAL.grey80);
   const ig = g.append('g').attr('transform', `translate(${x},${y})`).attr('class', 'inset').datum({ x, y, bw: w, bh: h });
   boxFrame(ig, w, h, T).attr('fill', S.theme === 'dark' ? T.box : '#ffffff').attr('stroke', 'none');
   const cg = ig.append('g').attr('clip-path', `url(#${id})`);
@@ -1912,7 +1940,7 @@ function legendEntries() {
         if (key === 'approved' && shown.length) E.push({ sym: 'none', note: true, label: t('Stiplet kant = under utbygging') });
       } else if (shown.length) {
         // Med farge per selskap viser lagoppføringene bare stilen (nøytral grå); fargene står under selskapene.
-        const lc = colorByCompanyOn() ? '#8a929b' : st.color;
+        const lc = colorByCompanyOn() ? PAL.grey60 : st.color;
         if (key === 'licences' && S.licStyle === 'solid') E.push({ sym: 'poly', color: lc, fo: S.licOpacity, stroke: lc, label: t(L.legend) });
         else E.push({ sym: 'poly', color: lc, fo: st.fill, dash: st.dash || (key === 'licences' && S.licStyle === 'outline'), label: t(L.legend) });
       }
@@ -1939,8 +1967,8 @@ function legendEntries() {
   }
   if (sel && S.splitRole && S.selMode !== 'custom' && !colorByCompanyOn()) {
     const nm = S.companies.map(shortName).join(', ');
-    E.push({ sym: 'poly', color: '#6c757d', fo: 0.85, label: `${nm} – ${t('operatør')}` });
-    E.push({ sym: 'poly', color: lighten('#6c757d', 0.55), stroke: '#6c757d', fo: 0.85, label: `${nm} – ${t('partner')}` });
+    E.push({ sym: 'poly', color: PAL.grey80, fo: 0.85, label: `${nm} – ${t('operatør')}` });
+    E.push({ sym: 'poly', color: lighten(PAL.grey80, 0.55), stroke: PAL.grey80, fo: 0.85, label: `${nm} – ${t('partner')}` });
   }
   if (sel && S.mode === 'highlight' && drewOther) E.push({ sym: 'poly', color: S.otherColor, fo: 0.5, label: t(S.selMode === 'custom' ? 'Andre felt og funn' : 'Andre selskaper') });
   E.forEach(e => { if (e.fo != null && e.stroke && e.stroke === e.color) e.fo = Math.max(e.fo, 0.35); });
@@ -2443,7 +2471,7 @@ function buildLayerList() {
     if (key === 'pipelines') {
       sub.innerHTML = `<label class="row"><input type="checkbox" id="o_pm" ${S.pipes.byMedium ? 'checked' : ''}> ${t('Farge etter medium (gass/olje/kondensat)')}</label>
         <label class="row"><input type="checkbox" id="o_pd" ${S.pipes.byDim ? 'checked' : ''}> ${t('Linjetykkelse etter dimensjon')}</label>
-        <div class="row" style="flex-wrap:wrap;gap:4px 10px">${[...Object.entries(PIPE_MEDIUM), ['other', { name: 'Annet / ukjent', color: '#adb5bd' }]]
+        <div class="row" style="flex-wrap:wrap;gap:4px 10px">${[...Object.entries(PIPE_MEDIUM), ['other', { name: 'Annet / ukjent', color: PAL.grey20 }]]
           .map(([m, v]) => `<label><input type="checkbox" data-pm="${m}" ${S.pipes.media.includes(m) ? 'checked' : ''}> <span style="color:${v.color}">━</span> ${t(v.name)}</label>`).join('')}</div>
         <label class="row"><input type="checkbox" id="o_prel" ${S.pipes.related ? 'checked' : ''}> ${t('Kun rørledninger knyttet til utvalget')}</label>
         <div class="hint" style="margin-left:22px">${t('Rør som starter, slutter eller går innenfor ca. 3 km fra valgte felt og funn (valgt selskap eller portefølje).')}</div>`;
@@ -2711,7 +2739,7 @@ function syncAllControls() {
   bindCheck('insetLabels', () => S.insetLabels, v => S.insetLabels = v);
   {
     const land = $('insetLand'), mk = $('insetMarkerColor');
-    const sync = () => { land.value = S.insetLand || (S.theme === 'dark' ? '#8fb3e8' : '#1f3b73'); mk.value = S.insetMarkerColor; };
+    const sync = () => { land.value = S.insetLand || (S.theme === 'dark' ? '#8fb3e8' : PAL.grey80); mk.value = S.insetMarkerColor; };
     sync();
     land.oninput = () => { S.insetLand = land.value; scheduleRender(); };
     mk.oninput = () => { S.insetMarkerColor = mk.value; scheduleRender(); };
@@ -2771,6 +2799,7 @@ function initStaticControls() {
   };
   $('btnResetLabels').onclick = () => { S.offsets = {}; S.hidden = []; S.labelText = {}; render(); };
   $('labelPanel').addEventListener('toggle', buildLabelList);
+  $('btnPalette').onclick = resetColours;
   setupPanel();
   $('labelSearch').oninput = buildLabelList;
   $('labelsAllOn').onclick = () => {
