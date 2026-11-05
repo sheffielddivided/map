@@ -5,6 +5,11 @@ Aker BP map
 
 Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-presentasjoner.
 
+Innstillingene ligger i fire faner: **Innhold** (kartlag, selskap/portefølje), **Kart** (utsnitt, bakgrunn,
+sektorer og rutenett, forstørrede felt, 3D), **Tekst og pynt** (tittel, tegnforklaring, miniatyrkart,
+målestokk, etiketter) og **Lagre**. Én seksjon er åpen om gangen, sjeldne finjusteringer ligger under
+«Flere valg», og feltet «Finn innstilling …» søker på norsk og engelsk og åpner riktig fane og seksjon.
+
 - **Kartlag:** felt i produksjon, felt under utbygging, nedstengte felt, funn, aktive lisenser (stiplet eller heltrukket omriss, eller helfarge uten omriss),
   transportrørledninger (filtrert på medium, valgfritt bare de som er knyttet til valgt selskap/portefølje,
   med etiketter langs røret), innretninger og letebrønner (filtrert på år, formål og resultat).
@@ -21,7 +26,7 @@ Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-pres
   Fire fargetemaer pluss egne farger, og transparent bakgrunn.
 - **Forstørrede felt:** felt kan forstørres opptil seks ganger rundt sitt eget midtpunkt, slik at små felt
   blir synlige i oversiktskart. Valgfritt også funn, og valgfritt bare valgte felt og funn.
-- **Miniatyrkart:** valgfritt oversiktskart i et hjørne som viser hvor utsnittet er hentet fra
+- **Miniatyrkart:** valgfritt oversiktskart i et hjørne (eller dratt til valgfri plass) som viser hvor utsnittet er hentet fra
   (automatisk område eller Nordsjøen/Skandinavia/Nord-Europa, markert med omriss eller sirkel).
 - **Tegnforklaring:** i et av hjørnene, eller dra den til valgfri plass i kartet («Flyttet manuelt»).
 - **Slide-format:** 16:9, halvside, 4:3, kvadrat, stående eller egendefinert. Rammen viser nøyaktig
