@@ -29,6 +29,10 @@ jobs:
       - name: Hent data fra Sodir
         run: python fetch_data.py
 
+      # Data til de interaktive kartene (index.html, embed.html, builder.html).
+      - name: Hent data til de interaktive kartene
+        run: python fetch_interactive.py
+
       - name: Commit hvis dataene er endret
         run: |
           git config user.name  "github-actions[bot]"

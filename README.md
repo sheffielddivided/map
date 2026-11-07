@@ -67,12 +67,24 @@ Selskapsnavn normaliseres til konsernnavn (`GROUPS` i skriptet), så ett valg de
 i alle land. `data/companies.json` kobler juridiske navn til konsernnavn, slik at eldre lenker og
 maler fortsatt virker.
 
-GitHub Action-en `.github/workflows/update-map-data.yml` kjører skriptet daglig og committer bare
+GitHub Action-en `.github/workflows/update-map-data.yml` kjører skriptet (og `fetch_interactive.py`) daglig og committer bare
 når dataene faktisk er endret. Feiler én kilde, beholdes forrige data for det landet. Skriptet kan
 også kjøres lokalt:
 
 ```
 python fetch_data.py
+```
+
+### Data for de interaktive kartene (`index.html`, `embed.html`, `builder.html`)
+
+`fetch_interactive.py` henter Aker BPs lisenser, samordnede områder (BAA), felt og funn med
+eierandeler fra Sodir, Aker BPs britiske lisenser fra NSTA, samt Sodirs felt- og funnbeskrivelser,
+og skriver dem til `data/akerbp/*.json`. Sidene leser bare disse filene, så de sender ingen
+spørringer til Sodir eller NSTA. Skriptet kjøres i samme daglige workflow (dataene er dermed
+opptil ett døgn gamle), beholder forrige fil hvis en kilde feiler, og kan kjøres lokalt:
+
+```
+python fetch_interactive.py
 ```
 
 `data/basemap.json` (kystlinje, landegrenser, dybdekurver og sektorgrenser) er statisk. Den er bygget én gang fra
