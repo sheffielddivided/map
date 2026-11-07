@@ -310,9 +310,7 @@
 <div id="errormsg" class="hidden"></div>
 
 <script>
-const BASE      = 'https://factmaps.sodir.no/api/rest/services/DataService/Data/MapServer';
-const AKERBP_ID = 28544099;
-const NSTA_BASE = 'https://services-eu1.arcgis.com/OZMfUznmLTnWccBc/arcgis/rest/services/UKCS%20offshore%20petroleum%20licences%20WGS84/FeatureServer';
+const DATA_DIR  = 'data/akerbp';
 
 // Colours
 let C_LIC_OP  = '#ce0f69';
@@ -401,39 +399,14 @@ function stopProp(e) { L.DomEvent.stopPropagation(e); }
 function showError(msg)  { const el=document.getElementById('errormsg'); el.textContent=msg; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),12000); }
 function setLoading(msg) { const el=document.getElementById('loading'); msg?(document.getElementById('loadingMsg').textContent=msg,el.classList.remove('hidden')):el.classList.add('hidden'); }
 
-async function queryAll(layerId, where, outFields, withGeo=false) {
-  let all=[], offset=0;
-  while(true) {
-    const params = { where, outFields, f:'json', returnGeometry:withGeo?'true':'false', resultRecordCount:'2000', resultOffset:String(offset), ...(withGeo?{outSR:'4326'}:{}) };
-    const body = new URLSearchParams(params);
-    let d;
-    try {
-      const resp = await fetch(`${BASE}/${layerId}/query`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()});
-      d = await resp.json();
-    } catch(e) {
-      const qs = new URLSearchParams(params);
-      const resp = await fetch(`${BASE}/${layerId}/query?${qs}`);
-      d = await resp.json();
-    }
-    if(d.error) throw new Error(`Layer ${layerId}: ${d.error.message}`);
-    const rows = d.features||[];
-    all = all.concat(rows);
-    if(!d.exceededTransferLimit || rows.length===0) break;
-    offset += rows.length;
+// Dataene hentes daglig fra Sodir og NSTA av fetch_interactive.py og ligger som statiske filer i data/akerbp/.
+const _dataCache = {};
+function loadLocal(name) {
+  if(!_dataCache[name]) {
+    _dataCache[name] = fetch(`${DATA_DIR}/${name}.json`,{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error(`${name}.json: HTTP ${r.status}`); return r.json(); });
+    _dataCache[name].catch(()=>{ delete _dataCache[name]; });
   }
-  return all;
-}
-
-function toGeoJSON(esriFeatures) {
-  return { type:'FeatureCollection', features:esriFeatures.map(f=>({type:'Feature',geometry:esriGeom(f.geometry),properties:f.attributes})).filter(f=>f.geometry) };
-}
-
-function esriGeom(g) {
-  if(!g) return null;
-  if(g.rings) { if(!g.rings.length) return null; return g.rings.length===1?{type:'Polygon',coordinates:g.rings}:{type:'MultiPolygon',coordinates:g.rings.map(r=>[r])}; }
-  if(g.x!==undefined) return {type:'Point',coordinates:[g.x,g.y]};
-  if(g.type) return g;
-  return null;
+  return _dataCache[name];
 }
 
 function fmtPct(v) { return (v==null||v==='')?null:parseFloat(v).toFixed(1)+' %'; }
@@ -469,111 +442,10 @@ function polyStyle(col, dashed, dimmed) {
 
 async function loadData() {
   try {
-    setLoading('Fetching licence operator roles...');
-    const licOperRows = await queryAll(3008,`cmpNpdidCompany = ${AKERBP_ID} AND prlOperDateValidTo IS NULL`,'prlNpdidLicence');
-    const operatorLicIds = new Set(licOperRows.map(f=>f.attributes.prlNpdidLicence));
-
-    setLoading('Fetching licence ownership shares...');
-    const licShareRows = await queryAll(3007,`cmpNpdidCompany = ${AKERBP_ID} AND prlLicenseeDateValidTo IS NULL`,'prlNpdidLicence,prlLicenseeInterest');
-    const licShareMap = {};
-    licShareRows.forEach(f=>{ licShareMap[f.attributes.prlNpdidLicence]=f.attributes.prlLicenseeInterest; });
-
-    setLoading('Fetching all licensees...');
-    const allLicIds = [...new Set([...operatorLicIds,...Object.keys(licShareMap).map(Number)])];
-    let allLicenseeRows = [];
-    for(let i=0;i<allLicIds.length;i+=500) {
-      const batch=allLicIds.slice(i,i+500).join(',');
-      const rows=await queryAll(3007,`prlNpdidLicence IN (${batch}) AND prlLicenseeDateValidTo IS NULL`,'prlNpdidLicence,cmpLongName,prlLicenseeInterest,prlLicenseeSdfi');
-      allLicenseeRows=allLicenseeRows.concat(rows);
-    }
-    const licLicenseeMap = {};
-    allLicenseeRows.forEach(f=>{ const a=f.attributes; if(!licLicenseeMap[a.prlNpdidLicence])licLicenseeMap[a.prlNpdidLicence]=[]; licLicenseeMap[a.prlNpdidLicence].push({company:a.cmpLongName,share:a.prlLicenseeInterest,sdfi:a.prlLicenseeSdfi}); });
-
-    setLoading('Loading licence geometries...');
-    const allInvolvedLicIds = [...new Set([...operatorLicIds,...Object.keys(licShareMap).map(Number)])];
-    let licGeoRows = [];
-    for(let i=0;i<allInvolvedLicIds.length;i+=100) {
-      const batch=allInvolvedLicIds.slice(i,i+100).join(',');
-      const rows=await queryAll(3000,`prlNpdidLicence IN (${batch})`,'prlNpdidLicence,prlName,prlMainArea,prlStatus,prlPhaseCurrent,prlCurrentArea,prlFactPageUrl',true);
-      licGeoRows=licGeoRows.concat(rows);
-    }
-    const seenLicIds=new Set();
-    const dedupedLicRows=licGeoRows.filter(f=>{ const id=f.attributes.prlNpdidLicence; if(seenLicIds.has(id))return false; seenLicIds.add(id); return true; });
-    const licGeo=toGeoJSON(dedupedLicRows);
-    licGeo.features.forEach(f=>{ const p=f.properties; p.isOperator=operatorLicIds.has(p.prlNpdidLicence); p._myShare=licShareMap[p.prlNpdidLicence]??null; p._allLicensees=licLicenseeMap[p.prlNpdidLicence]||[]; });
-
-    setLoading('Fetching BAA operator roles...');
-    const unitOperRows=await queryAll(3302,`cmpNpdidCompany = ${AKERBP_ID} AND baaOperatorDateValidTo IS NULL`,'baaNpdidBsnsArrArea,baaName');
-    const unitOperIds=new Set(unitOperRows.map(f=>f.attributes.baaNpdidBsnsArrArea));
-
-    setLoading('Fetching BAA ownership shares...');
-    const unitShareRows=await queryAll(3304,`cmpNpdidCompany = ${AKERBP_ID} AND baaLicenseeDateValidTo IS NULL`,'baaNpdidBsnsArrArea,baaLicenseeInterest');
-    const unitMyShareMap={};
-    unitShareRows.forEach(f=>{ unitMyShareMap[f.attributes.baaNpdidBsnsArrArea]=f.attributes.baaLicenseeInterest; });
-
-    const allUnitIds=[...new Set([...unitOperIds,...Object.keys(unitMyShareMap).map(Number)])];
-    let allUnitLicenseeRows=[];
-    if(allUnitIds.length>0) {
-      const rows=await queryAll(3304,`baaNpdidBsnsArrArea IN (${allUnitIds.join(',')}) AND baaLicenseeDateValidTo IS NULL`,'baaNpdidBsnsArrArea,cmpLongName,baaLicenseeInterest,baaLicenseeSdfi');
-      allUnitLicenseeRows=rows;
-    }
-    const unitLicenseeMap={};
-    allUnitLicenseeRows.forEach(f=>{ const a=f.attributes; if(!unitLicenseeMap[a.baaNpdidBsnsArrArea])unitLicenseeMap[a.baaNpdidBsnsArrArea]=[]; unitLicenseeMap[a.baaNpdidBsnsArrArea].push({company:a.cmpLongName,share:a.baaLicenseeInterest,sdfi:a.baaLicenseeSdfi}); });
-
-    setLoading('Loading BAA geometries...');
-    const unitGeoMap={};
-    async function fetchBaaPage(where, outFields, offset) {
-      const qs=new URLSearchParams({where,outFields,f:'json',returnGeometry:'true',outSR:'4326'});
-      if(offset>0) qs.set('resultOffset',String(offset));
-      return (await fetch(`${BASE}/3300/query?${qs}`)).json();
-    }
-    try {
-      let offset=0;
-      while(true) {
-        const d=await fetchBaaPage(`cmpNpdidCompany = ${AKERBP_ID}`,'baaNpdidBsnsArrArea,baaName,baaKind,baaActive,baaFactPageUrl',offset);
-        if(d.error){console.error('Layer 3300:',d.error.message);break;}
-        const rows=d.features||[];
-        rows.forEach(r=>{unitGeoMap[r.attributes.baaNpdidBsnsArrArea]=r;});
-        if(!d.exceededTransferLimit||rows.length===0) break;
-        offset+=rows.length;
-      }
-    } catch(e){console.error('Unit geo error:',e.message);}
-    const missingUnitIds=allUnitIds.filter(id=>!unitGeoMap[id]);
-    for(const id of missingUnitIds) {
-      try { const d=await fetchBaaPage(`baaNpdidBsnsArrArea = ${id}`,'baaNpdidBsnsArrArea,baaName,baaKind,baaActive,baaFactPageUrl',0); if(!d.error)(d.features||[]).forEach(r=>{unitGeoMap[r.attributes.baaNpdidBsnsArrArea]=r;}); } catch(e){}
-    }
-    const unitGeo=toGeoJSON(Object.values(unitGeoMap));
-    unitGeo.features.forEach(f=>{ const p=f.properties; p.isOperator=unitOperIds.has(p.baaNpdidBsnsArrArea); p._myShare=unitMyShareMap[p.baaNpdidBsnsArrArea]??null; p._allLicensees=unitLicenseeMap[p.baaNpdidBsnsArrArea]||[]; });
-
-    setLoading('Fetching field operator roles...');
-    const fldOperRows=await queryAll(7110,`cmpNpdidCompany = ${AKERBP_ID} AND fldOperatorTo IS NULL`,'fldNpdidField');
-    const operatorFieldIds=new Set(fldOperRows.map(f=>f.attributes.fldNpdidField));
-
-    setLoading('Fetching field ownership shares...');
-    const fldShareRows=await queryAll(7108,`cmpNpdidCompany = ${AKERBP_ID} AND fldLicenseeTo IS NULL`,'fldNpdidField,fldCompanyShare,fldOwnerKind,fldOwnerName');
-    const fldMyShareMap={};
-    fldShareRows.forEach(f=>{ const a=f.attributes; if(!fldMyShareMap[a.fldNpdidField])fldMyShareMap[a.fldNpdidField]={total:0,owners:[]}; fldMyShareMap[a.fldNpdidField].total+=parseFloat(a.fldCompanyShare)||0; fldMyShareMap[a.fldNpdidField].owners.push({kind:a.fldOwnerKind,name:a.fldOwnerName,share:a.fldCompanyShare}); });
-
-    setLoading('Fetching all field licensees...');
-    const allFldIds=[...new Set([...operatorFieldIds,...Object.keys(fldMyShareMap).map(Number)])];
-    let allFldLicenseeRows=[];
-    for(let i=0;i<allFldIds.length;i+=500) {
-      const batch=allFldIds.slice(i,i+500).join(',');
-      const rows=await queryAll(7108,`fldNpdidField IN (${batch}) AND fldLicenseeTo IS NULL`,'fldNpdidField,cmpLongName,fldCompanyShare,fldOwnerKind,fldOwnerName,fldSdfiShare');
-      allFldLicenseeRows=allFldLicenseeRows.concat(rows);
-    }
-    const fldLicenseeMap={};
-    allFldLicenseeRows.forEach(f=>{ const a=f.attributes; if(!fldLicenseeMap[a.fldNpdidField])fldLicenseeMap[a.fldNpdidField]=[]; fldLicenseeMap[a.fldNpdidField].push({company:a.cmpLongName,share:a.fldCompanyShare,ownerKind:a.fldOwnerKind,ownerName:a.fldOwnerName,sdfi:a.fldSdfiShare}); });
-
-    setLoading('Loading field geometries...');
-    let fldGeoRows=[];
-    for(let i=0;i<allFldIds.length;i+=500) {
-      const batch=allFldIds.slice(i,i+500).join(',');
-      const rows=await queryAll(7100,`fldNpdidField IN (${batch})`,'fldNpdidField,fldName,fldMainArea,fldCurrentActivitySatus,fldHcType,fldDiscoveryYear,fldOwnerName,fldFactPageUrl',true);
-      fldGeoRows=fldGeoRows.concat(rows);
-    }
-    const fieldGeo=toGeoJSON(fldGeoRows);
-    fieldGeo.features.forEach(f=>{ const p=f.properties; p.isOperator=operatorFieldIds.has(p.fldNpdidField); p._myShare=fldMyShareMap[p.fldNpdidField]??null; p._allLicensees=fldLicenseeMap[p.fldNpdidField]||[]; p._shutDown=isShutDown(p.fldCurrentActivitySatus); });
+    setLoading('Loading map data...');
+    ['discoveries','uk_licences'].forEach(n=>loadLocal(n).catch(()=>{}));
+    const [licGeo, unitGeo, fieldGeo] = await Promise.all(['licences','units','fields'].map(loadLocal));
+    fieldGeo.features.forEach(f=>{ f.properties._shutDown=isShutDown(f.properties.fldCurrentActivitySatus); });
 
     window._licGeo   = licGeo;
     window._unitGeo  = unitGeo;
@@ -697,11 +569,8 @@ function renderFields(geojson) {
           {heading:'Development & Status',rows:[['','<span style="color:#8ab0d0;font-style:italic">Loading...</span>']]}
         ]);
         try {
-          const qs=new URLSearchParams({where:`fldNpdidField = ${p.fldNpdidField} AND fldDescriptionHeading IN ('Development','Status')`,outFields:'fldDescriptionHeading,fldDescriptionText',f:'json',returnGeometry:'false'});
-          const d=await(await fetch(`${BASE}/7102/query?${qs}`)).json();
-          const feats=d.features||[];
-          const dev=feats.find(f=>f.attributes.fldDescriptionHeading==='Development')?.attributes.fldDescriptionText||null;
-          const sta=feats.find(f=>f.attributes.fldDescriptionHeading==='Status')?.attributes.fldDescriptionText||null;
+          const txt=(await loadLocal('field_texts'))[p.fldNpdidField]||{};
+          const dev=txt.dev||null, sta=txt.sta||null;
           const descSections=[];
           if(dev||sta) {
             descSections.push({heading:'Development & Status',rows:[
@@ -745,32 +614,13 @@ const OFFICES = [
 })();
 
 async function loadAkerbpDiscoveries(licGeo) {
-  let rows=[], offset=0;
-  while(true) {
-    const body=new URLSearchParams({where:"dscCurrentActivityStatus NOT IN ('Included in other discovery','Producing','Shut down')",outFields:'dscNpdidDiscovery,dscName,dscCurrentActivityStatus,dscFactPageUrl,dscDiscoveryYear,dscHcType,cmpLongName,cmpNpdidCompany,nmaName,fldName,fldNpdidField',f:'json',returnGeometry:'true',outSR:'4326',resultRecordCount:'500',resultOffset:String(offset)});
-    const d=await(await fetch(`${BASE}/7000/query`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()})).json();
-    if(d.error){console.warn('Discovery query:',d.error.message);break;}
-    rows=rows.concat(d.features||[]);
-    if(!d.exceededTransferLimit||(d.features||[]).length===0) break;
-    offset+=(d.features||[]).length;
-  }
-
-  setLoading('Loading Aker BP discovery interests...');
-  const akerbpDiscIds=new Set();
-  try {
-    const rows7003=await queryAll(7003,`cmpNpdidCompany = ${AKERBP_ID}`,'dscNpdidDiscovery');
-    rows7003.forEach(f=>akerbpDiscIds.add(f.attributes.dscNpdidDiscovery));
-  } catch(e){console.warn('Layer 7003:',e.message);}
-
-  const akerbpDisc=[], otherDisc=[];
-  rows.forEach(f=>{ if(akerbpDiscIds.has(f.attributes.dscNpdidDiscovery))akerbpDisc.push(f); else otherDisc.push(f); });
-
-  const toGeoD=(arr,isOther)=>{ const geo=toGeoJSON(arr); geo.features.forEach(f=>{f.properties._other=isOther;f.properties._isDiscovery=true;}); return geo; };
-  window._discAkerbpGeo=toGeoD(akerbpDisc,false);
-  window._discOtherGeo=toGeoD(otherDisc,true);
+  const features=(await loadLocal('discoveries')).features;
+  const toGeoD=isOther=>({type:'FeatureCollection',features:features.filter(f=>!!f.properties._other===isOther)});
+  window._discAkerbpGeo=toGeoD(false);
+  window._discOtherGeo=toGeoD(true);
 
   renderDiscoveries();
-  document.getElementById('discoveryCount').textContent=akerbpDisc.length;
+  document.getElementById('discoveryCount').textContent=window._discAkerbpGeo.features.length;
   setLoading(null);
 }
 
@@ -790,13 +640,7 @@ function renderDiscoveries() {
         showSidebar('Discovery: '+name,[{rows:[['Name',name],['Status',p.dscCurrentActivityStatus||''],['HC type',p.dscHcType||null],['Discovery year',p.dscDiscoveryYear||null],['Operator',p.cmpLongName||null],['Area',p.nmaName||null],['Aker BP',other?'No':'<span style="color:#e8c942">Yes</span>'],['Related field',p.fldName||null],...(p.dscFactPageUrl?[['Sodir',`<a href="${p.dscFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`]]:[])]
         },{heading:'Description',rows:[['','<span style="color:#8ab0d0;font-style:italic">Loading...</span>']]}]);
         try {
-          const qs=new URLSearchParams({where:`dscNpdidDiscovery = ${p.dscNpdidDiscovery}`,outFields:'dscDescriptionHeading,dscDescriptionText,dscCultureCode',f:'json',returnGeometry:'false'});
-          const d=await(await fetch(`${BASE}/7001/query?${qs}`)).json();
-          const feats=d.features||[];
-          const en=feats.find(f=>f.attributes.dscCultureCode==='en');
-          const no=feats.find(f=>f.attributes.dscCultureCode==='no');
-          const feat=(en||no)?.attributes||null;
-          const descText=feat?.dscDescriptionText||null;
+          const descText=(await loadLocal('discovery_texts'))[p.dscNpdidDiscovery]||null;
           showSidebar('Discovery: '+name,[
             {rows:[['Name',name],['Status',p.dscCurrentActivityStatus||''],['HC type',p.dscHcType||null],['Discovery year',p.dscDiscoveryYear||null],['Operator',p.cmpLongName||null],['Area',p.nmaName||null],['Aker BP',other?'No':'<span style="color:#e8c942">Yes</span>'],['Related field',p.fldName||null],...(p.dscFactPageUrl?[['Sodir',`<a href="${p.dscFactPageUrl}" target="_blank" style="color:#4a9eff">Open &#x2197;</a>`]]:[])
             ]},
@@ -813,11 +657,7 @@ function renderDiscoveries() {
 const C_UK_LIC='#4993b4';
 
 async function loadUKLicences() {
-  const where=encodeURIComponent(`ADMORGNO='12908310' OR LICORG LIKE '%12908310%'`);
-  const url=`${NSTA_BASE}/0/query?where=${where}&outFields=LICREF,LICNO,LICPREFIX,LICTYPE,LICSTATUS,LICORG,ADMORG,ADMORGNO,BLOCKREF,FIELDS,LICSTARTDT,LICENDDT,RNDNO,RNDTYPE,REGIONS,URL&returnGeometry=true&outSR=4326&f=geojson`;
-  const resp=await fetch(url);
-  if(!resp.ok) throw new Error(`NSTA HTTP ${resp.status}`);
-  const geojson=await resp.json();
+  const geojson=await loadLocal('uk_licences');
   if(!geojson.features?.length) return;
   window._ukGeo=geojson;
   renderUKLicences(geojson);
@@ -868,16 +708,8 @@ async function loadAllFields() {
   setLoading('Loading all NCS fields...');
   try {
     const akerbpIds=new Set((window._fieldGeo?.features||[]).map(f=>f.properties.fldNpdidField));
-    let rows=[], offset=0;
-    while(true) {
-      const body=new URLSearchParams({where:"fldCurrentActivitySatus NOT IN ('Shut down','Abandoned','Returned to authorities')",outFields:'fldNpdidField,fldName,fldMainArea,fldCurrentActivitySatus,fldHcType,fldDiscoveryYear,fldFactPageUrl',f:'json',returnGeometry:'true',outSR:'4326',resultRecordCount:'500',resultOffset:String(offset)});
-      const d=await(await fetch(`${BASE}/7100/query`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()})).json();
-      if(d.error) throw new Error(d.error.message);
-      rows=rows.concat(d.features||[]);
-      if(!d.exceededTransferLimit||(d.features||[]).length===0) break;
-      offset+=(d.features||[]).length;
-    }
-    const geo=toGeoJSON(rows.filter(f=>!akerbpIds.has(f.attributes.fldNpdidField)));
+    const all=await loadLocal('other_fields');
+    const geo={type:'FeatureCollection',features:all.features.filter(f=>!akerbpIds.has(f.properties.fldNpdidField))};
     geo.features.forEach(f=>{ f.properties._other=true; f.properties._shutDown=false; f.properties.isOperator=false; f.properties._myShare=null; f.properties._allLicensees=[]; });
     window._allFieldGeo=geo;
   } catch(e){ showError('Error loading other fields: '+e.message); }
