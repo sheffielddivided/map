@@ -274,7 +274,6 @@
       <div class="cp-basemap-grid">
         <button class="basemap-btn"        data-name="Sodir"     onclick="switchBasemap(this.dataset.name)">Standard</button>
         <button class="basemap-btn active" data-name="Ocean"     onclick="switchBasemap(this.dataset.name)">Ocean</button>
-        <button class="basemap-btn"        data-name="Dark"      onclick="switchBasemap(this.dataset.name)">Dark</button>
         <button class="basemap-btn"        data-name="OSM"       onclick="switchBasemap(this.dataset.name)">OpenStreetMap</button>
         <button class="basemap-btn"        data-name="NatGeo"    onclick="switchBasemap(this.dataset.name)">Nat. Geographic</button>
       </div>
@@ -346,7 +345,6 @@ function makeSodirLayer() {
 
 const BASEMAPS = {
   'Sodir':     makeSodirLayer(),
-  'Dark':      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',   { attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 19 }),
   'OSM':       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',                  { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }),
   'NatGeo':    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri &copy; National Geographic', maxZoom: 16 }),
   'Ocean':     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', { attribution: '&copy; Esri, GEBCO, NOAA', maxZoom: 13 }),
