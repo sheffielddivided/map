@@ -25,11 +25,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      # fetch_data.py bruker kun standardbiblioteket.
-      - name: Hent data fra Sodir
-        run: python fetch_data.py
-
       # Data til de interaktive kartene (index.html, embed.html, builder.html).
+      # fetch_interactive.py bruker kun standardbiblioteket.
       - name: Hent data til de interaktive kartene
         run: python fetch_interactive.py
 

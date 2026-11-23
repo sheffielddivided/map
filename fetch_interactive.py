@@ -17,8 +17,8 @@ _allLicensees), så visningskoden er uendret.
     field_texts.json      Sodirs «Development»- og «Status»-tekster per felt
     discovery_texts.json  Sodirs beskrivelse per funn (engelsk, ellers norsk)
 
-Kjøres daglig av .github/workflows/update-map-data.yml sammen med
-fetch_data.py, og kan kjøres lokalt (kun standardbiblioteket):
+Kjøres daglig av .github/workflows/update-map-data.yml, og kan kjøres lokalt
+(kun standardbiblioteket):
 
     python fetch_interactive.py
 
@@ -29,9 +29,34 @@ en kilde, eller gir den et tomt svar, beholdes filen fra forrige kjøring.
 import json
 import os
 import sys
+import time
 import urllib.parse
+import urllib.request
 
-from fetch_data import BASE, _get
+BASE = 'https://factmaps.sodir.no/api/rest/services/DataService/Data/MapServer'
+TIMEOUT = 180
+RETRIES = 4
+
+
+def _get(url, params):
+    """GET med retry og eksponentiell backoff. Sodir svarer av og til tregt."""
+    full = f'{url}?{urllib.parse.urlencode(params)}'
+    last = None
+    for attempt in range(RETRIES):
+        try:
+            req = urllib.request.Request(full, headers={'User-Agent': 'map-fetch'})
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+            if 'error' in data:
+                raise RuntimeError(data['error'].get('message', 'ukjent API-feil'))
+            return data
+        except Exception as exc:  # noqa: BLE001 - vi vil retry-e på alt
+            last = exc
+            if attempt < RETRIES - 1:
+                wait = 2 ** (attempt + 1)
+                print(f'    ! {exc} - prøver igjen om {wait}s')
+                time.sleep(wait)
+    raise RuntimeError(f'Ga opp etter {RETRIES} forsøk: {last}')
 
 AKERBP_ID = 28544099
 # NSTA sitt organisasjonsnummer for Aker BP.
