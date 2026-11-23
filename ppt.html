@@ -331,6 +331,7 @@
         <div class="row"><span class="grow">Vipping</span><input type="range" id="tilt" min="0" max="65" step="1" style="width:130px" /><span id="tiltVal" style="width:30px"></span></div>
         <div class="row"><span class="grow">Rotasjon</span><input type="range" id="bearing" min="-180" max="180" step="1" style="width:130px" /><span id="bearingVal" style="width:30px"></span></div>
         <div class="row"><span class="grow">Klosshøyde</span><input type="range" id="extrude" min="0" max="50" step="1" style="width:130px" /><span id="extrudeVal" style="width:30px"></span></div>
+        <div class="row"><span class="grow">Landhøyde</span><input type="range" id="landHeight" min="0" max="60" step="1" style="width:130px" /><span id="landHeightVal" style="width:30px"></span></div>
         <label class="row"><input type="checkbox" id="extFields" /> Felt som klosser</label>
         <label class="row"><input type="checkbox" id="extDsc" /> Funn som klosser</label>
         <details class="more">
@@ -340,7 +341,7 @@
             <label class="row"><input type="checkbox" id="haze" /> Dis mot horisonten</label>
           </div>
         </details>
-        <div class="hint">Klossene vises når kartet er vippet. I perspektiv gjelder målestokken langs linjen den står på (nederst i kartet).</div>
+        <div class="hint">Klossene og landhøyden vises når kartet er vippet. I perspektiv gjelder målestokken langs linjen den står på (nederst i kartet).</div>
       </div>
     </details>
     </div>
@@ -627,9 +628,9 @@ const EN = {
   'Zoom inn': 'Zoom in', 'Zoom ut': 'Zoom out',
   // 3D
   '3D-effekt': '3D effect', 'Lett skrå': 'Slight tilt', 'Skrå': 'Tilted', 'Dramatisk': 'Dramatic', 'Vipping': 'Tilt', 'Rotasjon': 'Rotation',
-  'Klosshøyde': 'Block height', 'Felt som klosser': 'Fields as blocks', 'Funn som klosser': 'Discoveries as blocks', 'Skygge': 'Shadow',
+  'Klosshøyde': 'Block height', 'Landhøyde': 'Land height', 'Felt som klosser': 'Fields as blocks', 'Funn som klosser': 'Discoveries as blocks', 'Skygge': 'Shadow',
   'Dis mot horisonten': 'Haze towards the horizon',
-  'Klossene vises når kartet er vippet. I perspektiv gjelder målestokken langs linjen den står på (nederst i kartet).': 'Blocks are shown when the map is tilted. In perspective the scale bar applies along the line it sits on (at the bottom of the map).',
+  'Klossene og landhøyden vises når kartet er vippet. I perspektiv gjelder målestokken langs linjen den står på (nederst i kartet).': 'Blocks and land height are shown when the map is tilted. In perspective the scale bar applies along the line it sits on (at the bottom of the map).',
   // Selskap
   'Selskap': 'Company', 'Farge per selskap (felles felt skraveres)': 'Colour per company (shared fields are hatched)', 'Delt eierskap': 'Shared ownership', 'Skjul overskriften i tegnforklaringen': 'Hide the legend heading', 'Overskrift i tegnforklaringen (valgfritt – standard er selskapsnavnene)': 'Legend heading (optional – default is the company names)', 'Selskap / portefølje': 'Company / portfolio', 'Egendefinert portefølje': 'Custom portfolio',
   'Navn på porteføljen (vises i tegnforklaringen)': 'Portfolio name (shown in the legend)', 'Søk etter felt eller funn …': 'Search for a field or discovery …',
@@ -777,7 +778,7 @@ function defaultState() {
     title: false, titleText: '', subtitleText: '',
     legend: true, legendPos: 'tr', legendXY: null, scale: true, north: true, source: true,
     labelSize: 16, symbolSize: 1.2, declutter: true, fieldScale: 1, fieldScaleDsc: false, fieldScaleSel: false,
-    tilt: 0, bearing: 0, extrude: 10, extFields: true, extDsc: false, shadow: true, haze: true,
+    tilt: 0, bearing: 0, extrude: 10, landHeight: 0, extFields: true, extDsc: false, shadow: true, haze: true,
     offsets: {}, hidden: [], labelText: {},
     markers: [], markerColor: null, markerTextSize: 26, markerDot: 1, leaderMode: 'free', leaderAngle: 45,
     lang: storedLang() === 'en' ? 'en' : 'no',
@@ -1036,7 +1037,7 @@ function setupProjection() {
     const x = W() * i / 8, y = H() * i / 8;
     for (const q of [[x, 0], [x, H()], [0, y], [W(), y]]) { const r = fromScreen(q[0], q[1]); if (r) pts.push(r); }
   }
-  const m = 60 + (persp.tilted ? S.extrude * 3 : 0);
+  const m = 60 + (persp.tilted ? Math.max(S.extrude, S.landHeight) * 3 : 0);
   proj.clipExtent([[d3.min(pts, q => q[0]) - m, d3.min(pts, q => q[1]) - m], [d3.max(pts, q => q[0]) + m, d3.max(pts, q => q[1]) + m]]);
   const perspStream = sink => ({
     point(x, y) { const q = toScreen(x, y); sink.point(q[0], q[1]); },
@@ -1045,6 +1046,69 @@ function setupProjection() {
     sphere() { if (sink.sphere) sink.sphere(); },
   });
   path = d3.geoPath({ stream: sink => proj.stream(perspStream(sink)) });
+}
+// Forhøyet land (3D): høyde i logiske px når kartet er vippet, ellers 0.
+const landH = () => (persp.tilted ? S.landHeight : 0);
+// Som path, men tegnet i høyden h over kartplanet.
+function pathAt(h) {
+  if (!h) return path;
+  return d3.geoPath({ stream: sink => proj.stream({
+    point(x, y) { const q = toScreen(x, y, h); sink.point(q[0], q[1]); },
+    lineStart() { sink.lineStart(); }, lineEnd() { sink.lineEnd(); },
+    polygonStart() { sink.polygonStart(); }, polygonEnd() { sink.polygonEnd(); }, sphere() {},
+  }) });
+}
+// Forhøyet land: synlige kystvegger (skyggelagt etter retning, bakfra og frem) og toppflaten i høyden h.
+function drawRaisedLand(g, land, T, h) {
+  const camR = [0, persp.D * persp.st];
+  const cam = [persp.cx + camR[0] * persp.cb + camR[1] * persp.sb, persp.cy - camR[0] * persp.sb + camR[1] * persp.cb];
+  const light = [-0.6, 0.8];
+  const tones = [0.35, 0.6, 0.85, 1.1].map(v => d3.color(S.land).darker(v).formatHex());
+  const walls = [];
+  // Kanter langs klippegrensen (der landet er kuttet ved kartets utsnitt) er ikke kyst og skal ikke ha vegg.
+  const [[cx0, cy0], [cx1, cy1]] = proj.clipExtent(), eps = 0.5;
+  const onClip = (a, c) => (Math.abs(a[0] - cx0) < eps && Math.abs(c[0] - cx0) < eps) || (Math.abs(a[0] - cx1) < eps && Math.abs(c[0] - cx1) < eps)
+    || (Math.abs(a[1] - cy0) < eps && Math.abs(c[1] - cy0) < eps) || (Math.abs(a[1] - cy1) < eps && Math.abs(c[1] - cy1) < eps);
+  for (const poly of planePolygons(land)) {
+    const ext = poly.reduce((m, r) => (Math.abs(ringArea(r)) > Math.abs(ringArea(m)) ? r : m), poly[0]);
+    const sgn = Math.sign(ringArea(ext)) || 1;
+    for (const r of poly) {
+      for (let i = 0, n = r.length; i < n; i++) {
+        const a = r[i], c = r[(i + 1) % n];
+        if (onClip(a, c)) continue;
+        const nx = sgn * (c[1] - a[1]), ny = -sgn * (c[0] - a[0]);
+        const mx = (a[0] + c[0]) / 2, my = (a[1] + c[1]) / 2;
+        if (nx * (cam[0] - mx) + ny * (cam[1] - my) <= 0) continue;
+        const nr = [nx * persp.cb - ny * persp.sb, nx * persp.sb + ny * persp.cb];
+        const dot = (nr[0] * light[0] + nr[1] * light[1]) / (Math.hypot(nr[0], nr[1]) || 1);
+        walls.push({ a, c, shade: Math.min(3, Math.floor((1 - dot) * 2)), depth: rot(mx, my)[1] });
+      }
+    }
+  }
+  // Veggene tegnes bakfra og frem i dybdebånd, med én path per skyggetone i hvert bånd. Det gir riktig
+  // overlapp for alt praktisk bruk og holder antallet elementer lavt (viktig for SVG i PowerPoint).
+  const wg = g.append('g').attr('class', 'landwalls');
+  const f = v => v.toFixed(1);
+  const BANDS = 24, d0 = d3.min(walls, w => w.depth), d1 = d3.max(walls, w => w.depth);
+  const bands = Array.from({ length: BANDS }, () => ['', '', '', '']);
+  for (const wl of walls) {
+    const p0 = toScreen(wl.a[0], wl.a[1], 0), p1 = toScreen(wl.c[0], wl.c[1], 0), p2 = toScreen(wl.c[0], wl.c[1], h), p3 = toScreen(wl.a[0], wl.a[1], h);
+    const bi = d1 > d0 ? Math.min(BANDS - 1, Math.floor((wl.depth - d0) / (d1 - d0) * BANDS)) : 0;
+    bands[bi][wl.shade] += `M${f(p0[0])},${f(p0[1])}L${f(p1[0])},${f(p1[1])}L${f(p2[0])},${f(p2[1])}L${f(p3[0])},${f(p3[1])}Z`;
+  }
+  for (const band of bands) band.forEach((d, sh) => {
+    if (d) wg.append('path').attr('d', d).attr('fill', tones[sh]).attr('stroke', tones[sh]).attr('stroke-width', 0.4).attr('stroke-linejoin', 'round');
+  });
+  g.append('path').attr('d', pathAt(h)(land)).attr('fill', S.land).attr('stroke', T.coast).attr('stroke-width', 0.6).attr('stroke-linejoin', 'round');
+}
+// Ligger punktet på land (brukes for å løfte markører med landet)?
+let onLandCache = { land: null, map: new Map() };
+function onLand(lonlat) {
+  const land = landToDraw();
+  if (onLandCache.land !== land) onLandCache = { land, map: new Map() };
+  const k = lonlat.join(',');
+  if (!onLandCache.map.has(k)) onLandCache.map.set(k, d3.geoContains(land, lonlat));
+  return onLandCache.map.get(k);
 }
 
 // Projiserte (og klippede) ringer i planet, gruppert per polygon.
@@ -1254,8 +1318,10 @@ function render() {
         .attr('fill-opacity', S.transparent ? 0.6 : 1).attr('stroke', 'none');
     });
   }
-  g.append('path').attr('d', path(landToDraw())).attr('fill', S.land).attr('stroke', T.coast).attr('stroke-width', 0.6).attr('stroke-linejoin', 'round');
-  if (S.borders) g.append('path').attr('d', path(bordersToDraw())).attr('fill', 'none').attr('stroke', T.border).attr('stroke-width', 0.8).attr('stroke-dasharray', '3 2');
+  const lh = landH();
+  if (lh > 0) drawRaisedLand(g, landToDraw(), T, lh);
+  else g.append('path').attr('d', path(landToDraw())).attr('fill', S.land).attr('stroke', T.coast).attr('stroke-width', 0.6).attr('stroke-linejoin', 'round');
+  if (S.borders) g.append('path').attr('d', pathAt(lh)(bordersToDraw())).attr('fill', 'none').attr('stroke', T.border).attr('stroke-width', 0.8).attr('stroke-dasharray', '3 2');
 
   if (S.blocks) {
     if (D.blocks) g.append('path').attr('d', path({ type: 'FeatureCollection', features: D.blocks.features.filter(inSector) }))
@@ -1398,8 +1464,7 @@ function render() {
     const cg = g.append('g');
     for (const [name, lon, lat, country] of CITIES) {
       if (!countryVisible(country)) continue;
-      const xy = P([lon, lat]);
-      if (!xy) continue;
+      const xy = P([lon, lat], landH());
       if (!xy || xy[0] < 0 || xy[1] < 0 || xy[0] > w || xy[1] > h) continue;
       cg.append('circle').attr('class', 'citydot').attr('data-city', `city:${name}`).attr('cx', xy[0]).attr('cy', xy[1]).attr('r', 2.6 * k).attr('fill', T.ink).attr('stroke', T.halo).attr('stroke-width', 0.8);
       labels.push({ key: `city:${name}`, text: name, x: xy[0], y: xy[1], anchor: 'right', size: S.labelSize * 0.92, weight: 'normal', italic: true, color: T.ink, priority: 7 });
@@ -1687,7 +1752,8 @@ function editLabelInMap(node, c, onSave) {
 // Teksten står forskjøvet (dx, dy) fra punktet; streken går fra tekstens kant til punktet.
 const MARKER_GAP = 8;
 function markerGeom(m) {
-  const xy = P([m.lon, m.lat]);
+  const lh = landH();
+  const xy = P([m.lon, m.lat], lh > 0 && onLand([m.lon, m.lat]) ? lh : 0);
   if (!xy) return null;
   const fs = S.markerTextSize, r = 4.5 * S.markerDot;
   const lx = xy[0] + m.dx, ly = xy[1] + (leaderLevel() ? 0 : m.dy), end = m.dx < 0;
@@ -1761,7 +1827,15 @@ function setMarkerAdd(on) {
 }
 function placeMarker(ev) {
   const [x, y] = d3.pointer(ev, svg.node());
-  const geo = Pinv([x, y]);
+  let geo = Pinv([x, y]);
+  // Forhøyet land: finn punktet på landet som tegnes under musepekeren (noen få iterasjoner).
+  const lh = landH();
+  for (let i = 0; geo && lh > 0 && i < 4 && onLand(geo); i++) {
+    const a = P(geo, lh), b = P(geo, 0);
+    const g2 = a && b && Pinv([x - (a[0] - b[0]), y - (a[1] - b[1])]);
+    if (!g2) break;
+    geo = g2;
+  }
   setMarkerAdd(false);
   if (!geo) return;
   // Teksten til venstre for punktet som standard, eller til høyre når punktet ligger i venstre del av kartet.
@@ -2878,6 +2952,8 @@ function syncAllControls() {
   bindValue('tilt', () => S.tilt, v => { S.tilt = +v; $('tiltVal').textContent = deg(v); setupProjection(); }, 'input');
   bindValue('bearing', () => S.bearing, v => { S.bearing = +v; $('bearingVal').textContent = deg(v); setupProjection(); }, 'input');
   bindValue('extrude', () => S.extrude, v => { S.extrude = +v; $('extrudeVal').textContent = v; setupProjection(); }, 'input');
+  bindValue('landHeight', () => S.landHeight, v => { S.landHeight = +v; $('landHeightVal').textContent = v; setupProjection(); }, 'input');
+  $('landHeightVal').textContent = S.landHeight;
   $('tiltVal').textContent = deg(S.tilt); $('bearingVal').textContent = deg(S.bearing); $('extrudeVal').textContent = S.extrude;
   bindCheck('secNo', () => S.sectors.no, v => S.sectors.no = v);
   bindCheck('secUk', () => S.sectors.uk, v => S.sectors.uk = v);
