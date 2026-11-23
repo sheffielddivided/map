@@ -1,116 +1,25 @@
 # map
 Aker BP map
 
-## NCS Mapmaker (`ppt.html`)
+## NCS Mapmaker har flyttet
 
-Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-presentasjoner.
+Mapmaker (tidligere `ppt.html` her) ligger nå i et eget repo,
+[`sheffielddivided/mapmaker`](https://github.com/sheffielddivided/mapmaker), og er publisert på
+https://map.kbak.no/. `ppt.html` sender videre dit og tar med oppsettet i lenken (`#s=…`), så gamle
+lenker og bokmerker fortsatt virker. Datahentingen til Mapmaker (`fetch_data.py`) og kartlagene i
+`data/` flyttet med.
 
-Innstillingene ligger i fire faner: **Innhold** (kartlag, selskap/portefølje), **Kart** (utsnitt, bakgrunn,
-sektorer og rutenett, forstørrede felt, 3D), **Tekst og pynt** (tittel, tegnforklaring, miniatyrkart,
-målestokk, etiketter) og **Lagre**. Én seksjon er åpen om gangen, sjeldne finjusteringer ligger under
-«Flere valg», og feltet «Finn innstilling …» søker på norsk og engelsk og åpner riktig fane og seksjon.
-
-- **Kartlag:** felt i produksjon, felt under utbygging, nedstengte felt, funn, aktive lisenser (stiplet eller heltrukket omriss, eller helfarge uten omriss),
-  transportrørledninger (filtrert på medium, valgfritt bare de som er knyttet til valgt selskap/portefølje,
-  med etiketter langs røret), innretninger og letebrønner (filtrert på år, formål og resultat).
-- **Sektorer:** norsk, britisk og dansk sektor kan slås av og på hver for seg. Sektorgrensene kan få egen
-  farge, tykkelse og stil, og landnavn parallelt med linjen på hver side.
-- **Selskapsfilter:** velg ett eller flere selskaper som operatør og/eller partner. De kan fremheves
-  (andre vises i grått) eller vises alene, med valgfri eierandel i etiketten. Gjelder felt, funn og lisenser.
-  Med «Farge per selskap» får hvert valgte selskap sin egen farge, og felt med flere av de valgte
-  selskapene som eiere skraveres i deres farger.
-- **Egendefinert portefølje:** alternativ til selskapsfilteret. Velg enkeltfelt og -funn ved å søke
-  eller klikke i kartet, og gi porteføljen et navn som vises i tegnforklaringen. Fremhev/vis kun
-  valgte og «Zoom til utvalg» virker som for selskaper.
-- **Farger:** standardfargene følger en fast palett (magenta, oransje, grønn, blå, rød, gul og gråtoner).
-  Paletten tilbys som forslag i alle fargevelgere, og «Tilbakestill farger til standardpaletten» under
-  Kartlag setter alle farger tilbake uten å endre andre innstillinger.
-- **Bakgrunn:** vektorkart med kystlinje, dybdekurver, landegrenser, valg av hvilke land som vises (f.eks. bare Norge og Danmark), byer og kvadrant-/blokknett (kvadranter med eller uten nummer, valgfri farge og linjetykkelse).
-  Fire fargetemaer pluss egne farger, og transparent bakgrunn.
-- **Forstørrede felt:** felt kan forstørres opptil seks ganger rundt sitt eget midtpunkt, slik at små felt
-  blir synlige i oversiktskart. Valgfritt også funn, og valgfritt bare valgte felt og funn.
-- **Miniatyrkart:** valgfritt oversiktskart i et hjørne (eller dratt til valgfri plass) som viser hvor utsnittet er hentet fra
-  (automatisk område eller Nordsjøen/Skandinavia/Nord-Europa, markert med omriss eller sirkel).
-- **3D-effekt:** vipping og rotasjon, felt og funn som klosser, og forhøyet land med kystvegger («Landhøyde»).
-- **Profiltemaer:** «Profil – lyst kart» og «Profil – mørkt kart» følger profilens kartfarger (bakgrunn,
-  kart, tekst og markør).
-- **Markører:** punkt med strek til en tekst, f.eks. for å vise et sted. Klikk i kartet for å plassere,
-  dra teksten eller punktet for å flytte, og høyreklikk teksten for å endre den. Flyttede etiketter får
-  samme strek og punkt. Streken kan være fri, vannrett med målet eller knekt (vannrett ut fra målet,
-  så skrå i valgfri vinkel). Farge, tekst- og
-  punktstørrelse kan justeres; standardfargen følger temaet.
-- **Tegnforklaring:** i et av hjørnene, eller dra den til valgfri plass i kartet («Flyttet manuelt»).
-- **Slide-format:** 16:9, halvside, 4:3, kvadrat, stående eller egendefinert. Rammen viser nøyaktig
-  det som eksporteres.
-- **Eksport:** *Kopier* legger en PNG på utklippstavlen (lim inn i PowerPoint med Ctrl+V), *PNG*
-  laster ned i opptil 8K, og *SVG* gir vektorgrafikk. I PowerPoint kan SVG-en konverteres til figur
-  ved å høyreklikke og velge «Konverter til figur».
-- **Etiketter:** overlappende etiketter skjules automatisk. Dra en etikett for å flytte den, og
-  dobbeltklikk for å skjule den, og høyreklikk for å endre teksten. Panelet «Etiketter i kartet» lister alle etiketter som vises nå,
-  gruppert etter type, med avkrysning for å skjule/vise hver enkelt. Teksten i en etikett kan redigeres
-  med ✎ i listen eller ved å høyreklikke etiketten i kartet; tømt felt gir standardteksten tilbake.
-- **Språk:** engelsk (standard) eller norsk, både i grensesnittet og i kartet (tegnforklaring, kildehenvisning, verktøytips).
-- **Lagring:** hele oppsettet ligger i URL-en, så kart kan bokmerkes og deles. Navngitte maler
-  lagres lokalt i nettleseren.
-
-### Data
-
-`fetch_data.py` (kun Python-standardbiblioteket) henter alle lag og skriver `data/*.json`. Hver
-feature har `cc` = `no`, `uk` eller `dk`.
-
-| Sektor | Kilde | Lag |
-| --- | --- | --- |
-| Norge | [Sodir FactMaps](https://factmaps.sodir.no) (NLOD 2.0) | felt, funn, lisenser, letebrønner, rørledninger, innretninger, kvadranter, blokker |
-| Storbritannia | [NSTA Open Data](https://opendata-nstauthority.hub.arcgis.com) (Open Government Licence v3.0) | felt (med rettighetshavere), uutbygde funn (punkter), lisens-delområder med eierandel, lete-/avgrensningsbrønner, transportrør ≥ 16", plattformer/FPSO/terminaler, havbunnsrammer, kvadranter, blokker |
-| Danmark | Energistyrelsens data via [GEUS WFS](https://data.geus.dk/geusmap/ows/4326.jsp) (feltavgrensninger, rørledninger, brønnresultater) og shapefilene i [sheffielddivided/ens](https://github.com/sheffielddivided/ens) | felt (status fra års- og månedsproduksjonen, eierandeler fra `ownership.json`), rørledninger (gass/olje/flerfase), lisenser, letebrønner med resultat (til 2019), innretninger, blokker |
-
-Selskapsnavn normaliseres til konsernnavn (`GROUPS` i skriptet), så ett valg dekker datterselskaper
-i alle land. `data/companies.json` kobler juridiske navn til konsernnavn, slik at eldre lenker og
-maler fortsatt virker.
-
-GitHub Action-en `.github/workflows/update-map-data.yml` kjører skriptet (og `fetch_interactive.py`) daglig og committer bare
-når dataene faktisk er endret. Feiler én kilde, beholdes forrige data for det landet. Skriptet kan
-også kjøres lokalt:
-
-```
-python fetch_data.py
-```
-
-### Data for de interaktive kartene (`index.html`, `embed.html`, `builder.html`)
+## Data for de interaktive kartene (`index.html`, `embed.html`, `builder.html`)
 
 `fetch_interactive.py` henter Aker BPs lisenser, samordnede områder (BAA), felt og funn med
 eierandeler fra Sodir, Aker BPs britiske lisenser fra NSTA, samt Sodirs felt- og funnbeskrivelser,
 og skriver dem til `data/akerbp/*.json`. Sidene leser bare disse filene, så de sender ingen
-spørringer til Sodir eller NSTA. Skriptet kjøres i samme daglige workflow (dataene er dermed
+spørringer til Sodir eller NSTA. Skriptet kjøres daglig av `.github/workflows/update-map-data.yml` (dataene er dermed
 opptil ett døgn gamle), beholder forrige fil hvis en kilde feiler, og kan kjøres lokalt:
 
 ```
 python fetch_interactive.py
 ```
 
-`data/basemap.json` (kystlinje, landegrenser, dybdekurver og sektorgrenser) er statisk. Den er bygget én gang fra
-[Natural Earth](https://www.naturalearthdata.com) 10m (public domain) med
-[mapshaper](https://github.com/mbloch/mapshaper):
-
-```
-mapshaper -i ne_10m_land.shp ne_10m_minor_islands.shp combine-files -merge-layers force \
-  -clip bbox=-14,48,50,83 -dissolve2 -simplify 70% weighted keep-shapes \
-  -filter-slivers min-area=0.3km2 -rename-layers land -o land.json format=topojson
-# tilsvarende for admin_0_boundary_lines_land (borders, med -filter-fields ADM0_A3_L,ADM0_A3_R -rename-fields l=ADM0_A3_L,r=ADM0_A3_R) og bathymetry_K_200/J_1000/I_2000/H_3000
-# (d200/d1000/d2000/d3000), deretter:
-# landene hver for seg (for landvalget), fra admin_0_countries:
-mapshaper -i ne_10m_admin_0_countries.shp -clip bbox=-14,48,50,83 -filter-fields ADM0_A3,NAME \
-  -rename-fields c=ADM0_A3 -simplify 70% weighted keep-shapes -filter-slivers min-area=0.3km2 \
-  -rename-layers countries -o countries.json format=topojson
-mapshaper -i land.json borders.json d200.json d1000.json d2000.json d3000.json sectors.json countries.json \
-  combine-files -o basemap.json format=topojson quantization=100000
-```
-
-Sektorområdene (`sectorAreas`) er hvert lands blokknett (Sodir, NSTA og ENS) slått sammen
-(`mapshaper -i no.json uk.json dk.json combine-files snap snap-interval=0.0005 -merge-layers force -dissolve2 cc`).
-Sektorgrensene (`sectors`, med landene på hver side i `l`/`r`) er den delen av ett lands sektoromriss
-som ligger innenfor 0,01° fra nabolandets sektor. Det gir én sammenhengende linje per grense, også
-der blokknettene fra ulike kilder ikke deler punkter nøyaktig.
-
-Siden må serveres over HTTP(S), f.eks. via GitHub Pages eller lokalt med
-`python -m http.server`. Den fungerer ikke åpnet direkte som fil.
+Sidene må serveres over HTTP(S), f.eks. via GitHub Pages eller lokalt med
+`python -m http.server`. De fungerer ikke åpnet direkte som fil.
