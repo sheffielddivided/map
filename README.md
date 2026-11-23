@@ -1,7 +1,7 @@
 # map
 Aker BP map
 
-## PPT-kart (`ppt.html`)
+## NCS Mapmaker (`ppt.html`)
 
 Lager egendefinerte kart over norsk, britisk og dansk sokkel til PowerPoint-presentasjoner.
 
@@ -49,7 +49,7 @@ målestokk, etiketter) og **Lagre**. Én seksjon er åpen om gangen, sjeldne fin
   dobbeltklikk for å skjule den, og høyreklikk for å endre teksten. Panelet «Etiketter i kartet» lister alle etiketter som vises nå,
   gruppert etter type, med avkrysning for å skjule/vise hver enkelt. Teksten i en etikett kan redigeres
   med ✎ i listen eller ved å høyreklikke etiketten i kartet; tømt felt gir standardteksten tilbake.
-- **Språk:** norsk eller engelsk, både i grensesnittet og i kartet (tegnforklaring, kildehenvisning, verktøytips).
+- **Språk:** engelsk (standard) eller norsk, både i grensesnittet og i kartet (tegnforklaring, kildehenvisning, verktøytips).
 - **Lagring:** hele oppsettet ligger i URL-en, så kart kan bokmerkes og deles. Navngitte maler
   lagres lokalt i nettleseren.
 

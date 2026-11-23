@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="no">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>PPT-kart – norsk sokkel</title>
+<title>NCS Mapmaker</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <style>
@@ -123,7 +123,7 @@
 </head>
 <body>
 <header>
-  <h1>PPT-kart</h1>
+  <h1>NCS Mapmaker</h1>
   <div class="group">
     <label for="format">Format</label>
     <select id="format">
@@ -612,7 +612,7 @@ const EN = {
   'Målestokk, nordpil og kilde': 'Scale bar, north arrow and source', 'Etiketter og symboler': 'Labels and symbols', 'Flere valg': 'More options',
   'Overskriften er selskapsnavnene eller porteføljens navn. Egen overskrift gjelder selskapsvalg.': 'The heading is the company names or the portfolio name. A custom heading applies to company selections.',
   // Topplinje
-  'PPT-kart': 'PPT Map', 'Språk': 'Language', '16:9 helside': '16:9 full slide', '16:9 halvside (8:9)': '16:9 half slide (8:9)',
+  'Språk': 'Language', '16:9 helside': '16:9 full slide', '16:9 halvside (8:9)': '16:9 half slide (8:9)',
   'Kvadrat': 'Square', 'Stående 3:4': 'Portrait 3:4', 'Egendefinert …': 'Custom …', 'Oppløsning': 'Resolution', 'Kopier': 'Copy',
   'Kopier som PNG til utklippstavlen (lim inn i PowerPoint med Ctrl+V)': 'Copy as PNG to the clipboard (paste into PowerPoint with Ctrl+V)',
   'Last ned PNG': 'Download PNG',
@@ -745,7 +745,7 @@ function applyStaticText() {
     } else it.el.setAttribute(it.attr, t(it.orig));
   }
   document.documentElement.lang = S.lang === 'en' ? 'en' : 'no';
-  document.title = S.lang === 'en' ? 'PPT Map – Norwegian continental shelf' : 'PPT-kart – norsk sokkel';
+  document.title = 'NCS Mapmaker';
 }
 function storedLang() { try { return localStorage.getItem('pptkart.lang'); } catch { return null; } }
 
@@ -781,7 +781,7 @@ function defaultState() {
     tilt: 0, bearing: 0, extrude: 10, landHeight: 0, extFields: true, extDsc: false, shadow: true, haze: true,
     offsets: {}, hidden: [], labelText: {},
     markers: [], markerColor: null, markerTextSize: 26, markerDot: 1, leaderMode: 'free', leaderAngle: 45,
-    lang: storedLang() === 'en' ? 'en' : 'no',
+    lang: storedLang() === 'no' ? 'no' : 'en',   // engelsk er standard
   };
 }
 let S = defaultState();
