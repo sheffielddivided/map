@@ -7,19 +7,35 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <style>
+  /* Farger og font som i NCS Insight: vinrød topplinje (--navy), magenta som aktiv farge
+     (--accent, i NCS Insight kalt --blue) og lys rosa bak menyknappene (--light). */
   :root {
-    --bg: #eef0f3; --panel: #ffffff; --ink: #1c2430; --muted: #687385; --line: #dde1e7;
-    --accent: #1f5fae; --accent-ink: #ffffff; --hover: #f3f5f8;
+    --bg: #f1f1f1; --panel: #ffffff; --ink: #1a2332; --muted: #828282; --line: #d5d5d5;
+    --accent: #ce0f69; --accent-ink: #ffffff; --hover: #faf0f5;
+    --navy: #7d2248; --light: #f5cfe1; --topbar-h: 46px;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
-  body { font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: var(--ink); background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+  body { font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
 
-  header { display: flex; align-items: center; gap: 12px; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  header h1 { font-size: 15px; margin: 0 12px 0 0; font-weight: 650; }
+  /* Topplinjen som i NCS Insight: vinrød, hvit tittel i fet skrift, 46 px høy.
+     Kontrollene er gjennomsiktige felt som NCS Insights søkefelt. */
+  header { display: flex; align-items: center; gap: 12px; min-height: var(--topbar-h); padding: 6px 16px; background: var(--navy); color: #fff; flex-wrap: wrap; }
+  header h1 { font-size: 1rem; margin: 0 12px 0 0; font-weight: 700; letter-spacing: -0.01em; }
   header .grow { flex: 1; }
   header .group { display: flex; align-items: center; gap: 6px; }
+  header label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: rgba(255,255,255,.75); }
+  header select, header input[type=number], header button:not(.primary) {
+    background-color: rgba(255,255,255,.12); border-color: rgba(255,255,255,.28); color: #fff; }
+  header select { appearance: none; -webkit-appearance: none; padding-right: 22px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffffff' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 6px center; }
+  header select option { color: var(--ink); background: #fff; }
+  header button:not(.primary):hover, header select:hover { background-color: rgba(255,255,255,.22); }
+  header select:focus, header input:focus { outline: none; border-color: #fff; }
+  header button.primary { font-weight: 700; }
   .status { color: var(--muted); font-size: 12px; }
+  header .status { color: rgba(255,255,255,.75); }
 
   button, select, input[type=text], input[type=number], input[type=search] {
     font: inherit; color: inherit; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 5px 8px;
@@ -28,6 +44,8 @@
   button:hover { background: var(--hover); }
   button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
   button.primary:hover { filter: brightness(1.08); }
+  input[type=checkbox], input[type=radio], input[type=range] { accent-color: var(--accent); }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
   button.small { padding: 2px 7px; font-size: 12px; }
   input[type=color] { width: 26px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; flex: none; }
   input[type=number] { width: 70px; }
@@ -36,10 +54,12 @@
   aside { width: 340px; flex: none; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); padding: 0 0 40px; }
   /* Faner øverst i panelet, med søk etter innstillinger. Faner og søk blir stående når panelet scrolles. */
   .paneltop { position: sticky; top: 0; z-index: 3; background: var(--panel); }
-  .tabs { display: flex; border-bottom: 1px solid var(--line); }
-  .tabs button { flex: 1 1 auto; border: 0; border-radius: 0; background: none; padding: 10px 2px 8px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
-  .tabs button:hover { background: var(--hover); color: var(--ink); }
-  .tabs button.on { color: var(--accent); border-bottom-color: var(--accent); }
+  /* Fanene ser ut som NCS Insights hovedmeny: knapper på lys rosa, aktiv knapp i magenta. */
+  .tabs { display: flex; gap: 2px; margin: 8px 12px; padding: 3px; background: var(--light); border-radius: 8px; }
+  .tabs button { flex: 1 1 auto; border: 0; border-radius: 6px; background: none; padding: 6px 4px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.01em; color: var(--muted); white-space: nowrap; transition: all .15s; }
+  .tabs button:hover { background: rgba(255,255,255,.6); color: var(--ink); }
+  .tabs button.on { background: var(--accent); color: var(--accent-ink); }
+  .paneltop { border-bottom: 1px solid var(--line); }
   .finder { position: relative; padding: 8px 14px; border-bottom: 1px solid var(--line); }
   .finder input { width: 100%; }
   #settingResults { position: absolute; left: 14px; right: 14px; top: 100%; margin-top: -4px; background: var(--panel); border: 1px solid var(--line);
@@ -61,7 +81,7 @@
   details.more[open] > summary::after { content: "▾"; }
   details.more > .sec { padding: 4px 0 2px 12px; border-left: 2px solid var(--line); margin-top: 4px; }
   details { border-bottom: 1px solid var(--line); }
-  summary { padding: 9px 14px; font-weight: 650; cursor: pointer; user-select: none; list-style: none; display: flex; justify-content: space-between; }
+  summary { padding: 9px 14px; font-weight: 700; cursor: pointer; user-select: none; list-style: none; display: flex; justify-content: space-between; }
   summary::-webkit-details-marker { display: none; }
   summary::after { content: "▸"; color: var(--muted); }
   details[open] > summary::after { content: "▾"; }
@@ -75,12 +95,13 @@
   .lyr { display: flex; align-items: center; gap: 7px; }
   .lyr .name { flex: 1; }
   .lyr .lbl { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 2px; }
-  .seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-  .seg button { border: 0; border-radius: 0; flex: 1; padding: 4px 6px; font-size: 12px; }
-  .seg button + button { border-left: 1px solid var(--line); }
+  /* Som NCS Insights pill-group. */
+  .seg { display: flex; border: 1.5px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; flex: 1; padding: 4px 6px; font-size: 12px; font-weight: 500; color: var(--muted); }
+  .seg button + button { border-left: 1.5px solid var(--line); }
   .seg button.on { background: var(--accent); color: var(--accent-ink); }
   .chips { display: flex; flex-wrap: wrap; gap: 4px; }
-  .chip { background: #e7eef8; color: #1a467f; border-radius: 12px; padding: 2px 4px 2px 9px; font-size: 12px; display: flex; align-items: center; gap: 3px; }
+  .chip { background: var(--light); color: var(--navy); border-radius: 12px; padding: 2px 4px 2px 9px; font-size: 12px; display: flex; align-items: center; gap: 3px; }
   .chip button { border: 0; background: none; padding: 0 4px; line-height: 1; color: inherit; }
   .complist { max-height: 180px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
   .complist label { display: flex; gap: 6px; padding: 3px 8px; align-items: center; cursor: pointer; }
@@ -90,7 +111,7 @@
   .complist .lbedit:hover { color: inherit; }
   .complist input.lbtext { flex: 1; min-width: 0; padding: 1px 4px; font: inherit; }
   .complist .edited { font-style: italic; }
-  #labelEditor { position: absolute; z-index: 20; font: 14px system-ui, sans-serif; padding: 2px 6px; border: 1px solid #1c64d8;
+  #labelEditor { position: absolute; z-index: 20; font: 14px system-ui, sans-serif; padding: 2px 6px; border: 1px solid var(--accent);
     border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,.25); min-width: 120px; }
   .presets { display: flex; flex-wrap: wrap; gap: 5px; }
 
